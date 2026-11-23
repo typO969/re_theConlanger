@@ -1,0 +1,38 @@
+<UserControl x:Class="Conlanger.Desktop.Views.OutputTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
+             d:DesignHeight="620" d:DesignWidth="1120">
+    <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1*" />
+            <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+
+        <GroupBox Grid.Column="0" Header="Phonotactic Word Generator" Margin="0,0,10,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding WordCount}" Width="60" Margin="0,0,12,0" Padding="4,2" />
+                    <TextBlock Text="Syllables:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding SyllablesPerWord}" Width="60" Margin="0,0,12,0" Padding="4,2" />
+                    <Button Content="Generate Words" Command="{Binding GenerateWordsCommand}" />
+                </StackPanel>
+                <TextBox Text="{Binding GeneratedWordsText}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="14" />
+            </DockPanel>
+        </GroupBox>
+
+        <GroupBox Grid.Column="1" Header="Full Sentence Output">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Generate Sentence" Command="{Binding GenerateSentenceCommand}" />
+                </StackPanel>
+                <TextBox Text="{Binding SentenceOutput, Mode=OneWay}" IsReadOnly="True" FontSize="20" TextWrapping="Wrap" Padding="10" Background="#F8FAFC" />
+            </DockPanel>
+        </GroupBox>
+    </Grid>
+</UserControl>

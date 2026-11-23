@@ -1,0 +1,9 @@
+{
+  "Id": "conlanger.evolution-sim",
+  "Name": "Diachronic Evolution Simulator",
+  "Version": "2.0.0",
+  "Author": "Conlanger",
+  "Description": "Applies ordered enabled phonology rules across the lexicon and generated vocabulary.",
+  "EntryAssembly": "EvolutionSimPlugin.dll",
+  "PluginTypeName": "EvolutionSimPlugin.Plugin"
+}

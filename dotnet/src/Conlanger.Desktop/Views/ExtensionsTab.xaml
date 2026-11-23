@@ -1,0 +1,22 @@
+<UserControl x:Class="Conlanger.Desktop.Views.ExtensionsTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
+             d:DesignHeight="580" d:DesignWidth="1060">
+    <Grid Margin="10">
+        <GroupBox Header="Installed Conlanger.SDK Plugins (Place .plugin.json + .dll under /plugins)">
+            <DataGrid ItemsSource="{Binding Plugins}" AutoGenerateColumns="False" IsReadOnly="True">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Plugin Name" Binding="{Binding Manifest.Name}" Width="200" />
+                    <DataGridTextColumn Header="Version" Binding="{Binding Manifest.Version}" Width="80" />
+                    <DataGridTextColumn Header="Description" Binding="{Binding Manifest.Description}" Width="*" />
+                    <DataGridTextColumn Header="Assembly" Binding="{Binding Manifest.EntryAssembly}" Width="180" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </GroupBox>
+    </Grid>
+</UserControl>

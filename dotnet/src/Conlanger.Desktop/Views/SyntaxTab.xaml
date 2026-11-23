@@ -1,0 +1,37 @@
+<UserControl x:Class="Conlanger.Desktop.Views.SyntaxTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
+             d:DesignHeight="500" d:DesignWidth="960">
+    <StackPanel Margin="16">
+        <GroupBox Header="Clause Architecture &amp; Sampling Controls">
+            <WrapPanel Orientation="Horizontal">
+                <StackPanel Margin="0,0,18,8">
+                    <TextBlock Text="Word Order" Foreground="#475569" Margin="0,0,0,4" />
+                    <ComboBox ItemsSource="{Binding WordOrders}" SelectedItem="{Binding SelectedWordOrder}" Width="140" />
+                </StackPanel>
+                <StackPanel Margin="0,0,18,8">
+                    <TextBlock Text="Clause Template" Foreground="#475569" Margin="0,0,0,4" />
+                    <ComboBox ItemsSource="{Binding ClauseTemplates}" SelectedItem="{Binding SelectedClauseTemplate}" Width="160" />
+                </StackPanel>
+                <StackPanel Margin="0,0,18,8">
+                    <TextBlock Text="Approx. Words (NP Modifiers)" Foreground="#475569" Margin="0,0,0,4" />
+                    <TextBox Text="{Binding ApproxWords, UpdateSourceTrigger=PropertyChanged}" Width="120" Padding="4,3" />
+                </StackPanel>
+                <StackPanel Margin="0,0,18,8">
+                    <TextBlock Text="RNG Seed" Foreground="#475569" Margin="0,0,0,4" />
+                    <TextBox Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" Width="110" Padding="4,3" />
+                </StackPanel>
+                <Button Content="Generate Sentence" Command="{Binding GenerateSentenceCommand}" VerticalAlignment="Bottom" Margin="0,0,0,8" />
+            </WrapPanel>
+        </GroupBox>
+
+        <GroupBox Header="Live Sentence Preview">
+            <TextBox Text="{Binding SentenceOutput, Mode=OneWay}" IsReadOnly="True" FontSize="20" Padding="10" Background="#F8FAFC" BorderThickness="0" />
+        </GroupBox>
+    </StackPanel>
+</UserControl>

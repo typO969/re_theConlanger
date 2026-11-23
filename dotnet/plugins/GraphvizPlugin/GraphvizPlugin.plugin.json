@@ -1,0 +1,9 @@
+{
+  "Id": "conlanger.graphviz",
+  "Name": "Graphviz & Feature Exporter",
+  "Version": "2.0.0",
+  "Author": "Conlanger",
+  "Description": "Exports DOT syllable/phonology flow graphs and distinctive phonological feature CSV matrices.",
+  "EntryAssembly": "GraphvizPlugin.dll",
+  "PluginTypeName": "GraphvizPlugin.Plugin"
+}

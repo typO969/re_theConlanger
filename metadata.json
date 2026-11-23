@@ -1,0 +1,4 @@
+{
+  "name": "Conlang Builder",
+  "description": "Constructed language builder ported from theConlanger with phonology, morphology, syntax, orthography, sentence generation, inspectors, and plugin workbench."
+}

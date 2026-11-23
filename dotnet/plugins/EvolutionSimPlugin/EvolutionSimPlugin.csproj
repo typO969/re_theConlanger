@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>EvolutionSimPlugin</RootNamespace>
+    <AssemblyName>EvolutionSimPlugin</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Conlanger.SDK\Conlanger.SDK.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="EvolutionSimPlugin.plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>
