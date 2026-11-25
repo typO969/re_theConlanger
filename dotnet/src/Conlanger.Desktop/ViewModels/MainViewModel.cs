@@ -332,7 +332,7 @@ public sealed class MainViewModel : ViewModelBase
     public Array ClauseTemplates => Enum.GetValues(typeof(ClauseTemplate));
     public Array CapitalizationModes => Enum.GetValues(typeof(CapitalizationMode));
     public Array StressPatterns => Enum.GetValues(typeof(StressPattern));
-    public Array FlowDirections => Enum.GetValues(typeof(FlowDirection));
+    public Array FlowDirections => Enum.GetValues(typeof(Conlanger.SDK.FlowDirection));
     public IReadOnlyList<string> FeaturicContexts { get; } = ["any", "initial", "medial", "final"];
 
     // Toolbar properties
@@ -486,7 +486,7 @@ public sealed class MainViewModel : ViewModelBase
     public string Layer1SourceDisplay { get => _layer1SourceDisplay; set => SetField(ref _layer1SourceDisplay, value); }
     public string Layer1TokensSummary { get => _layer1TokensSummary; set => SetField(ref _layer1TokensSummary, value); }
     public bool ShowAnchors { get => _showAnchors; set => SetField(ref _showAnchors, value); }
-    public FlowDirection SelectedFlowDirection
+    public Conlanger.SDK.FlowDirection SelectedFlowDirection
     {
         get => _project.WritingSystem.FlowDirection;
         set { _project.WritingSystem.FlowDirection = value; OnPropertyChanged(); RefreshWritingCanvas(); ScheduleAutosave(); }
@@ -1010,7 +1010,7 @@ public sealed class MainViewModel : ViewModelBase
     {
         var id = NewGlyphId.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(id) || _project.WritingSystem.Glyphs.ContainsKey(id)) return;
-        bool isVert = _project.WritingSystem.FlowDirection is FlowDirection.TTB_LTR or FlowDirection.TTB_RTL;
+        bool isVert = _project.WritingSystem.FlowDirection is Conlanger.SDK.FlowDirection.TTB_LTR or Conlanger.SDK.FlowDirection.TTB_RTL;
         _project.WritingSystem.Glyphs[id] = new GlyphDefinition
         {
             Id = id,

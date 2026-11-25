@@ -5,6 +5,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>Conlanger.Desktop</RootNamespace>
     <AssemblyName>Conlanger.Desktop</AssemblyName>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Conlanger.SDK\Conlanger.SDK.csproj" />
