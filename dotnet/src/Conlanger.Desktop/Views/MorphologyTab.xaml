@@ -6,35 +6,98 @@
              xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
-             d:DesignHeight="640" d:DesignWidth="1160">
+             d:DesignHeight="720" d:DesignWidth="1220">
     <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="1*" />
-            <ColumnDefinition Width="1.2*" />
+            <ColumnDefinition Width="1.25*" />
         </Grid.ColumnDefinitions>
 
-        <GroupBox Grid.Column="0" Header="Lexicon (Underlying Representations)" Margin="0,0,10,0">
-            <DataGrid ItemsSource="{Binding Lexemes}" AutoGenerateColumns="False" CanUserAddRows="True">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Lemma" Binding="{Binding Lemma}" Width="*" />
-                    <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="80" />
-                    <DataGridTextColumn Header="UR (Space Phones)" Binding="{Binding UR}" Width="1.2*" />
-                </DataGrid.Columns>
-            </DataGrid>
+        <!-- Lexicon Editor -->
+        <GroupBox Grid.Row="0" Grid.Column="0" Header="Lexicon (Underlying Representations)" Margin="0,0,10,10">
+            <DockPanel>
+                <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Lemma:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding NewLexLemma, UpdateSourceTrigger=PropertyChanged}" Width="90" Margin="0,0,6,0" />
+                    <TextBlock Text="POS:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding NewLexPos, UpdateSourceTrigger=PropertyChanged}" Width="46" Margin="0,0,6,0" />
+                    <TextBlock Text="UR:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding NewLexUr, UpdateSourceTrigger=PropertyChanged}" Width="115" Margin="0,0,6,0" />
+                    <Button Content="+ Lexeme" Command="{Binding AddLexemeCommand}" />
+                </WrapPanel>
+                <DataGrid ItemsSource="{Binding Lexemes}" AutoGenerateColumns="False" CanUserAddRows="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Lemma" Binding="{Binding Lemma}" Width="*" />
+                        <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="65" />
+                        <DataGridTextColumn Header="UR (Space Phones)" Binding="{Binding UR}" Width="1.2*" />
+                        <DataGridTemplateColumn Width="36">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="×" Padding="4,1" Margin="0"
+                                            Command="{Binding DataContext.RemoveLexemeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
         </GroupBox>
 
-        <GroupBox Grid.Column="1" Header="Inflectional &amp; Derivational Affixes">
-            <DataGrid ItemsSource="{Binding Affixes}" AutoGenerateColumns="False" CanUserAddRows="True">
-                <DataGrid.Columns>
-                    <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="42" />
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="110" />
-                    <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="60" />
-                    <DataGridTextColumn Header="Feature" Binding="{Binding FeatureName}" Width="80" />
-                    <DataGridTextColumn Header="Value" Binding="{Binding FeatureValue}" Width="75" />
-                    <DataGridTextColumn Header="Affix UR" Binding="{Binding Affix}" Width="90" />
-                    <DataGridCheckBoxColumn Header="Prefix?" Binding="{Binding IsPrefix}" Width="65" />
-                </DataGrid.Columns>
-            </DataGrid>
+        <!-- Affixes Editor -->
+        <GroupBox Grid.Row="0" Grid.Column="1" Header="Inflectional &amp; Derivational Affixes" Margin="0,0,0,10">
+            <DockPanel>
+                <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBox Text="{Binding NewAffixName, UpdateSourceTrigger=PropertyChanged}" Width="88" ToolTip="Affix Name" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewAffixPos, UpdateSourceTrigger=PropertyChanged}" Width="42" ToolTip="POS" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewAffixFeatName, UpdateSourceTrigger=PropertyChanged}" Width="75" ToolTip="Feature Name" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewAffixFeatVal, UpdateSourceTrigger=PropertyChanged}" Width="62" ToolTip="Feature Value" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewAffixForm, UpdateSourceTrigger=PropertyChanged}" Width="60" ToolTip="Affix Phones" Margin="0,0,6,4" />
+                    <CheckBox Content="Prefix" IsChecked="{Binding NewAffixIsPrefix}" VerticalAlignment="Center" Margin="0,0,8,4" />
+                    <Button Content="+ Affix" Command="{Binding AddAffixCommand}" Margin="0,0,0,4" />
+                </WrapPanel>
+                <DataGrid ItemsSource="{Binding Affixes}" AutoGenerateColumns="False" CanUserAddRows="False">
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="38" />
+                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="105" />
+                        <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="50" />
+                        <DataGridTextColumn Header="Feature" Binding="{Binding FeatureName}" Width="78" />
+                        <DataGridTextColumn Header="Value" Binding="{Binding FeatureValue}" Width="68" />
+                        <DataGridTextColumn Header="Affix UR" Binding="{Binding Affix}" Width="80" />
+                        <DataGridCheckBoxColumn Header="Prefix?" Binding="{Binding IsPrefix}" Width="58" />
+                        <DataGridTemplateColumn Width="36">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="×" Padding="4,1" Margin="0"
+                                            Command="{Binding DataContext.RemoveAffixCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </GroupBox>
+
+        <!-- Bottom: Live Morphology Realizer Preview -->
+        <GroupBox Grid.Row="1" Grid.ColumnSpan="2" Header="Live Morphology Realizer Preview (Respects Swapped Phase 4 Realizer)">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Lemma:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <TextBox Text="{Binding MorphPreviewLemma, UpdateSourceTrigger=PropertyChanged}" Width="110" Margin="0,0,10,0" />
+                <TextBlock Text="POS:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <TextBox Text="{Binding MorphPreviewPos, UpdateSourceTrigger=PropertyChanged}" Width="55" Margin="0,0,10,0" />
+                <TextBlock Text="Feature:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <TextBox Text="{Binding MorphPreviewFeatName, UpdateSourceTrigger=PropertyChanged}" Width="90" Margin="0,0,6,0" />
+                <TextBlock Text="=" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBox Text="{Binding MorphPreviewFeatVal, UpdateSourceTrigger=PropertyChanged}" Width="80" Margin="0,0,10,0" />
+                <Button Content="Realize" Command="{Binding RefreshMorphPreviewCommand}" />
+                <TextBlock Text="UR Realized:" VerticalAlignment="Center" Foreground="#475569" Margin="10,0,6,0" />
+                <TextBlock Text="{Binding MorphPreviewOutput}" VerticalAlignment="Center" FontWeight="SemiBold" FontFamily="Consolas" FontSize="14" Foreground="#0F172A" />
+            </WrapPanel>
         </GroupBox>
     </Grid>
 </UserControl>

@@ -2,8 +2,11 @@
   "Id": "conlanger.graphviz",
   "Name": "Graphviz & Feature Exporter",
   "Version": "2.0.0",
-  "Author": "Conlanger",
-  "Description": "Exports DOT syllable/phonology flow graphs and distinctive phonological feature CSV matrices.",
+  "Author": "Conlang Builder",
+  "Description": "Exports phonological rule pipelines (DOT), phoneme feature matrices (CSV), and a hyphenated orthography renderer.",
+  "Website": "https://github.com/typO969/theConlanger",
+  "IsolationMode": "InProcess",
+  "Capabilities": [ "OutputFiles", "UnifiedProjectRead", "PipelineOrthography" ],
   "EntryAssembly": "GraphvizPlugin.dll",
   "PluginTypeName": "GraphvizPlugin.Plugin"
 }

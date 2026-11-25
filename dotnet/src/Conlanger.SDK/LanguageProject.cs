@@ -12,6 +12,9 @@ public enum ClauseTemplate { Intransitive, Transitive, Copular }
 public enum CapitalizationMode { None, SentenceInitial, AllWords }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
+public enum StressPattern { None, Initial, Penultimate, Final }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum FlowDirection { LTR, RTL, TTB_LTR, TTB_RTL, Boustrophedon }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -83,8 +86,8 @@ public sealed class AffixEntry
 {
     public string Name { get; set; } = "";
     public string Pos { get; set; } = "N";
-    public string FeatureName { get; set; } = "num";
-    public string FeatureValue { get; set; } = "PL";
+    public string FeatureName { get; set; } = "Number";
+    public string FeatureValue { get; set; } = "Pl";
     public string Affix { get; set; } = "";
     public bool IsPrefix { get; set; }
     public bool Enabled { get; set; } = true;
@@ -148,6 +151,21 @@ public sealed class WritingSystemConfig
     public List<FeaturicAssemblyRule> FeaturicRules { get; set; } = new();
 }
 
+public sealed class PipelineSelection
+{
+    [JsonPropertyName("syntaxGeneratorId")]
+    public string SyntaxGeneratorId { get; set; } = "configurable-syntax";
+
+    [JsonPropertyName("morphologyRealizerId")]
+    public string MorphologyRealizerId { get; set; } = "standard-morphology";
+
+    [JsonPropertyName("orthographyRendererId")]
+    public string OrthographyRendererId { get; set; } = "standard-orthography";
+
+    [JsonPropertyName("enabledPhonoPluginRules")]
+    public List<string> EnabledPhonoPluginRules { get; set; } = new();
+}
+
 public sealed record GraphemeToken(
     string Id,
     string Grapheme,
@@ -162,13 +180,14 @@ public sealed record DiagnosticIssue(DiagnosticSeverity Severity, string Subsyst
 public sealed class LanguageProject
 {
     public int SchemaVersion { get; set; } = 2;
-    public string Name { get; set; } = "Proto-Conlang";
+    public string Name { get; set; } = "My Conlang";
     public List<Phoneme> Phonemes { get; set; } = new();
     public List<string> Consonants { get; set; } = new();
     public List<string> Vowels { get; set; } = new();
     public List<SyllableTemplate> SyllableTemplates { get; set; } = new();
     public PhonotacticsConfig Phonotactics { get; set; } = new();
     public GeneratorOptions GeneratorOptions { get; set; } = new();
+    public StressPattern StressPattern { get; set; } = StressPattern.None;
     public List<PhonologyRuleSpec> PhonologyRules { get; set; } = new();
     public List<LexemeEntry> Lexemes { get; set; } = new();
     public List<AffixEntry> Affixes { get; set; } = new();
@@ -178,4 +197,5 @@ public sealed class LanguageProject
     public List<OrthExceptionEntry> OrthographyExceptions { get; set; } = new();
     public CapitalizationMode Capitalization { get; set; } = CapitalizationMode.SentenceInitial;
     public WritingSystemConfig WritingSystem { get; set; } = new();
+    public PipelineSelection Pipeline { get; set; } = new();
 }

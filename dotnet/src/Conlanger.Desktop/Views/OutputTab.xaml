@@ -6,32 +6,48 @@
              xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
-             d:DesignHeight="620" d:DesignWidth="1120">
+             d:DesignHeight="680" d:DesignWidth="1200">
     <Grid Margin="10">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="1*" />
-            <ColumnDefinition Width="1*" />
+            <ColumnDefinition Width="1.2*" />
         </Grid.ColumnDefinitions>
 
+        <!-- Left: Phonotactic Word Generator -->
         <GroupBox Grid.Column="0" Header="Phonotactic Word Generator" Margin="0,0,10,0">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
-                    <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <TextBox Text="{Binding WordCount}" Width="60" Margin="0,0,12,0" Padding="4,2" />
-                    <TextBlock Text="Syllables:" VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <TextBox Text="{Binding SyllablesPerWord}" Width="60" Margin="0,0,12,0" Padding="4,2" />
-                    <Button Content="Generate Words" Command="{Binding GenerateWordsCommand}" />
-                </StackPanel>
-                <TextBox Text="{Binding GeneratedWordsText}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="14" />
+                <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding WordCount, UpdateSourceTrigger=PropertyChanged}" Width="52" Margin="0,0,10,4" />
+                    <TextBlock Text="Syllables:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding SyllablesPerWord, UpdateSourceTrigger=PropertyChanged}" Width="46" Margin="0,0,10,4" />
+                    <CheckBox Content="Hyphenate" IsChecked="{Binding HyphenateSyllables}" VerticalAlignment="Center" Margin="0,0,10,4" />
+                    <CheckBox Content="Allow Duplicates" IsChecked="{Binding AllowDuplicates}" VerticalAlignment="Center" Margin="0,0,10,4" />
+                    <Button Content="Generate Words" Command="{Binding GenerateWordsCommand}" Margin="0,0,0,4" />
+                </WrapPanel>
+                <TextBox Text="{Binding GeneratedWordsText, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="14" Background="#F8FAFC" />
             </DockPanel>
         </GroupBox>
 
-        <GroupBox Grid.Column="1" Header="Full Sentence Output">
+        <!-- Right: Batch Sentence Corpus & Export -->
+        <GroupBox Grid.Column="1" Header="Full Pipeline Batch Sentence Corpus &amp; Export">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
-                    <Button Content="Generate Sentence" Command="{Binding GenerateSentenceCommand}" />
-                </StackPanel>
-                <TextBox Text="{Binding SentenceOutput, Mode=OneWay}" IsReadOnly="True" FontSize="20" TextWrapping="Wrap" Padding="10" Background="#F8FAFC" />
+                <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock Text="Samples (N):" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding SampleCount, UpdateSourceTrigger=PropertyChanged}" Width="48" Margin="0,0,10,4" />
+                    <TextBlock Text="Approx Words:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding OutputApproxWords, UpdateSourceTrigger=PropertyChanged}" Width="48" Margin="0,0,10,4" />
+                    <TextBlock Text="Seed:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding OutputSeedText, UpdateSourceTrigger=PropertyChanged}" Width="70" Margin="0,0,10,4" />
+                    <TextBlock Text="Constraint:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding ConstraintFeatName, UpdateSourceTrigger=PropertyChanged}" Width="68" ToolTip="Feature Name" Margin="0,0,4,4" />
+                    <TextBlock Text="=" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding ConstraintFeatVal, UpdateSourceTrigger=PropertyChanged}" Width="64" ToolTip="Feature Value" Margin="0,0,10,4" />
+                    <Button Content="Generate Corpus" Command="{Binding GenerateBatchCommand}" Background="#0F172A" Foreground="White" Margin="0,0,6,4" />
+                    <Button Content="Export TXT..." Click="OnExportTxtClick" Margin="0,0,6,4" />
+                    <Button Content="Export CSV..." Click="OnExportCsvClick" Margin="0,0,0,4" />
+                </WrapPanel>
+                <TextBox Text="{Binding BatchOutputText, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontSize="15" TextWrapping="Wrap" Padding="10" Background="#F8FAFC" />
             </DockPanel>
         </GroupBox>
     </Grid>

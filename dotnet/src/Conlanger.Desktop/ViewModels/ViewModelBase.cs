@@ -20,16 +20,59 @@ public abstract class ViewModelBase : INotifyPropertyChanged
     }
 }
 
-public sealed class RelayCommand(Action execute, Func<bool>? canExecute = null) : ICommand
+public sealed class RelayCommand(Action<object?> execute, Func<object?, bool>? canExecute = null) : ICommand
 {
-    private readonly Action _execute = execute ?? throw new ArgumentNullException(nameof(execute));
-    private readonly Func<bool>? _canExecute = canExecute;
+    private readonly Action<object?> _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+    private readonly Func<object?, bool>? _canExecute = canExecute;
+
+    public RelayCommand(Action execute, Func<bool>? canExecute = null)
+        : this(_ => execute(), canExecute is null ? null : _ => canExecute())
+    {
+    }
 
     public event EventHandler? CanExecuteChanged;
 
-    public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
+    public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
 
-    public void Execute(object? parameter) => _execute();
+    public void Execute(object? parameter) => _execute(parameter);
+
+    public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+}
+
+public sealed class AsyncRelayCommand(Func<object?, Task> executeAsync, Func<object?, bool>? canExecute = null) : ICommand
+{
+    private readonly Func<object?, Task> _executeAsync = executeAsync ?? throw new ArgumentNullException(nameof(executeAsync));
+    private readonly Func<object?, bool>? _canExecute = canExecute;
+    private int _running;
+
+    public AsyncRelayCommand(Func<Task> executeAsync, Func<bool>? canExecute = null)
+        : this(_ => executeAsync(), canExecute is null ? null : _ => canExecute())
+    {
+    }
+
+    public event EventHandler? CanExecuteChanged;
+
+    public bool CanExecute(object? parameter) =>
+        Volatile.Read(ref _running) == 0 && (_canExecute?.Invoke(parameter) ?? true);
+
+    public async void Execute(object? parameter)
+    {
+        if (Interlocked.Exchange(ref _running, 1) == 1) return;
+        RaiseCanExecuteChanged();
+        try
+        {
+            await _executeAsync(parameter);
+        }
+        catch
+        {
+            // Keep WPF UI thread resilient against unhandled async command exceptions
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _running, 0);
+            RaiseCanExecuteChanged();
+        }
+    }
 
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }

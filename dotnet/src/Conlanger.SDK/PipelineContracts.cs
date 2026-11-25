@@ -37,22 +37,45 @@ public sealed record SyntaxTree(SyntaxNode Root)
 public interface ISyntaxGenerator
 {
     string Id { get; }
+    string Name { get; }
+    string Description { get; }
     SyntaxTree Generate(SentenceSpec spec, LanguageProject project, Random rng);
 }
 
 public interface IPhonoRule
 {
+    string Id { get; }
     string Name { get; }
+    string Description { get; }
     bool Enabled { get; }
-    IReadOnlyList<string> Apply(IReadOnlyList<string> wordPhones, LanguageProject project);
+    IReadOnlyList<string> Apply(
+        IReadOnlyList<string> wordPhones,
+        LanguageProject project,
+        IReadOnlySet<int>? stressedIndices = null
+    );
 }
 
 public interface IMorphologyRealizer
 {
+    string Id { get; }
+    string Name { get; }
+    string Description { get; }
     IReadOnlyList<IReadOnlyList<string>> RealizeWords(SyntaxTree tree, LanguageProject project);
+    string RealizeForPreview(string lemma, string pos, IReadOnlyList<Feat> features, LanguageProject project);
 }
 
 public interface IOrthographyRenderer
 {
+    string Id { get; }
+    string Name { get; }
+    string Description { get; }
     OrthographyResult Render(IReadOnlyList<IReadOnlyList<string>> surfaceWords, LanguageProject project);
+}
+
+public interface IPipelineExtensionProvider
+{
+    IReadOnlyList<ISyntaxGenerator> GetSyntaxGenerators();
+    IReadOnlyList<IMorphologyRealizer> GetMorphologyRealizers();
+    IReadOnlyList<IOrthographyRenderer> GetOrthographyRenderers();
+    IReadOnlyList<IPhonoRule> GetPhonoRules();
 }

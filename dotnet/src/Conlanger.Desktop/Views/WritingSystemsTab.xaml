@@ -6,80 +6,232 @@
              xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
-             d:DesignHeight="680" d:DesignWidth="1180">
+             d:DesignHeight="780" d:DesignWidth="1300">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.4*" />
+            <ColumnDefinition Width="1.45*" />
             <ColumnDefinition Width="1*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Layer 1 + Layer 2 Controls -->
-        <GroupBox Grid.Row="0" Grid.ColumnSpan="2" Header="Layer 1 Input &amp; Layer 2 Flow Vector Controls">
-            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Input Sequence:" VerticalAlignment="Center" Margin="0,0,6,0" />
-                <TextBox Text="{Binding ShapingInput, UpdateSourceTrigger=PropertyChanged}" Width="240" Padding="5,3" Margin="0,0,14,0" />
-                <TextBlock Text="Flow Vector:" VerticalAlignment="Center" Margin="0,0,6,0" />
-                <ComboBox ItemsSource="{Binding FlowDirections}" SelectedItem="{Binding SelectedFlowDirection}" Width="140" Margin="0,0,14,0" />
-                <CheckBox Content="Cursive Anchor Bonding" IsChecked="{Binding CursiveBonding}" VerticalAlignment="Center" Margin="0,0,14,0" />
-                <CheckBox Content="Show Debug Anchors" IsChecked="{Binding ShowAnchors}" VerticalAlignment="Center" Margin="0,0,14,0" />
-                <Button Content="Preset: RTL Cursive" Command="{Binding ApplyRtlPresetCommand}" />
-                <Button Content="Preset: Vertical Spine" Command="{Binding ApplyWritingPresetCommand}" />
-                <Button Content="Export SVG..." Click="OnExportSvgClick" />
-            </WrapPanel>
+        <!-- Layer 1 + Layer 2 Top Controls -->
+        <GroupBox Grid.Row="0" Grid.ColumnSpan="2" Header="Layer 1 Input (Sandbox vs. Engine), Layer 2 Flow Vectors &amp; Script Presets">
+            <StackPanel>
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
+                    <RadioButton Content="Sandbox Mode" IsChecked="{Binding UseSandboxLayer1, Mode=OneWay}" GroupName="Layer1Mode" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <RadioButton Content="Engine Layer 1 Mode" IsChecked="{Binding UseEngineLayer1}" GroupName="Layer1Mode" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    <TextBlock Text="Input:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding ShapingInput, UpdateSourceTrigger=PropertyChanged}" Width="210" Margin="0,0,10,0" />
+                    <TextBlock Text="Engine Seed:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding WsEngineSeed, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="0,0,6,0" />
+                    <Button Content="Sample Sentence" Command="{Binding NextEngineSeedCommand}" Margin="0,0,12,0" />
+                    <Button Content="Preset: RTL Cursive" Command="{Binding ApplyRtlPresetCommand}" />
+                    <Button Content="Preset: Vertical Spine" Command="{Binding ApplyVerticalPresetCommand}" />
+                    <Button Content="Preset: Boustrophedon" Command="{Binding ApplyBoustrophedonPresetCommand}" />
+                    <Button Content="Export SVG..." Click="OnExportSvgClick" Background="#0F172A" Foreground="White" />
+                </WrapPanel>
+
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
+                    <TextBlock Text="Flow Vector:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding FlowDirections}" SelectedItem="{Binding SelectedFlowDirection}" Width="140" Margin="0,0,12,0" />
+                    <CheckBox Content="Cursive Anchor Bonding" IsChecked="{Binding CursiveBonding}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <CheckBox Content="Contextual Variants" IsChecked="{Binding ContextualVariants}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <CheckBox Content="Show Debug Anchors" IsChecked="{Binding ShowAnchors}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    <TextBlock Text="Scale:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding GlyphScale, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,10,0" />
+                    <TextBlock Text="Spacing:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding LetterSpacing, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,10,0" />
+                    <TextBlock Text="Wrap:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding WrapLimit, UpdateSourceTrigger=LostFocus}" Width="55" />
+                </WrapPanel>
+
+                <TextBlock Text="{Binding Layer1TokensSummary}" FontFamily="Consolas" FontSize="11" Foreground="#475569" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
         </GroupBox>
 
-        <!-- Layer 3 Vector Canvas Renderer (100% Declarative WPF Vector Paths) -->
-        <GroupBox Grid.Row="1" Grid.Column="0" Header="Layer 3: Agnostic Vector Shaping Canvas" Margin="0,0,10,0">
+        <!-- Layer 3 Vector Shaping Canvas -->
+        <GroupBox Grid.Row="1" Grid.Column="0" Header="Layer 3: Agnostic Vector Shaping Canvas (Green = Entering, Amber = Exiting)" Margin="0,0,10,0">
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="#FFFFFF">
-                <ItemsControl ItemsSource="{Binding ShapedGlyphs}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <Canvas Width="{Binding DataContext.CanvasWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    Height="{Binding DataContext.CanvasHeight, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    Background="White" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemContainerStyle>
-                        <Style TargetType="ContentPresenter">
-                            <Setter Property="Canvas.Left" Value="{Binding X}" />
-                            <Setter Property="Canvas.Top" Value="{Binding Y}" />
-                        </Style>
-                    </ItemsControl.ItemContainerStyle>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid>
-                                <Path Data="{Binding PathGeometry}"
-                                      Stroke="#0F172A"
-                                      StrokeThickness="4"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      StrokeLineJoin="Round">
-                                    <Path.LayoutTransform>
+                <Grid Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}" Background="White">
+                    <!-- Primary & Featuric Paths -->
+                    <ItemsControl ItemsSource="{Binding ShapedGlyphs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas Width="{Binding DataContext.CanvasWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        Height="{Binding DataContext.CanvasHeight, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        Background="Transparent" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Canvas.Left" Value="{Binding X}" />
+                                <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.LayoutTransform>
                                         <ScaleTransform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}" />
-                                    </Path.LayoutTransform>
-                                </Path>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                                    </Grid.LayoutTransform>
+                                    <Canvas Width="100" Height="100">
+                                        <Path Data="{Binding PathGeometry}"
+                                              Stroke="#0F172A"
+                                              StrokeThickness="4.5"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              StrokeLineJoin="Round" />
+                                        <ItemsControl ItemsSource="{Binding ExtraGeometries}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <Canvas Width="100" Height="100" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Path Data="{Binding}"
+                                                          Stroke="#1E293B"
+                                                          StrokeThickness="4"
+                                                          StrokeStartLineCap="Round"
+                                                          StrokeEndLineCap="Round"
+                                                          StrokeLineJoin="Round" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Canvas>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Debug Entering Anchor Markers -->
+                    <ItemsControl ItemsSource="{Binding ShapedGlyphs}"
+                                  Visibility="{Binding ShowAnchors, Converter={StaticResource BoolToVis}}"
+                                  IsHitTestVisible="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas Width="{Binding DataContext.CanvasWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        Height="{Binding DataContext.CanvasHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Canvas.Left" Value="{Binding EnterX}" />
+                                <Setter Property="Canvas.Top" Value="{Binding EnterY}" />
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Ellipse Width="7" Height="7" Fill="#10B981" Stroke="White" StrokeThickness="1" Margin="-3.5,-3.5,0,0" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Debug Exiting Anchor Markers -->
+                    <ItemsControl ItemsSource="{Binding ShapedGlyphs}"
+                                  Visibility="{Binding ShowAnchors, Converter={StaticResource BoolToVis}}"
+                                  IsHitTestVisible="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas Width="{Binding DataContext.CanvasWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        Height="{Binding DataContext.CanvasHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Canvas.Left" Value="{Binding ExitX}" />
+                                <Setter Property="Canvas.Top" Value="{Binding ExitY}" />
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Ellipse Width="7" Height="7" Fill="#F59E0B" Stroke="White" StrokeThickness="1" Margin="-3.5,-3.5,0,0" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
             </ScrollViewer>
         </GroupBox>
 
-        <!-- Shaping Graph Trace -->
-        <GroupBox Grid.Row="1" Grid.Column="1" Header="Layer 2 Shaping Graph Execution Trace">
-            <DataGrid ItemsSource="{Binding ShapingTrace}" AutoGenerateColumns="False" IsReadOnly="True">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="#" Binding="{Binding Step}" Width="38" />
-                    <DataGridTextColumn Header="Token" Binding="{Binding TokenId}" Width="65" />
-                    <DataGridTextColumn Header="Variant" Binding="{Binding Variant}" Width="75" />
-                    <DataGridTextColumn Header="Anchor / Strategy" Binding="{Binding AnchorMode}" Width="*" />
-                    <DataGridTextColumn Header="Pos" Binding="{Binding Position}" Width="85" />
-                </DataGrid.Columns>
-            </DataGrid>
-        </GroupBox>
+        <!-- Right Side: Glyph Editor, Featuric Rules & Shaping Graph Trace -->
+        <TabControl Grid.Row="1" Grid.Column="1">
+            <TabItem Header="Glyph Matrix &amp; Anchors">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="8">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="Select Glyph:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <ComboBox ItemsSource="{Binding GlyphIds}" SelectedItem="{Binding SelectedGlyphId}" Width="90" Margin="0,0,12,0" />
+                            <TextBox Text="{Binding NewGlyphId, UpdateSourceTrigger=PropertyChanged}" Width="70" ToolTip="New Glyph Id" Margin="0,0,4,0" />
+                            <Button Content="+ New Glyph" Command="{Binding AddGlyphCommand}" />
+                        </StackPanel>
+
+                        <Border BorderBrush="#CBD5E1" BorderThickness="1" Background="#F8FAFC" Width="120" Height="120" HorizontalAlignment="Left" Margin="0,0,0,8">
+                            <Canvas Width="100" Height="100" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Path Data="{Binding SelectedGlyphPreviewGeometry}" Stroke="#0F172A" StrokeThickness="4.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                            </Canvas>
+                        </Border>
+
+                        <TextBlock Text="SVG Path (0..100 Coordinate Box):" Foreground="#475569" Margin="0,0,0,3" />
+                        <TextBox Text="{Binding SelectedGlyphSvgPath, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Height="64" FontFamily="Consolas" Margin="0,0,0,8" />
+
+                        <WrapPanel Orientation="Horizontal">
+                            <TextBlock Text="Enter X:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox Text="{Binding SelectedGlyphEnterX, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,10,0" />
+                            <TextBlock Text="Enter Y:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox Text="{Binding SelectedGlyphEnterY, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,12,0" />
+                            <TextBlock Text="Exit X:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox Text="{Binding SelectedGlyphExitX, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,10,0" />
+                            <TextBlock Text="Exit Y:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox Text="{Binding SelectedGlyphExitY, UpdateSourceTrigger=LostFocus}" Width="46" />
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Featuric Assembly Rules">
+                <DockPanel Margin="6">
+                    <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBox Text="{Binding NewFeaturicName, UpdateSourceTrigger=PropertyChanged}" Width="115" ToolTip="Rule Name" Margin="0,0,4,4" />
+                        <TextBox Text="{Binding NewFeaturicTarget, UpdateSourceTrigger=PropertyChanged}" Width="48" ToolTip="Target Glyph (*)" Margin="0,0,4,4" />
+                        <ComboBox ItemsSource="{Binding FeaturicContexts}" SelectedItem="{Binding NewFeaturicContext}" Width="82" Margin="0,0,4,4" />
+                        <TextBox Text="{Binding NewFeaturicPath, UpdateSourceTrigger=PropertyChanged}" Width="140" ToolTip="Append SVG Path" Margin="0,0,6,4" />
+                        <Button Content="+ Rule" Command="{Binding AddFeaturicRuleCommand}" Margin="0,0,0,4" />
+                    </WrapPanel>
+                    <DataGrid ItemsSource="{Binding FeaturicRules}" AutoGenerateColumns="False" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="38" />
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="110" />
+                            <DataGridTextColumn Header="Target" Binding="{Binding TargetGlyphId}" Width="55" />
+                            <DataGridTextColumn Header="Ctx" Binding="{Binding ContextPosition}" Width="65" />
+                            <DataGridTextColumn Header="Append SVG" Binding="{Binding AppendSvgPath}" Width="*" />
+                            <DataGridTemplateColumn Width="36">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="×" Padding="4,1" Margin="0"
+                                                Command="{Binding DataContext.RemoveFeaturicRuleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
+            <TabItem Header="Shaping Graph Trace">
+                <DataGrid ItemsSource="{Binding ShapingTrace}" AutoGenerateColumns="False" IsReadOnly="True" Margin="4">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="#" Binding="{Binding Step}" Width="36" />
+                        <DataGridTextColumn Header="Token" Binding="{Binding TokenId}" Width="60" />
+                        <DataGridTextColumn Header="Variant" Binding="{Binding Variant}" Width="72" />
+                        <DataGridTextColumn Header="Anchor / Strategy" Binding="{Binding AnchorMode}" Width="*" />
+                        <DataGridTextColumn Header="Pos" Binding="{Binding Position}" Width="80" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+        </TabControl>
     </Grid>
 </UserControl>

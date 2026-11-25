@@ -6,32 +6,48 @@
              xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
-             d:DesignHeight="500" d:DesignWidth="960">
-    <StackPanel Margin="16">
-        <GroupBox Header="Clause Architecture &amp; Sampling Controls">
+             d:DesignHeight="620" d:DesignWidth="1160">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <GroupBox Grid.Row="0" Header="Clause Architecture &amp; Sampling Controls (Respects Swapped Phase 4 Syntax Generator)">
             <WrapPanel Orientation="Horizontal">
-                <StackPanel Margin="0,0,18,8">
+                <StackPanel Margin="0,0,18,6">
                     <TextBlock Text="Word Order" Foreground="#475569" Margin="0,0,0,4" />
-                    <ComboBox ItemsSource="{Binding WordOrders}" SelectedItem="{Binding SelectedWordOrder}" Width="140" />
+                    <ComboBox ItemsSource="{Binding WordOrders}" SelectedItem="{Binding SelectedWordOrder}" Width="130" />
                 </StackPanel>
-                <StackPanel Margin="0,0,18,8">
+                <StackPanel Margin="0,0,18,6">
                     <TextBlock Text="Clause Template" Foreground="#475569" Margin="0,0,0,4" />
-                    <ComboBox ItemsSource="{Binding ClauseTemplates}" SelectedItem="{Binding SelectedClauseTemplate}" Width="160" />
+                    <ComboBox ItemsSource="{Binding ClauseTemplates}" SelectedItem="{Binding SelectedClauseTemplate}" Width="150" />
                 </StackPanel>
-                <StackPanel Margin="0,0,18,8">
+                <StackPanel Margin="0,0,18,6">
                     <TextBlock Text="Approx. Words (NP Modifiers)" Foreground="#475569" Margin="0,0,0,4" />
-                    <TextBox Text="{Binding ApproxWords, UpdateSourceTrigger=PropertyChanged}" Width="120" Padding="4,3" />
+                    <TextBox Text="{Binding SyntaxApproxWords, UpdateSourceTrigger=PropertyChanged}" Width="130" />
                 </StackPanel>
-                <StackPanel Margin="0,0,18,8">
-                    <TextBlock Text="RNG Seed" Foreground="#475569" Margin="0,0,0,4" />
-                    <TextBox Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" Width="110" Padding="4,3" />
+                <StackPanel Margin="0,0,18,6">
+                    <TextBlock Text="Preview Seed" Foreground="#475569" Margin="0,0,0,4" />
+                    <TextBox Text="{Binding SyntaxPreviewSeed, UpdateSourceTrigger=PropertyChanged}" Width="100" />
                 </StackPanel>
-                <Button Content="Generate Sentence" Command="{Binding GenerateSentenceCommand}" VerticalAlignment="Bottom" Margin="0,0,0,8" />
+                <Button Content="Sample New Seed" Command="{Binding SampleSyntaxSeedCommand}" VerticalAlignment="Bottom" Margin="0,0,0,6" />
             </WrapPanel>
         </GroupBox>
 
-        <GroupBox Header="Live Sentence Preview">
-            <TextBox Text="{Binding SentenceOutput, Mode=OneWay}" IsReadOnly="True" FontSize="20" Padding="10" Background="#F8FAFC" BorderThickness="0" />
-        </GroupBox>
-    </StackPanel>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1.2*" />
+            </Grid.ColumnDefinitions>
+
+            <GroupBox Grid.Column="0" Header="Linearized Clause Leaves (Lemma / Category)" Margin="0,0,10,0">
+                <TextBox Text="{Binding SyntaxLinearPreview, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontSize="17" Padding="10" Background="#F8FAFC" BorderThickness="0" />
+            </GroupBox>
+
+            <GroupBox Grid.Column="1" Header="Syntax Tree Hierarchy">
+                <TextBox Text="{Binding SyntaxTreeSummary, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13" Padding="10" Background="#F8FAFC" BorderThickness="0" />
+            </GroupBox>
+        </Grid>
+    </Grid>
 </UserControl>

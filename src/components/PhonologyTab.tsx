@@ -4,6 +4,7 @@ import {
   Phoneme,
   PhonologicalFeatures,
   RuleSpec,
+  StressPattern,
 } from '../core/types';
 import {
   buildEngineFromState,
@@ -71,7 +72,10 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
     ];
     const derived = engine.phonology.derive(mock);
     const sylStr = derived.syllables
-      .map((s) => `${s.onset.join('')}${s.nucleus.join('')}${s.coda.join('')}`)
+      .map((s, idx) => {
+        const prefix = idx === derived.stressIndex ? 'ˈ' : '';
+        return `${prefix}${s.onset.join('')}${s.nucleus.join('')}${s.coda.join('')}`;
+      })
       .join('.');
     return [
       ...derived.steps.map((s) => `${s.label}: ${s.value}`),
@@ -590,12 +594,33 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
         </div>
       </div>
 
-      {/* Phonological Rules + Derivation Trace */}
+      {/* Phonological Rules + Stress + Derivation Trace */}
       <div className="border-t border-slate-200 pt-4 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-bold text-slate-900">
-            Phonological Rules <span className="font-normal text-xs text-slate-500">(supports ∅ epenthesis/deletion, # word boundary, [+voice] / [manner=stop])</span>
+            Phonological Rules{' '}
+            <span className="font-normal text-xs text-slate-500">
+              (supports ∅, #, V/C classes, [+voice], [-stressed], [manner=stop])
+            </span>
           </h3>
+          <label className="flex items-center gap-2 text-xs">
+            <span className="font-medium text-slate-700">Primary Stress:</span>
+            <select
+              value={state.StressPattern ?? 'None'}
+              onChange={(e) =>
+                onUpdate(
+                  (prev) => ({ ...prev, StressPattern: e.target.value as StressPattern }),
+                  'Stress pattern updated'
+                )
+              }
+              className="px-2 py-1 bg-white border border-slate-300 rounded"
+            >
+              <option value="None">None</option>
+              <option value="Initial">Initial Syllable</option>
+              <option value="Penultimate">Penultimate Syllable</option>
+              <option value="Final">Final Syllable</option>
+            </select>
+          </label>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2 border border-slate-300 bg-white rounded h-52 overflow-y-auto divide-y divide-slate-100">

@@ -34,14 +34,67 @@ public sealed class LanguageEngineTests
     }
 
     [Fact]
-    public void Syllabifier_RespectsMaximalOnsetAndPhonotactics()
+    public void PhonologyEngine_MatchesFeatureBracketsAndNaturalClassesInTargetsAndContexts()
     {
         var project = ProjectFactory.CreateStarterProject();
-        var syllables = PhonologyEngine.Syllabify(["p", "a", "s", "t", "a"], project);
+        project.Phonemes.Add(ProjectFactory.CreatePhoneme("b", "C"));
+        project.PhonologyRules =
+        [
+            new() { Name = "Post-stop sibilant voicing", Target = "[+sibilant,-voice]", Replacement = "z", PrevPhone = "[manner=stop]", Enabled = true }
+        ];
+
+        var res = PhonologyEngine.Derive(["b", "s", "a"], project);
+        Assert.Equal(new[] { "b", "z", "a" }, res.SurfacePhones);
+    }
+
+    [Fact]
+    public void PhonologyEngine_AssignsStressAndAppliesUnstressedVowelReduction()
+    {
+        var project = ProjectFactory.CreateStarterProject();
+        project.StressPattern = StressPattern.Initial;
+        project.Pipeline.EnabledPhonoPluginRules = ["unstressed-vowel-reduction"];
+
+        var engine = new LangEngine();
+        var rules = engine.ResolvePluginRules(project);
+        var res = PhonologyEngine.Derive(["t", "a", "k", "a"], project, rules);
+
+        Assert.Equal(0, res.StressIndex);
+        Assert.Equal(new[] { "t", "a", "k", "ə" }, res.SurfacePhones);
+    }
+
+    [Fact]
+    public void Syllabifier_RespectsMultiConsonantMaximalOnsetAndPhonotactics()
+    {
+        var project = ProjectFactory.CreateStarterProject();
+        project.Phonotactics.AllowedOnsets = ["st", "tr", "str", "k", "p", "t", "s", "r"];
+        project.Phonotactics.MaxOnsetCluster = 3;
+        project.Phonotactics.MaxCodaCluster = 2;
+
+        var syllables = PhonologyEngine.Syllabify(["ɛ", "k", "s", "t", "r", "ə"], project);
 
         Assert.Equal(2, syllables.Count);
-        Assert.Equal(new[] { "p" }, syllables[0].Onset);
-        Assert.Equal(new[] { "s", "t" }, syllables[1].Onset);
+        Assert.Equal(new[] { "k" }, syllables[0].Coda);
+        Assert.Equal(new[] { "s", "t", "r" }, syllables[1].Onset);
+    }
+
+    [Fact]
+    public void PipelineRegistry_SwapsSyntaxMorphologyOrthographyAndPluginPhonoRules()
+    {
+        var project = ProjectFactory.CreateStarterProject();
+        project.Pipeline.SyntaxGeneratorId = "rich-np-syntax";
+        project.Pipeline.MorphologyRealizerId = "reduplicative-plural";
+        project.Pipeline.OrthographyRendererId = "ipa-broad";
+        project.Pipeline.EnabledPhonoPluginRules = ["intervocalic-stop-lenition"];
+
+        var engine = new LangEngine();
+        var morph = engine.ResolveMorphology(project);
+        var pluralPerson = morph.InflectSingle("person", "N", [new Feat("Number", "Pl")], project);
+        Assert.Equal(new[] { "m", "a", "m", "a", "t", "a", "i" }, pluralPerson);
+
+        var sentence = engine.GenerateSentence(project, seed: 42, approxWords: 2, new Dictionary<string, string> { ["Number"] = "Pl" });
+        Assert.StartsWith("/", sentence.Written);
+        Assert.EndsWith("/", sentence.Written);
+        Assert.True(sentence.Tree.Leaves().Count >= 5);
     }
 
     [Fact]

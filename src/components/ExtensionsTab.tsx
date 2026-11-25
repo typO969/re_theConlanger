@@ -1,14 +1,23 @@
 import React, { useMemo, useState } from 'react';
 import { LanguageProjectState } from '../core/types';
+import {
+  BUILTIN_MORPHOLOGY_MODULES,
+  BUILTIN_ORTHOGRAPHY_MODULES,
+  BUILTIN_PLUGIN_PHONO_RULES,
+  BUILTIN_SYNTAX_MODULES,
+  DEFAULT_PIPELINE_SELECTION,
+} from '../core/languageEngine';
 import { getBuiltInPlugins, PluginOutputFile } from '../core/plugins';
 import { downloadTextFile } from '../core/download';
 
 interface ExtensionsTabProps {
   state: LanguageProjectState;
+  onUpdate: (updater: (prev: LanguageProjectState) => LanguageProjectState, label: string) => void;
 }
 
-export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({ state }) => {
+export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({ state, onUpdate }) => {
   const { plugins, actions } = useMemo(() => getBuiltInPlugins(), []);
+  const pipeline = state.Pipeline ?? DEFAULT_PIPELINE_SELECTION;
 
   const [selectedPluginId, setSelectedPluginId] = useState<string>(plugins[0]?.id ?? '');
   const [selectedActionId, setSelectedActionId] = useState<string>(actions[0]?.actionId ?? '');
@@ -42,6 +51,20 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({ state }) => {
     appendLog(`Refreshed plugin catalog (${plugins.length} loaded, ${actions.length} actions).`);
   };
 
+  const togglePluginPhonoRule = (ruleId: string) => {
+    onUpdate((prev) => {
+      const cur = prev.Pipeline ?? DEFAULT_PIPELINE_SELECTION;
+      const exists = cur.enabledPhonoPluginRules.includes(ruleId);
+      const nextRules = exists
+        ? cur.enabledPhonoPluginRules.filter((id) => id !== ruleId)
+        : [...cur.enabledPhonoPluginRules, ruleId];
+      return {
+        ...prev,
+        Pipeline: { ...cur, enabledPhonoPluginRules: nextRules },
+      };
+    }, 'Toggled plugin phonology rule');
+  };
+
   const updateArg = (actionId: string, argName: string, val: string | boolean) => {
     setArgValues((prev) => ({
       ...prev,
@@ -70,9 +93,112 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({ state }) => {
   };
 
   return (
-    <div className="p-5 space-y-4">
+    <div className="p-5 space-y-5">
+      {/* Phase 4: Runtime Pipeline Stage Swapping */}
+      <div className="border border-slate-300 bg-white rounded p-4 space-y-3">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Phase 4: Runtime Pipeline Stage Swapper</h3>
+          <p className="text-xs text-slate-600">
+            Hot-swap active Syntax, Morphology, Orthography, and Plugin Phonology modules consumed by LangEngine.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <label className="space-y-1">
+            <span className="font-semibold text-slate-700">ISyntaxGenerator</span>
+            <select
+              value={pipeline.syntaxGeneratorId}
+              onChange={(e) =>
+                onUpdate(
+                  (prev) => ({
+                    ...prev,
+                    Pipeline: { ...(prev.Pipeline ?? DEFAULT_PIPELINE_SELECTION), syntaxGeneratorId: e.target.value },
+                  }),
+                  'Swapped syntax generator'
+                )
+              }
+              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded"
+            >
+              {BUILTIN_SYNTAX_MODULES.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="font-semibold text-slate-700">IMorphologyRealizer</span>
+            <select
+              value={pipeline.morphologyRealizerId}
+              onChange={(e) =>
+                onUpdate(
+                  (prev) => ({
+                    ...prev,
+                    Pipeline: {
+                      ...(prev.Pipeline ?? DEFAULT_PIPELINE_SELECTION),
+                      morphologyRealizerId: e.target.value,
+                    },
+                  }),
+                  'Swapped morphology realizer'
+                )
+              }
+              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded"
+            >
+              {BUILTIN_MORPHOLOGY_MODULES.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="font-semibold text-slate-700">IOrthographyRenderer</span>
+            <select
+              value={pipeline.orthographyRendererId}
+              onChange={(e) =>
+                onUpdate(
+                  (prev) => ({
+                    ...prev,
+                    Pipeline: {
+                      ...(prev.Pipeline ?? DEFAULT_PIPELINE_SELECTION),
+                      orthographyRendererId: e.target.value,
+                    },
+                  }),
+                  'Swapped orthography renderer'
+                )
+              }
+              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded"
+            >
+              {BUILTIN_ORTHOGRAPHY_MODULES.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="pt-1 space-y-1">
+          <div className="text-xs font-semibold text-slate-700">Plugin IPhonoRule Extensions</div>
+          <div className="flex flex-wrap gap-4 text-xs">
+            {BUILTIN_PLUGIN_PHONO_RULES.map((rule) => (
+              <label key={rule.id} className="flex items-center gap-1.5" title={rule.description}>
+                <input
+                  type="checkbox"
+                  checked={pipeline.enabledPhonoPluginRules.includes(rule.id)}
+                  onChange={() => togglePluginPhonoRule(rule.id)}
+                />
+                <span>{rule.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
-        <h3 className="text-base font-bold text-slate-900">Phase 4 Readiness: Unified Plugin Discovery</h3>
+        <h3 className="text-base font-bold text-slate-900">Action Plugins (Unified SDK)</h3>
         <button
           type="button"
           onClick={refreshPlugins}

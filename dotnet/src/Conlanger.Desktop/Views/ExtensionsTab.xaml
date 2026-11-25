@@ -6,17 +6,116 @@
              xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
-             d:DesignHeight="580" d:DesignWidth="1060">
+             d:DesignHeight="760" d:DesignWidth="1240">
     <Grid Margin="10">
-        <GroupBox Header="Installed Conlanger.SDK Plugins (Place .plugin.json + .dll under /plugins)">
-            <DataGrid ItemsSource="{Binding Plugins}" AutoGenerateColumns="False" IsReadOnly="True">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Plugin Name" Binding="{Binding Manifest.Name}" Width="200" />
-                    <DataGridTextColumn Header="Version" Binding="{Binding Manifest.Version}" Width="80" />
-                    <DataGridTextColumn Header="Description" Binding="{Binding Manifest.Description}" Width="*" />
-                    <DataGridTextColumn Header="Assembly" Binding="{Binding Manifest.EntryAssembly}" Width="180" />
-                </DataGrid.Columns>
-            </DataGrid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Phase 4: Runtime Pipeline Stage Swapper -->
+        <GroupBox Grid.Row="0" Header="Phase 4: Runtime Pipeline Stage Swapper (Built-In + Loaded Plugin DLLs)">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,8">
+                    <TextBlock Text="Syntax Generator (ISyntaxGenerator)" Foreground="#475569" Margin="0,0,0,4" />
+                    <ComboBox ItemsSource="{Binding SyntaxModuleOptions}" SelectedValue="{Binding SelectedSyntaxGeneratorId}" SelectedValuePath="Id" DisplayMemberPath="Name" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,12,8">
+                    <TextBlock Text="Morphology Realizer (IMorphologyRealizer)" Foreground="#475569" Margin="0,0,0,4" />
+                    <ComboBox ItemsSource="{Binding MorphologyModuleOptions}" SelectedValue="{Binding SelectedMorphologyRealizerId}" SelectedValuePath="Id" DisplayMemberPath="Name" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,8">
+                    <TextBlock Text="Orthography Renderer (IOrthographyRenderer)" Foreground="#475569" Margin="0,0,0,4" />
+                    <ComboBox ItemsSource="{Binding OrthographyModuleOptions}" SelectedValue="{Binding SelectedOrthographyRendererId}" SelectedValuePath="Id" DisplayMemberPath="Name" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                    <TextBlock Text="Active Pipeline Phonology Hooks (IPhonoRule):" Foreground="#475569" Margin="0,0,0,4" />
+                    <ItemsControl ItemsSource="{Binding PipelinePhonoRuleItems}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Name}" ToolTip="{Binding Description}" IsChecked="{Binding IsEnabled}" Margin="0,0,16,4" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Grid>
         </GroupBox>
+
+        <!-- Bottom: Interactive Plugin Runner & Output Viewer -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1.2*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Col 1: Plugins & Actions -->
+            <GroupBox Grid.Column="0" Header="Installed SDK Plugins &amp; Actions" Margin="0,0,10,0">
+                <DockPanel>
+                    <Button DockPanel.Dock="Top" Content="Rescan /plugins Directory" Command="{Binding RefreshPluginsCommand}" Margin="0,0,0,8" HorizontalAlignment="Left" />
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="1*" />
+                            <RowDefinition Height="1.1*" />
+                        </Grid.RowDefinitions>
+                        <DataGrid Grid.Row="0" ItemsSource="{Binding Plugins}" SelectedItem="{Binding SelectedPlugin}" AutoGenerateColumns="False" IsReadOnly="True" Margin="0,0,0,8">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Plugin" Binding="{Binding Manifest.Name}" Width="*" />
+                                <DataGridTextColumn Header="Ver" Binding="{Binding Manifest.Version}" Width="55" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding Actions}" SelectedItem="{Binding SelectedAction}" AutoGenerateColumns="False" IsReadOnly="True">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Action" Binding="{Binding Title}" Width="*" />
+                                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="85" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </DockPanel>
+            </GroupBox>
+
+            <!-- Col 2: Selected Action Parameters + Execution Log -->
+            <GroupBox Grid.Column="1" Header="Action Parameters &amp; Execution Log" Margin="0,0,10,0">
+                <DockPanel>
+                    <Button DockPanel.Dock="Top" Content="Run Selected Action (Isolated)" Command="{Binding RunActionCommand}" CommandParameter="{Binding SelectedAction}" Background="#0F172A" Foreground="White" Margin="0,0,0,8" />
+                    <DataGrid DockPanel.Dock="Top" ItemsSource="{Binding ActionArgs}" AutoGenerateColumns="False" CanUserAddRows="False" MaxHeight="180" Margin="0,0,0,8">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Parameter" Binding="{Binding Label}" Width="120" IsReadOnly="True" />
+                            <DataGridTextColumn Header="Value" Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBox Text="{Binding PluginLogsText, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11.5" Background="#F8FAFC" />
+                </DockPanel>
+            </GroupBox>
+
+            <!-- Col 3: Generated Plugin Artifacts -->
+            <GroupBox Grid.Column="2" Header="Generated Plugin Outputs">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                        <ComboBox ItemsSource="{Binding PluginOutputs}" SelectedItem="{Binding SelectedPluginOutput}" DisplayMemberPath="FileName" Width="220" Margin="0,0,8,0" />
+                        <Button Content="Save Output..." Click="OnSavePluginOutputClick" />
+                    </StackPanel>
+                    <TextBox Text="{Binding SelectedPluginOutput.Content, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12" Background="#F8FAFC" />
+                </DockPanel>
+            </GroupBox>
+        </Grid>
     </Grid>
 </UserControl>

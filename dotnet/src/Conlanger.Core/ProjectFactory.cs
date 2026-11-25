@@ -16,12 +16,12 @@ public static class ProjectFactory
 
     private static readonly Dictionary<string, PhonologicalFeatures> KnownFeatures = new(StringComparer.Ordinal)
     {
-        ["p"] = new() { Voicing = "voiceless", Manner = "plosive", Place = "bilabial" },
-        ["b"] = new() { Voicing = "voiced", Manner = "plosive", Place = "bilabial" },
-        ["t"] = new() { Voicing = "voiceless", Manner = "plosive", Place = "alveolar" },
-        ["d"] = new() { Voicing = "voiced", Manner = "plosive", Place = "alveolar" },
-        ["k"] = new() { Voicing = "voiceless", Manner = "plosive", Place = "velar" },
-        ["g"] = new() { Voicing = "voiced", Manner = "plosive", Place = "velar" },
+        ["p"] = new() { Voicing = "voiceless", Manner = "stop", Place = "bilabial" },
+        ["b"] = new() { Voicing = "voiced", Manner = "stop", Place = "bilabial" },
+        ["t"] = new() { Voicing = "voiceless", Manner = "stop", Place = "alveolar" },
+        ["d"] = new() { Voicing = "voiced", Manner = "stop", Place = "alveolar" },
+        ["k"] = new() { Voicing = "voiceless", Manner = "stop", Place = "velar" },
+        ["g"] = new() { Voicing = "voiced", Manner = "stop", Place = "velar" },
         ["m"] = new() { Voicing = "voiced", Manner = "nasal", Place = "bilabial" },
         ["n"] = new() { Voicing = "voiced", Manner = "nasal", Place = "alveolar" },
         ["ŋ"] = new() { Voicing = "voiced", Manner = "nasal", Place = "velar" },
@@ -33,16 +33,16 @@ public static class ProjectFactory
         ["ʒ"] = new() { Voicing = "voiced", Manner = "fricative", Place = "postalveolar" },
         ["h"] = new() { Voicing = "voiceless", Manner = "fricative", Place = "glottal" },
         ["tʃ"] = new() { Voicing = "voiceless", Manner = "affricate", Place = "postalveolar" },
-        ["l"] = new() { Voicing = "voiced", Manner = "lateral", Place = "alveolar" },
+        ["l"] = new() { Voicing = "voiced", Manner = "approximant", Place = "alveolar" },
         ["r"] = new() { Voicing = "voiced", Manner = "trill", Place = "alveolar" },
         ["j"] = new() { Voicing = "voiced", Manner = "approximant", Place = "palatal" },
         ["w"] = new() { Voicing = "voiced", Manner = "approximant", Place = "labiovelar" },
-        ["a"] = new() { Height = "low", Backness = "central", Roundness = "unrounded" },
-        ["e"] = new() { Height = "mid", Backness = "front", Roundness = "unrounded" },
-        ["i"] = new() { Height = "high", Backness = "front", Roundness = "unrounded" },
-        ["o"] = new() { Height = "mid", Backness = "back", Roundness = "rounded" },
-        ["u"] = new() { Height = "high", Backness = "back", Roundness = "rounded" },
-        ["ə"] = new() { Height = "mid", Backness = "central", Roundness = "unrounded" }
+        ["a"] = new() { Voicing = "voiced", Manner = "vowel", Height = "low", Backness = "central", Roundness = "unrounded" },
+        ["e"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "front", Roundness = "unrounded" },
+        ["i"] = new() { Voicing = "voiced", Manner = "vowel", Height = "high", Backness = "front", Roundness = "unrounded" },
+        ["o"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "back", Roundness = "rounded" },
+        ["u"] = new() { Voicing = "voiced", Manner = "vowel", Height = "high", Backness = "back", Roundness = "rounded" },
+        ["ə"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "central", Roundness = "unrounded" }
     };
 
     public static Phoneme CreatePhoneme(string symbol, string type = "C", int weight = 1, bool allowOnset = true, bool allowCoda = true)
@@ -58,7 +58,7 @@ public static class ProjectFactory
                 Roundness = preset.Roundness,
                 Custom = preset.Custom
             }
-            : new PhonologicalFeatures();
+            : (type == "V" ? new PhonologicalFeatures { Voicing = "voiced", Manner = "vowel" } : new PhonologicalFeatures());
 
         return new Phoneme
         {
@@ -73,7 +73,7 @@ public static class ProjectFactory
 
     public static LanguageProject CreateStarterProject()
     {
-        var consonants = new[] { "p", "t", "k", "s", "n", "r", "m", "l" };
+        var consonants = new[] { "p", "t", "k", "ʃ", "s", "z" };
         var vowels = new[] { "a", "e", "i", "o", "u" };
         var phonemes = consonants.Select(c => CreatePhoneme(c, "C"))
             .Concat(vowels.Select(v => CreatePhoneme(v, "V")))
@@ -82,73 +82,56 @@ public static class ProjectFactory
         return new LanguageProject
         {
             SchemaVersion = 2,
-            Name = "Proto-Conlang",
+            Name = "My Conlang",
             Phonemes = phonemes,
             Consonants = consonants.ToList(),
             Vowels = vowels.ToList(),
             SyllableTemplates = new()
             {
                 new() { Pattern = "CV", Weight = 3 },
-                new() { Pattern = "CVC", Weight = 2 },
-                new() { Pattern = "V", Weight = 1 }
+                new() { Pattern = "CVC", Weight = 2 }
             },
             Phonotactics = new PhonotacticsConfig
             {
-                AllowedOnsets = consonants.Concat(new[] { "pr", "tr", "kr", "sp", "st", "sk" }).ToList(),
-                AllowedCodas = new() { "n", "r", "l", "s", "t" },
+                AllowedOnsets = new() { "pr", "tr", "kr", "sp", "st", "sk" },
+                AllowedCodas = new() { "m", "n", "s", "t", "k", "r", "l" },
                 MaxOnsetCluster = 2,
-                MaxCodaCluster = 1,
-                ForbiddenPatterns = new() { "sss", "nnn" }
+                MaxCodaCluster = 2,
+                ForbiddenPatterns = new()
             },
-            GeneratorOptions = new GeneratorOptions { HyphenateSyllables = false, AllowDuplicates = false },
+            GeneratorOptions = new GeneratorOptions { HyphenateSyllables = false, AllowDuplicates = true },
+            StressPattern = StressPattern.None,
             PhonologyRules = new()
             {
-                new() { Name = "Intervocalic s -> z", Target = "s", Replacement = "z", PrevPhone = "V", NextPhone = "V", Condition = "", Enabled = true },
-                new() { Name = "Coda k -> ∅ (lenition)", Target = "k", Replacement = "∅", PrevPhone = "V", NextPhone = "#", Condition = "", Enabled = false }
+                new() { Name = "Intervocalic voicing", Target = "s", Replacement = "z", PrevPhone = "a", NextPhone = "a", Condition = "", Enabled = true }
             },
             Lexemes = new()
             {
-                new() { Lemma = "cat", Pos = "N", UR = "p a t" },
-                new() { Lemma = "dog", Pos = "N", UR = "k a n" },
-                new() { Lemma = "sun", Pos = "N", UR = "s a r" },
-                new() { Lemma = "big", Pos = "Adj", UR = "t o r" },
-                new() { Lemma = "fast", Pos = "Adj", UR = "k i s" },
-                new() { Lemma = "see", Pos = "V", UR = "t e r" },
-                new() { Lemma = "chase", Pos = "V", UR = "p a s" },
-                new() { Lemma = "sleep", Pos = "V", UR = "m i n" },
-                new() { Lemma = "be", Pos = "Cop", UR = "e s" }
+                new() { Lemma = "person", Pos = "N", UR = "p e r s o n" },
+                new() { Lemma = "fish", Pos = "N", UR = "f i ʃ" },
+                new() { Lemma = "water", Pos = "N", UR = "k a s a" },
+                new() { Lemma = "see", Pos = "V", UR = "s i" },
+                new() { Lemma = "seek", Pos = "V", UR = "t i k a" },
+                new() { Lemma = "small", Pos = "ADJ", UR = "s m a l" }
             },
             Affixes = new()
             {
-                new() { Name = "Plural", Pos = "N", FeatureName = "num", FeatureValue = "PL", Affix = "i", IsPrefix = false, Enabled = true },
-                new() { Name = "Past", Pos = "V", FeatureName = "tense", FeatureValue = "PST", Affix = "t a", IsPrefix = false, Enabled = true }
+                new() { Name = "Plural", Pos = "N", FeatureName = "Number", FeatureValue = "Pl", Affix = "-i", IsPrefix = false, Enabled = true },
+                new() { Name = "Past", Pos = "V", FeatureName = "Tense", FeatureValue = "Past", Affix = "-ta", IsPrefix = false, Enabled = true }
             },
             WordOrder = WordOrder.SVO,
             ClauseTemplate = ClauseTemplate.Transitive,
             OrthographyRules = new()
             {
-                new() { Phone = "p", Grapheme = "p", Enabled = true },
-                new() { Phone = "t", Grapheme = "t", Enabled = true },
-                new() { Phone = "k", Grapheme = "k", Enabled = true },
-                new() { Phone = "s", Grapheme = "s", Enabled = true },
-                new() { Phone = "z", Grapheme = "z", Enabled = true },
-                new() { Phone = "n", Grapheme = "n", Enabled = true },
-                new() { Phone = "r", Grapheme = "r", Enabled = true },
-                new() { Phone = "m", Grapheme = "m", Enabled = true },
-                new() { Phone = "l", Grapheme = "l", Enabled = true },
-                new() { Phone = "a", Grapheme = "a", Enabled = true },
-                new() { Phone = "e", Grapheme = "e", Enabled = true },
-                new() { Phone = "i", Grapheme = "i", Enabled = true },
-                new() { Phone = "o", Grapheme = "o", Enabled = true },
-                new() { Phone = "u", Grapheme = "u", Enabled = true },
-                new() { Phone = "ʃ", Grapheme = "sh", Enabled = true }
+                new() { Phone = "ʃ", Grapheme = "sh", Enabled = true },
+                new() { Phone = "t", Grapheme = "c", NextContext = "i", Enabled = true },
+                new() { Phone = "k", Grapheme = "c", NextContext = "e", Enabled = true },
+                new() { Phone = "k", Grapheme = "k", Enabled = true }
             },
-            OrthographyExceptions = new()
-            {
-                new() { Input = "ka", Output = "ca" }
-            },
+            OrthographyExceptions = new(),
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig()
+            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            Pipeline = new PipelineSelection()
         };
     }
 
@@ -167,9 +150,11 @@ public static class ProjectFactory
         }
 
         if (project.WritingSystem.Glyphs.Count == 0)
-        {
             project.WritingSystem = WritingSystemEngine.CreateDefaultConfig();
-        }
+
+        project.Pipeline ??= new PipelineSelection();
+        project.Phonotactics ??= new PhonotacticsConfig();
+        project.GeneratorOptions ??= new GeneratorOptions();
         project.SchemaVersion = 2;
     }
 

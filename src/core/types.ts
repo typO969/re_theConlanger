@@ -109,6 +109,14 @@ export interface AffixRule {
 export type WordOrder = 'SVO' | 'SOV' | 'VSO' | 'VOS' | 'OVS' | 'OSV';
 export type ClauseTemplate = 'Intransitive' | 'Transitive' | 'Copular';
 export type CapitalizationMode = 'None' | 'SentenceInitial' | 'AllWords';
+export type StressPattern = 'None' | 'Initial' | 'Penultimate' | 'Final';
+
+export interface PipelineSelection {
+  syntaxGeneratorId: string;
+  morphologyRealizerId: string;
+  orthographyRendererId: string;
+  enabledPhonoPluginRules: string[];
+}
 
 export interface OrthographyRule {
   phone: string;
@@ -235,6 +243,7 @@ export interface LanguageProjectState {
   SyllableTemplates: SyllableTemplate[];
   Phonotactics: PhonotacticsConfig;
   GeneratorOptions: GeneratorOptions;
+  StressPattern: StressPattern;
   PhonologyRules: PhonologyRuleState[];
   Lexemes: LexemeState[];
   Affixes: AffixState[];
@@ -244,4 +253,5 @@ export interface LanguageProjectState {
   OrthographyExceptions: OrthExceptionState[];
   Capitalization: CapitalizationMode;
   WritingSystem: WritingSystemConfig;
+  Pipeline: PipelineSelection;
 }

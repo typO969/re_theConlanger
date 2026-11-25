@@ -8,35 +8,67 @@
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
         Title="Conlanger (.NET 10 LTS Studio)"
-        Width="1280"
-        Height="820"
+        Width="1360"
+        Height="860"
+        MinWidth="1024"
+        MinHeight="700"
         Background="#F8FAFC">
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
 
     <DockPanel LastChildFill="True">
-        <!-- Top Project Toolbar -->
+        <!-- Top Unified Project & Persistence Toolbar -->
         <Border DockPanel.Dock="Top" Background="White" BorderBrush="#CBD5E1" BorderThickness="0,0,0,1" Padding="12,8">
-            <DockPanel LastChildFill="False">
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="CONLANGER" FontWeight="Bold" FontSize="15" Foreground="#0F172A" VerticalAlignment="Center" Margin="0,0,16,0" />
-                    <TextBlock Text="Project:" VerticalAlignment="Center" Foreground="#475569" Margin="0,0,6,0" />
-                    <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}" Width="180" VerticalContentAlignment="Center" Padding="6,3" Margin="0,0,12,0" />
-                    <Button Content="Open .clproj..." Click="OnOpenProjectClick" />
-                    <Button Content="Save .clproj..." Click="OnSaveProjectClick" />
-                    <Button Content="New / Reset" Command="{Binding NewProjectCommand}" />
-                    <Button Content="Undo" Command="{Binding UndoCommand}" />
-                    <Button Content="Redo" Command="{Binding RedoCommand}" />
-                    <Button Content="Sync &amp; Validate" Command="{Binding RefreshAllCommand}" Background="#0F172A" Foreground="White" />
-                </StackPanel>
-                <TextBlock DockPanel.Dock="Right" Text="{Binding StatusMessage}" VerticalAlignment="Center" Foreground="#475569" FontSize="12" />
-            </DockPanel>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,6">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="CONLANGER" FontWeight="Bold" FontSize="15" Foreground="#0F172A" VerticalAlignment="Center" Margin="0,0,14,0" />
+                        <TextBlock Text="Project:" VerticalAlignment="Center" Foreground="#475569" Margin="0,0,6,0" />
+                        <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}" Width="165" VerticalContentAlignment="Center" Margin="0,0,8,0" />
+                        <Border Background="#F1F5F9" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="4" Padding="7,2" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding CurrentFileName}" FontSize="11" Foreground="#334155" />
+                        </Border>
+                        <Button Content="Open .clproj..." Click="OnOpenProjectClick" />
+                        <Button Content="Save" Click="OnSaveProjectClick" />
+                        <Button Content="Save As..." Click="OnSaveAsProjectClick" />
+                        <Button Content="New / Reset" Command="{Binding NewProjectCommand}" />
+                        <Button Content="Undo" Command="{Binding UndoCommand}" />
+                        <Button Content="Redo" Command="{Binding RedoCommand}" />
+                        <Button Content="Sync &amp; Validate" Command="{Binding RefreshAllCommand}" Background="#0F172A" Foreground="White" />
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding AutosaveTime}" VerticalAlignment="Center" Foreground="#059669" FontSize="11" Margin="0,0,12,0" />
+                        <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Foreground="#475569" FontSize="12" />
+                    </StackPanel>
+                </DockPanel>
+
+                <!-- Secondary Bar: Lexicon Import/Export, Recent Projects & Versioned Backups -->
+                <WrapPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Import Lexicon (.csv/.json)" Click="OnImportLexiconClick" FontSize="11" Padding="8,3" />
+                    <Button Content="Export Lexicon CSV" Click="OnExportLexiconCsvClick" FontSize="11" Padding="8,3" />
+                    <Button Content="Export Lexicon JSON" Click="OnExportLexiconJsonClick" FontSize="11" Padding="8,3" Margin="0,0,16,0" />
+
+                    <TextBlock Text="Recent:" VerticalAlignment="Center" FontSize="11" Foreground="#475569" Margin="0,0,5,0" />
+                    <ComboBox x:Name="RecentProjectsCombo" ItemsSource="{Binding RecentProjects}" DisplayMemberPath="FileName" Width="170" Margin="0,0,4,0" FontSize="11" />
+                    <Button Content="Open Recent" Command="{Binding OpenRecentCommand}" CommandParameter="{Binding SelectedItem, ElementName=RecentProjectsCombo}" FontSize="11" Padding="8,3" Margin="0,0,14,0" />
+
+                    <TextBlock Text="Backups:" VerticalAlignment="Center" FontSize="11" Foreground="#475569" Margin="0,0,5,0" />
+                    <ComboBox x:Name="BackupsCombo" ItemsSource="{Binding BackupSnapshots}" DisplayMemberPath="Label" Width="210" Margin="0,0,4,0" FontSize="11" />
+                    <Button Content="Restore Snapshot" Command="{Binding RestoreBackupCommand}" CommandParameter="{Binding SelectedItem, ElementName=BackupsCombo}" FontSize="11" Padding="8,3" />
+                </WrapPanel>
+            </Grid>
         </Border>
 
         <!-- Bottom Central Diagnostics Bar -->
-        <Expander DockPanel.Dock="Bottom" Header="Project Diagnostics" IsExpanded="False" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" Padding="8,4">
-            <DataGrid ItemsSource="{Binding Diagnostics}" AutoGenerateColumns="False" IsReadOnly="True" MaxHeight="140">
+        <Expander DockPanel.Dock="Bottom" Header="{Binding DiagnosticsSummary}" IsExpanded="False" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" Padding="8,4">
+            <DataGrid ItemsSource="{Binding Diagnostics}" AutoGenerateColumns="False" IsReadOnly="True" MaxHeight="160">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="90" />
                     <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="120" />
@@ -45,7 +77,7 @@
             </DataGrid>
         </Expander>
 
-        <!-- Main Workspace Tabs (100% Declarative XAML UserControls) -->
+        <!-- Main Workspace Tabs (All 8 Declarative XAML UserControls) -->
         <TabControl Margin="10" Background="White">
             <TabItem Header="Phonology &amp; Phonotactics">
                 <views:PhonologyTab />
@@ -65,7 +97,10 @@
             <TabItem Header="Output &amp; Generator">
                 <views:OutputTab />
             </TabItem>
-            <TabItem Header="Extensions">
+            <TabItem Header="Inspectors">
+                <views:InspectorsTab />
+            </TabItem>
+            <TabItem Header="Extensions &amp; Pipeline">
                 <views:ExtensionsTab />
             </TabItem>
         </TabControl>

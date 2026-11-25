@@ -160,3 +160,41 @@ export function saveRecentProject(fileName: string, state: LanguageProjectState)
   }
   return next;
 }
+
+export interface BackupSnapshot {
+  id: string;
+  label: string;
+  createdAt: string;
+  state: LanguageProjectState;
+}
+
+const BACKUP_STORAGE_KEY = 'conlang_builder_backups_v2';
+
+export function loadBackupSnapshots(): BackupSnapshot[] {
+  try {
+    const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function createBackupSnapshot(state: LanguageProjectState, label: string): BackupSnapshot[] {
+  const existing = loadBackupSnapshots();
+  const snap: BackupSnapshot = {
+    id: `${Date.now()}`,
+    label: `${state.Name || 'Project'} (${label})`,
+    createdAt: new Date().toLocaleTimeString(),
+    state: structuredClone(state),
+  };
+  const next = [snap, ...existing].slice(0, 15);
+  try {
+    localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Ignore storage quota errors
+  }
+  return next;
+}
+

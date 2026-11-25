@@ -6,10 +6,13 @@ import {
   validateProject,
 } from './core/languageEngine';
 import {
+  BackupSnapshot,
+  createBackupSnapshot,
   exportLexiconToCsv,
   exportLexiconToJson,
   importLexiconFromText,
   loadAutosavedProject,
+  loadBackupSnapshots,
   loadRecentProjects,
   ProjectHistory,
   RecentProjectRecord,
@@ -58,6 +61,7 @@ export const App: React.FC = () => {
   const [recentProjects, setRecentProjects] = useState<RecentProjectRecord[]>(() =>
     loadRecentProjects()
   );
+  const [backups, setBackups] = useState<BackupSnapshot[]>(() => loadBackupSnapshots());
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [historyVersion, setHistoryVersion] = useState(0);
   const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
@@ -103,6 +107,7 @@ export const App: React.FC = () => {
   };
 
   const handleReset = () => {
+    setBackups(createBackupSnapshot(projectState, 'before-reset'));
     const fresh = createDefaultProjectState();
     setProjectState(fresh);
     setCurrentProjectFile('(unsaved)');
@@ -121,6 +126,7 @@ export const App: React.FC = () => {
     downloadTextFile(fileName, json, 'application/json;charset=utf-8');
     setCurrentProjectFile(fileName);
     setRecentProjects(saveRecentProject(fileName, projectState));
+    setBackups(createBackupSnapshot(projectState, 'manual-save'));
     setStatusMessage(`Saved ${fileName}`);
   };
 
@@ -326,19 +332,48 @@ export const App: React.FC = () => {
           </button>
         </div>
 
-        {recentProjects.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <span className="text-xs text-slate-500">Recent:</span>
-            {recentProjects.map((rec) => (
-              <button
-                key={rec.id}
-                type="button"
-                onClick={() => openRecent(rec)}
-                className="px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-mono"
-              >
-                {rec.fileName}
-              </button>
-            ))}
+        {(recentProjects.length > 0 || backups.length > 0) && (
+          <div className="flex flex-wrap items-center gap-3 pt-0.5">
+            {recentProjects.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-slate-500">Recent:</span>
+                {recentProjects.map((rec) => (
+                  <button
+                    key={rec.id}
+                    type="button"
+                    onClick={() => openRecent(rec)}
+                    className="px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-mono"
+                  >
+                    {rec.fileName}
+                  </button>
+                ))}
+              </div>
+            )}
+            {backups.length > 0 && (
+              <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                <span>Restore Backup:</span>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const snap = backups.find((b) => b.id === e.target.value);
+                    if (!snap) return;
+                    const normalized = normalizeLoadedProjectState(snap.state);
+                    setProjectState(normalized);
+                    historyRef.current?.push(normalized, 'Restored backup');
+                    setHistoryVersion((v) => v + 1);
+                    setStatusMessage(`Restored backup: ${snap.label}`);
+                  }}
+                  className="px-2 py-0.5 bg-slate-50 border border-slate-300 rounded text-xs"
+                >
+                  <option value="">{backups.length} snapshot(s)…</option>
+                  {backups.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.createdAt} — {b.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         )}
       </header>
@@ -381,7 +416,7 @@ export const App: React.FC = () => {
         )}
         {activeTab === 'Output' && <OutputTab state={projectState} />}
         {activeTab === 'Inspectors' && <InspectorsTab state={projectState} />}
-        {activeTab === 'Extensions' && <ExtensionsTab state={projectState} />}
+        {activeTab === 'Extensions' && <ExtensionsTab state={projectState} onUpdate={updateProject} />}
       </main>
 
       {/* Central Diagnostics Bar (Roadmap Phase 0 #3) */}

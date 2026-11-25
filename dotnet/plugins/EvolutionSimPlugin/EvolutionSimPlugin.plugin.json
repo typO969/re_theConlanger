@@ -1,9 +1,12 @@
 {
   "Id": "conlanger.evolution-sim",
-  "Name": "Diachronic Evolution Simulator",
+  "Name": "Evolution Simulator",
   "Version": "2.0.0",
-  "Author": "Conlanger",
-  "Description": "Applies ordered enabled phonology rules across the lexicon and generated vocabulary.",
+  "Author": "Conlang Builder",
+  "Description": "Generates sample lexicon candidates and simulates diachronic sound change directly from LanguageProject.",
+  "Website": "https://github.com/typO969/theConlanger",
+  "IsolationMode": "OutOfProcess",
+  "Capabilities": [ "OutputFiles", "UnifiedProjectRead", "PipelinePhonoRule" ],
   "EntryAssembly": "EvolutionSimPlugin.dll",
   "PluginTypeName": "EvolutionSimPlugin.Plugin"
 }

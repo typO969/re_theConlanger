@@ -11,10 +11,10 @@ public partial class WritingSystemsTab : UserControl
 {
     public WritingSystemsTab() => InitializeComponent();
 
-    private void OnExportSvgClick(object sender, RoutedEventArgs e)
+    private async void OnExportSvgClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
-        var tokens = WritingSystemEngine.TokenizeRawInput(vm.ShapingInput, vm.Project.WritingSystem.Glyphs.Keys);
+        var tokens = vm.BuildCurrentLayer1Tokens(out _);
         var shaped = WritingSystemEngine.RunShapingGraph(tokens, vm.Project.WritingSystem);
         var svg = WritingSystemEngine.ExportShapedSvg(shaped, vm.Project.WritingSystem);
 
@@ -23,10 +23,16 @@ public partial class WritingSystemsTab : UserControl
             Filter = "Scalable Vector Graphics (*.svg)|*.svg",
             FileName = $"{vm.ProjectName}-script.svg"
         };
-        if (dlg.ShowDialog() == true)
+        if (dlg.ShowDialog() != true) return;
+
+        try
         {
-            File.WriteAllText(dlg.FileName, svg);
+            await File.WriteAllTextAsync(dlg.FileName, svg);
             vm.StatusMessage = $"Exported SVG to {Path.GetFileName(dlg.FileName)}";
+        }
+        catch
+        {
+            vm.StatusMessage = "Failed to export SVG";
         }
     }
 }

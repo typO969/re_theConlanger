@@ -6,11 +6,12 @@
              xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
-             d:DesignHeight="640" d:DesignWidth="1160">
+             d:DesignHeight="700" d:DesignWidth="1200">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="1.2*" />
@@ -22,25 +23,72 @@
             <ComboBox ItemsSource="{Binding CapitalizationModes}" SelectedItem="{Binding SelectedCapitalization}" Width="180" />
         </StackPanel>
 
-        <GroupBox Grid.Row="1" Grid.Column="0" Header="Grapheme Mapping Rules (Context-Aware)" Margin="0,0,10,0">
-            <DataGrid ItemsSource="{Binding OrthographyRules}" AutoGenerateColumns="False" CanUserAddRows="True">
-                <DataGrid.Columns>
-                    <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="45" />
-                    <DataGridTextColumn Header="Phone" Binding="{Binding Phone}" Width="80" />
-                    <DataGridTextColumn Header="Grapheme" Binding="{Binding Grapheme}" Width="100" />
-                    <DataGridTextColumn Header="Prev" Binding="{Binding PrevContext}" Width="80" />
-                    <DataGridTextColumn Header="Next" Binding="{Binding NextContext}" Width="*" />
-                </DataGrid.Columns>
-            </DataGrid>
+        <GroupBox Grid.Row="1" Grid.Column="0" Header="Grapheme Mapping Rules (Context-Aware)" Margin="0,0,10,10">
+            <DockPanel>
+                <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBox Text="{Binding NewOrthPhone, UpdateSourceTrigger=PropertyChanged}" Width="62" ToolTip="Phone" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding NewOrthGrapheme, UpdateSourceTrigger=PropertyChanged}" Width="68" ToolTip="Grapheme" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding NewOrthPrev, UpdateSourceTrigger=PropertyChanged}" Width="55" ToolTip="Prev Context" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding NewOrthNext, UpdateSourceTrigger=PropertyChanged}" Width="55" ToolTip="Next Context" Margin="0,0,6,0" />
+                    <Button Content="+ Mapping" Command="{Binding AddOrthRuleCommand}" />
+                </WrapPanel>
+                <DataGrid ItemsSource="{Binding OrthographyRules}" AutoGenerateColumns="False" CanUserAddRows="False">
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="40" />
+                        <DataGridTextColumn Header="Phone" Binding="{Binding Phone}" Width="75" />
+                        <DataGridTextColumn Header="Grapheme" Binding="{Binding Grapheme}" Width="90" />
+                        <DataGridTextColumn Header="Prev" Binding="{Binding PrevContext}" Width="75" />
+                        <DataGridTextColumn Header="Next" Binding="{Binding NextContext}" Width="*" />
+                        <DataGridTemplateColumn Width="36">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="×" Padding="4,1" Margin="0"
+                                            Command="{Binding DataContext.RemoveOrthRuleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
         </GroupBox>
 
-        <GroupBox Grid.Row="1" Grid.Column="1" Header="Digraph / Spelling Exceptions">
-            <DataGrid ItemsSource="{Binding OrthographyExceptions}" AutoGenerateColumns="False" CanUserAddRows="True">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Match Input" Binding="{Binding Input}" Width="*" />
-                    <DataGridTextColumn Header="Replace With" Binding="{Binding Output}" Width="*" />
-                </DataGrid.Columns>
-            </DataGrid>
+        <GroupBox Grid.Row="1" Grid.Column="1" Header="Whole-Word Spelling Exceptions" Margin="0,0,0,10">
+            <DockPanel>
+                <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBox Text="{Binding NewExInput, UpdateSourceTrigger=PropertyChanged}" Width="110" ToolTip="Match Word" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding NewExOutput, UpdateSourceTrigger=PropertyChanged}" Width="110" ToolTip="Replace With" Margin="0,0,6,0" />
+                    <Button Content="+ Exception" Command="{Binding AddOrthExceptionCommand}" />
+                </WrapPanel>
+                <DataGrid ItemsSource="{Binding OrthographyExceptions}" AutoGenerateColumns="False" CanUserAddRows="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Match Input" Binding="{Binding Input}" Width="*" />
+                        <DataGridTextColumn Header="Replace With" Binding="{Binding Output}" Width="*" />
+                        <DataGridTemplateColumn Width="36">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="×" Padding="4,1" Margin="0"
+                                            Command="{Binding DataContext.RemoveOrthExceptionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </GroupBox>
+
+        <GroupBox Grid.Row="2" Grid.ColumnSpan="2" Header="Live Orthography &amp; Layer 1 Tokenization Preview">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="Surface Input:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBox Text="{Binding OrthPreviewInput, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,8,0" />
+                    <Button Content="Render" Command="{Binding RefreshOrthPreviewCommand}" />
+                    <TextBlock Text="Rendered:" VerticalAlignment="Center" Foreground="#475569" Margin="12,0,6,0" />
+                    <TextBlock Text="{Binding OrthPreviewOutput}" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Foreground="#0F172A" />
+                </StackPanel>
+                <TextBlock Text="{Binding OrthPreviewTokens}" FontFamily="Consolas" FontSize="12" Foreground="#475569" TextWrapping="Wrap" />
+            </StackPanel>
         </GroupBox>
     </Grid>
 </UserControl>

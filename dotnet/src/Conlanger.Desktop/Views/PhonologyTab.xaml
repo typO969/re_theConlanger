@@ -6,69 +6,217 @@
              xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
-             d:DesignHeight="680" d:DesignWidth="1180">
+             d:DesignHeight="760" d:DesignWidth="1280">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.2*" />
-            <ColumnDefinition Width="1*" />
+            <ColumnDefinition Width="1.15*" />
+            <ColumnDefinition Width="1.15*" />
         </Grid.ColumnDefinitions>
 
-        <GroupBox Grid.Row="0" Grid.Column="0" Header="Phoneme Inventory &amp; Distinctive Features Matrix" Margin="0,0,10,10">
-            <DataGrid ItemsSource="{Binding Phonemes}" AutoGenerateColumns="False" CanUserAddRows="True">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Symbol" Binding="{Binding Symbol}" Width="65" />
-                    <DataGridTextColumn Header="C/V" Binding="{Binding Type}" Width="45" />
-                    <DataGridTextColumn Header="Wt" Binding="{Binding Weight}" Width="45" />
-                    <DataGridCheckBoxColumn Header="Onset" Binding="{Binding AllowOnset}" Width="55" />
-                    <DataGridCheckBoxColumn Header="Coda" Binding="{Binding AllowCoda}" Width="55" />
-                    <DataGridTextColumn Header="Voicing" Binding="{Binding Features.Voicing}" Width="80" />
-                    <DataGridTextColumn Header="Manner" Binding="{Binding Features.Manner}" Width="85" />
-                    <DataGridTextColumn Header="Place" Binding="{Binding Features.Place}" Width="85" />
-                    <DataGridTextColumn Header="Height" Binding="{Binding Features.Height}" Width="70" />
-                </DataGrid.Columns>
-            </DataGrid>
+        <!-- Left Column: Phoneme Inventory & Distinctive Features -->
+        <GroupBox Grid.Row="0" Grid.Column="0" Header="Phoneme Inventory &amp; Distinctive Features" Margin="0,0,10,10">
+            <DockPanel>
+                <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Symbol:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding NewPhonemeSymbol, UpdateSourceTrigger=PropertyChanged}" Width="60" Margin="0,0,8,0" />
+                    <TextBlock Text="Wt:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox Text="{Binding NewPhonemeWeight, UpdateSourceTrigger=PropertyChanged}" Width="42" Margin="0,0,8,0" />
+                    <CheckBox Content="Onset" IsChecked="{Binding NewAllowOnset}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <CheckBox Content="Coda" IsChecked="{Binding NewAllowCoda}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Button Content="+ Consonant" Command="{Binding AddConsonantCommand}" />
+                    <Button Content="+ Vowel" Command="{Binding AddVowelCommand}" />
+                    <Button Content="Toggle Features Matrix" Command="{Binding ToggleFeatureEditorCommand}" />
+                </WrapPanel>
+
+                <!-- Optional Distinctive Features Matrix -->
+                <DataGrid DockPanel.Dock="Bottom"
+                          Visibility="{Binding ShowFeatureEditor, Converter={StaticResource BoolToVis}}"
+                          ItemsSource="{Binding Phonemes}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          MaxHeight="190"
+                          Margin="0,8,0,0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Sym" Binding="{Binding Symbol}" Width="50" IsReadOnly="True" />
+                        <DataGridTextColumn Header="C/V" Binding="{Binding Type}" Width="40" IsReadOnly="True" />
+                        <DataGridTextColumn Header="Voicing" Binding="{Binding Features.Voicing}" Width="75" />
+                        <DataGridTextColumn Header="Manner" Binding="{Binding Features.Manner}" Width="85" />
+                        <DataGridTextColumn Header="Place" Binding="{Binding Features.Place}" Width="85" />
+                        <DataGridTextColumn Header="Height" Binding="{Binding Features.Height}" Width="65" />
+                        <DataGridTextColumn Header="Backness" Binding="{Binding Features.Backness}" Width="75" />
+                        <DataGridTextColumn Header="Round" Binding="{Binding Features.Roundness}" Width="70" />
+                        <DataGridTextColumn Header="Custom" Binding="{Binding Features.Custom}" Width="*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Consonants & Vowels Split Grids -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.2*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <DataGrid Grid.Column="0" ItemsSource="{Binding Consonants}" AutoGenerateColumns="False" CanUserAddRows="False" Margin="0,0,6,0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Cons" Binding="{Binding Symbol}" Width="55" />
+                            <DataGridTextColumn Header="Wt" Binding="{Binding Weight}" Width="40" />
+                            <DataGridCheckBoxColumn Header="Ons" Binding="{Binding AllowOnset}" Width="45" />
+                            <DataGridCheckBoxColumn Header="Cod" Binding="{Binding AllowCoda}" Width="45" />
+                            <DataGridTextColumn Header="Features" Binding="{Binding Features.Manner}" Width="*" IsReadOnly="True" />
+                            <DataGridTemplateColumn Width="36">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="×" Padding="4,1" Margin="0"
+                                                Command="{Binding DataContext.RemovePhonemeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <DataGrid Grid.Column="1" ItemsSource="{Binding Vowels}" AutoGenerateColumns="False" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Vowel" Binding="{Binding Symbol}" Width="55" />
+                            <DataGridTextColumn Header="Wt" Binding="{Binding Weight}" Width="40" />
+                            <DataGridTextColumn Header="Height" Binding="{Binding Features.Height}" Width="*" IsReadOnly="True" />
+                            <DataGridTemplateColumn Width="36">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="×" Padding="4,1" Margin="0"
+                                                Command="{Binding DataContext.RemovePhonemeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </DockPanel>
         </GroupBox>
 
+        <!-- Right Column: Syllables, Phonotactics, Primary Stress, Ordered Rules -->
         <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,10">
             <Grid.RowDefinitions>
-                <RowDefinition Height="160" />
+                <RowDefinition Height="145" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <GroupBox Grid.Row="0" Header="Syllable Templates (Weighted)">
-                <DataGrid ItemsSource="{Binding SyllableTemplates}" AutoGenerateColumns="False" CanUserAddRows="True">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Pattern" Binding="{Binding Pattern}" Width="*" />
-                        <DataGridTextColumn Header="Weight" Binding="{Binding Weight}" Width="90" />
-                    </DataGrid.Columns>
-                </DataGrid>
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Pattern:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NewTemplatePattern, UpdateSourceTrigger=PropertyChanged}" Width="80" Margin="0,0,8,0" />
+                        <TextBlock Text="Weight:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NewTemplateWeight, UpdateSourceTrigger=PropertyChanged}" Width="45" Margin="0,0,8,0" />
+                        <Button Content="+ Add Template" Command="{Binding AddTemplateCommand}" />
+                    </StackPanel>
+                    <DataGrid ItemsSource="{Binding SyllableTemplates}" AutoGenerateColumns="False" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Pattern" Binding="{Binding Pattern}" Width="*" />
+                            <DataGridTextColumn Header="Weight" Binding="{Binding Weight}" Width="75" />
+                            <DataGridTemplateColumn Width="36">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="×" Padding="4,1" Margin="0"
+                                                Command="{Binding DataContext.RemoveTemplateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
             </GroupBox>
 
-            <GroupBox Grid.Row="1" Header="Ordered Phonological Rules (Supports ∅, #, [+voice])">
-                <DataGrid ItemsSource="{Binding PhonologyRules}" AutoGenerateColumns="False" CanUserAddRows="True">
-                    <DataGrid.Columns>
-                        <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="42" />
-                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="120" />
-                        <DataGridTextColumn Header="Target" Binding="{Binding Target}" Width="55" />
-                        <DataGridTextColumn Header="Repl" Binding="{Binding Replacement}" Width="55" />
-                        <DataGridTextColumn Header="Prev" Binding="{Binding PrevPhone}" Width="50" />
-                        <DataGridTextColumn Header="Next" Binding="{Binding NextPhone}" Width="50" />
-                        <DataGridTextColumn Header="Condition" Binding="{Binding Condition}" Width="*" />
-                    </DataGrid.Columns>
-                </DataGrid>
+            <GroupBox Grid.Row="1" Header="Phonotactics &amp; Primary Stress (Step 3)">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="85" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Allowed Onsets:" VerticalAlignment="Center" Margin="0,0,6,6" />
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding AllowedOnsetsText, UpdateSourceTrigger=LostFocus}" Margin="0,0,12,6" />
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Max Onset:" VerticalAlignment="Center" Margin="0,0,6,6" />
+                    <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding MaxOnsetCluster, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,6" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Allowed Codas:" VerticalAlignment="Center" Margin="0,0,6,6" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AllowedCodasText, UpdateSourceTrigger=LostFocus}" Margin="0,0,12,6" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Max Coda:" VerticalAlignment="Center" Margin="0,0,6,6" />
+                    <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding MaxCodaCluster, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,6" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Forbidden Regex:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ForbiddenPatternsText, UpdateSourceTrigger=LostFocus}" AcceptsReturn="True" Height="42" Margin="0,0,12,0" />
+                    <TextBlock Grid.Row="2" Grid.Column="2" Text="Primary Stress:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox Grid.Row="2" Grid.Column="3" ItemsSource="{Binding StressPatterns}" SelectedItem="{Binding SelectedStressPattern}" VerticalAlignment="Center" />
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Grid.Row="2" Header="Ordered Phonological Rules (Supports ∅, V, C, #, [+voice], [-stressed], [manner=...])">
+                <DockPanel>
+                    <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBox Text="{Binding NewRuleName, UpdateSourceTrigger=PropertyChanged}" Width="115" ToolTip="Rule Name" Margin="0,0,4,4" />
+                        <TextBox Text="{Binding NewRuleTarget, UpdateSourceTrigger=PropertyChanged}" Width="55" ToolTip="Target" Margin="0,0,4,4" />
+                        <TextBox Text="{Binding NewRuleReplacement, UpdateSourceTrigger=PropertyChanged}" Width="55" ToolTip="Replacement" Margin="0,0,4,4" />
+                        <TextBox Text="{Binding NewRulePrev, UpdateSourceTrigger=PropertyChanged}" Width="50" ToolTip="Prev Context" Margin="0,0,4,4" />
+                        <TextBox Text="{Binding NewRuleNext, UpdateSourceTrigger=PropertyChanged}" Width="50" ToolTip="Next Context" Margin="0,0,4,4" />
+                        <TextBox Text="{Binding NewRuleCond, UpdateSourceTrigger=PropertyChanged}" Width="85" ToolTip="Feature Condition" Margin="0,0,6,4" />
+                        <Button Content="+ Rule" Command="{Binding AddRuleCommand}" Margin="0,0,0,4" />
+                    </WrapPanel>
+                    <DataGrid ItemsSource="{Binding PhonologyRules}" SelectedItem="{Binding SelectedRule}" AutoGenerateColumns="False" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="38" />
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="110" />
+                            <DataGridTextColumn Header="Tgt" Binding="{Binding Target}" Width="50" />
+                            <DataGridTextColumn Header="Rep" Binding="{Binding Replacement}" Width="45" />
+                            <DataGridTextColumn Header="Prev" Binding="{Binding PrevPhone}" Width="45" />
+                            <DataGridTextColumn Header="Next" Binding="{Binding NextPhone}" Width="45" />
+                            <DataGridTextColumn Header="Condition" Binding="{Binding Condition}" Width="*" />
+                            <DataGridTemplateColumn Header="Order" Width="92">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="↑" Padding="5,1" Margin="0,0,2,0"
+                                                    Command="{Binding DataContext.MoveRuleUpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                            <Button Content="↓" Padding="5,1" Margin="0,0,2,0"
+                                                    Command="{Binding DataContext.MoveRuleDownCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                            <Button Content="×" Padding="5,1" Margin="0"
+                                                    Command="{Binding DataContext.RemoveRuleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
             </GroupBox>
         </Grid>
 
-        <GroupBox Grid.Row="1" Grid.ColumnSpan="2" Header="Live Phonology &amp; Syllabifier Derivation">
+        <!-- Bottom: Live Phonology & Stress Syllabifier Trace -->
+        <GroupBox Grid.Row="1" Grid.ColumnSpan="2" Header="Live Phonology, Stress &amp; Maximal-Onset Syllabifier Derivation">
             <DockPanel LastChildFill="True">
-                <TextBlock DockPanel.Dock="Left" Text="Space-separated UR:" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <TextBox DockPanel.Dock="Left" Text="{Binding TestWordUr, UpdateSourceTrigger=PropertyChanged}" Width="180" Margin="0,0,8,0" VerticalContentAlignment="Center" />
-                <Button DockPanel.Dock="Left" Content="Derive" Command="{Binding TestDerivationCommand}" />
-                <TextBlock Text="{Binding DerivationResult}" VerticalAlignment="Center" FontFamily="Consolas" Margin="8,0,0,0" />
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Top">
+                    <TextBlock Text="Space-separated UR:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBox Text="{Binding TestWordUr, UpdateSourceTrigger=PropertyChanged}" Width="190" Margin="0,0,8,0" VerticalContentAlignment="Center" />
+                    <Button Content="Derive" Command="{Binding TestDerivationCommand}" />
+                </StackPanel>
+                <TextBox Text="{Binding DerivationResult, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Height="74" FontFamily="Consolas" Background="#F8FAFC" BorderThickness="0" />
             </DockPanel>
         </GroupBox>
     </Grid>
