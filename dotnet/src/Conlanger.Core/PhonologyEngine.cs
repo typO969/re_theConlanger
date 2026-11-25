@@ -20,39 +20,81 @@ public static class PhonologyEngine
     private static readonly HashSet<string> KnownVowels = new(StringComparer.Ordinal)
     {
         "a", "e", "i", "o", "u", "ə", "ɛ", "ɔ", "æ", "ø", "œ", "y", "ɨ", "ɯ", "ʌ", "ɑ", "ɒ", "ɐ", "ɤ", "ɪ", "ʊ",
-        "aː", "eː", "iː", "oː", "uː"
+        "ɚ", "ɝː", "aː", "eː", "iː", "oː", "uː", "ɑː", "ɔː", "eɪ", "oʊ", "aɪ", "aʊ", "ɔɪ"
     };
+
+    private static readonly HashSet<char> VowelBaseChars = new("aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤɚɝ");
 
     private static readonly HashSet<string> SibilantSymbols = new(StringComparer.Ordinal)
     {
         "s", "z", "ʃ", "ʒ", "tʃ", "dʒ"
     };
 
+    private static readonly Dictionary<string, string> NasalPlaceFallback = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["bilabial"] = "m",
+        ["labiodental"] = "ɱ",
+        ["dental"] = "n",
+        ["alveolar"] = "n",
+        ["postalveolar"] = "ɲ",
+        ["palatal"] = "ɲ",
+        ["velar"] = "ŋ"
+    };
+
+    public static string StripStressMark(string phone) => phone.TrimStart('ˈ');
+
+    public static bool HasStressMark(string phone) => phone.StartsWith('ˈ');
+
+    private static string CleanDiacritics(string phone) =>
+        phone.Replace("ˈ", "", StringComparison.Ordinal).Replace("ʰ", "", StringComparison.Ordinal);
+
     public static bool IsVowel(string phone, LanguageProject project)
     {
-        var clean = phone.TrimStart('ˈ');
-        var custom = project.Phonemes.FirstOrDefault(p => p.Symbol == clean);
+        if (string.IsNullOrEmpty(phone)) return false;
+        var clean = StripStressMark(phone);
+        var custom = project.Phonemes.FirstOrDefault(p => StripStressMark(p.Symbol) == clean);
         if (custom is not null) return custom.Type == "V";
-        return KnownVowels.Contains(clean) || project.Vowels.Contains(clean);
+        if (KnownVowels.Contains(clean) || project.Vowels.Contains(clean)) return true;
+        return clean.Length > 0 && VowelBaseChars.Contains(clean[0]);
     }
 
-    public static int ResolveStressSyllableIndex(int syllableCount, StressPattern pattern) => pattern switch
+    public static int ResolveStressSyllableIndex(int syllableCount, StressPattern pattern) =>
+        ResolveStressSyllableIndex(syllableCount, pattern, null);
+
+    public static int ResolveStressSyllableIndex(int syllableCount, StressPattern pattern, IReadOnlyList<Syllable>? syllables)
     {
-        StressPattern.None => -1,
-        _ when syllableCount <= 0 => -1,
-        StressPattern.Initial => 0,
-        StressPattern.Final => syllableCount - 1,
-        StressPattern.Penultimate => syllableCount >= 2 ? syllableCount - 2 : 0,
-        _ => -1
-    };
+        if (syllableCount <= 0 || pattern == StressPattern.None) return -1;
+        if (pattern == StressPattern.Lexical && syllables is not null)
+        {
+            for (int i = 0; i < syllables.Count; i++)
+            {
+                var s = syllables[i];
+                if (s.Onset.Any(HasStressMark) || s.Nucleus.Any(HasStressMark) || s.Coda.Any(HasStressMark))
+                    return i;
+            }
+            return -1;
+        }
+        return pattern switch
+        {
+            StressPattern.Initial => 0,
+            StressPattern.Final => syllableCount - 1,
+            StressPattern.Penultimate => syllableCount >= 2 ? syllableCount - 2 : 0,
+            _ => -1
+        };
+    }
 
     public static HashSet<int> ComputeStressedPhoneIndices(IReadOnlyList<string> phones, LanguageProject project)
     {
         var stressed = new HashSet<int>();
-        if (project.StressPattern == StressPattern.None || phones.Count == 0) return stressed;
+        if (phones.Count == 0) return stressed;
+        bool hasExplicitMark = phones.Any(HasStressMark);
+        if (project.StressPattern == StressPattern.None && !hasExplicitMark) return stressed;
 
         var syls = Syllabify(phones, project);
-        int targetIdx = ResolveStressSyllableIndex(syls.Count, project.StressPattern);
+        var effectivePattern = hasExplicitMark && project.StressPattern == StressPattern.None
+            ? StressPattern.Lexical
+            : project.StressPattern;
+        int targetIdx = ResolveStressSyllableIndex(syls.Count, effectivePattern, syls);
         if (targetIdx < 0) return stressed;
 
         int offset = 0;
@@ -141,29 +183,33 @@ public static class PhonologyEngine
     public static bool IsOnsetAllowed(IReadOnlyList<string> phones, LanguageProject project)
     {
         if (phones.Count == 0) return true;
-        if (phones.Count > project.Phonotactics.MaxOnsetCluster) return false;
-        foreach (var sym in phones)
+        foreach (var raw in phones)
         {
-            var ph = project.Phonemes.FirstOrDefault(p => p.Symbol == sym);
+            var cleanSym = StripStressMark(raw);
+            var ph = project.Phonemes.FirstOrDefault(p => StripStressMark(p.Symbol) == cleanSym);
             if (ph is not null && !ph.AllowOnset) return false;
         }
+        var cleanCluster = string.Concat(phones.Select(CleanDiacritics));
+        if (project.Phonotactics.AllowedOnsets.Contains(cleanCluster)) return true;
+        if (phones.Count > project.Phonotactics.MaxOnsetCluster) return false;
         if (phones.Count == 1) return true;
-        if (project.Phonotactics.AllowedOnsets.Count == 0) return true;
-        return project.Phonotactics.AllowedOnsets.Contains(string.Concat(phones));
+        return project.Phonotactics.AllowedOnsets.Count == 0 || project.Phonotactics.AllowedOnsets.Contains(cleanCluster);
     }
 
     public static bool IsCodaAllowed(IReadOnlyList<string> phones, LanguageProject project)
     {
         if (phones.Count == 0) return true;
-        if (phones.Count > project.Phonotactics.MaxCodaCluster) return false;
-        foreach (var sym in phones)
+        foreach (var raw in phones)
         {
-            var ph = project.Phonemes.FirstOrDefault(p => p.Symbol == sym);
+            var cleanSym = StripStressMark(raw);
+            var ph = project.Phonemes.FirstOrDefault(p => StripStressMark(p.Symbol) == cleanSym);
             if (ph is not null && !ph.AllowCoda) return false;
         }
+        var cleanCluster = string.Concat(phones.Select(CleanDiacritics));
+        if (project.Phonotactics.AllowedCodas.Contains(cleanCluster)) return true;
+        if (phones.Count > project.Phonotactics.MaxCodaCluster) return false;
         if (phones.Count == 1) return true;
-        if (project.Phonotactics.AllowedCodas.Count == 0) return true;
-        return project.Phonotactics.AllowedCodas.Contains(string.Concat(phones));
+        return project.Phonotactics.AllowedCodas.Count == 0 || project.Phonotactics.AllowedCodas.Contains(cleanCluster);
     }
 
     public static IReadOnlyList<string> ValidateWordPhonotactics(IReadOnlyList<string> phones, LanguageProject project)
@@ -189,11 +235,18 @@ public static class PhonologyEngine
         {
             var s = syllables[i];
             if (!IsOnsetAllowed(s.Onset, project))
-                issues.Add($"Illegal onset '{string.Concat(s.Onset)}' in syllable {i + 1}");
+                issues.Add($"Illegal onset '{string.Concat(s.Onset.Select(CleanDiacritics))}' in syllable {i + 1}");
             if (!IsCodaAllowed(s.Coda, project))
-                issues.Add($"Illegal coda '{string.Concat(s.Coda)}' in syllable {i + 1}");
+                issues.Add($"Illegal coda '{string.Concat(s.Coda.Select(CleanDiacritics))}' in syllable {i + 1}");
         }
         return issues;
+    }
+
+    private static Phoneme ResolvePhoneme(string phone, LanguageProject project)
+    {
+        var clean = StripStressMark(phone);
+        return project.Phonemes.FirstOrDefault(p => StripStressMark(p.Symbol) == clean)
+            ?? ProjectFactory.CreatePhoneme(clean, IsVowel(clean, project) ? "V" : "C");
     }
 
     private static bool MatchesSingleClause(
@@ -205,6 +258,7 @@ public static class PhonologyEngine
     {
         var body = clause.Trim();
         if (string.IsNullOrEmpty(body)) return true;
+        var clean = StripStressMark(phone);
 
         if (body.StartsWith('+') || body.StartsWith('-'))
         {
@@ -217,8 +271,7 @@ public static class PhonologyEngine
                 return positive ? isStressed : !isStressed;
             }
 
-            var ph = project.Phonemes.FirstOrDefault(p => p.Symbol == phone)
-                ?? ProjectFactory.CreatePhoneme(phone, IsVowel(phone, project) ? "V" : "C");
+            var ph = ResolvePhoneme(clean, project);
 
             if (feat is "voice" or "voicing" or "voiced")
             {
@@ -232,7 +285,7 @@ public static class PhonologyEngine
             }
             if (feat == "sibilant")
             {
-                bool sib = SibilantSymbols.Contains(phone) || ph.Features.Custom.Contains("sibilant", StringComparison.OrdinalIgnoreCase);
+                bool sib = SibilantSymbols.Contains(clean) || ph.Features.Custom.Contains("sibilant", StringComparison.OrdinalIgnoreCase);
                 return positive ? sib : !sib;
             }
             if (feat == "sonorant")
@@ -247,8 +300,7 @@ public static class PhonologyEngine
 
         if (body.Contains('='))
         {
-            var ph = project.Phonemes.FirstOrDefault(p => p.Symbol == phone)
-                ?? ProjectFactory.CreatePhoneme(phone, IsVowel(phone, project) ? "V" : "C");
+            var ph = ResolvePhoneme(clean, project);
             var kv = body.Split('=', 2);
             var k = kv[0].Trim().ToLowerInvariant();
             var v = kv[1].Trim().ToLowerInvariant();
@@ -269,7 +321,7 @@ public static class PhonologyEngine
         return true;
     }
 
-    private static bool MatchesCondition(
+    internal static bool MatchesCondition(
         string? phone,
         string? condition,
         LanguageProject project,
@@ -299,11 +351,85 @@ public static class PhonologyEngine
         var exp = expected.Trim();
         if (exp == "#") return actual is null;
         if (actual is null) return false;
-        if (exp == "V") return IsVowel(actual, project);
-        if (exp == "C") return !IsVowel(actual, project);
+        var cleanActual = StripStressMark(actual);
+        if (exp == "V") return IsVowel(cleanActual, project);
+        if (exp == "C") return !IsVowel(cleanActual, project);
         if (exp.StartsWith('[') && exp.EndsWith(']'))
-            return MatchesCondition(actual, exp, project, stressedSet, actualIndex);
-        return actual == exp;
+            return MatchesCondition(cleanActual, exp, project, stressedSet, actualIndex);
+        return exp.StartsWith('ˈ') ? actual == exp : cleanActual == exp;
+    }
+
+    private static (HashSet<int> Starts, HashSet<int> Ends) ComputeSyllableBoundarySets(IReadOnlyList<string> phones, LanguageProject project)
+    {
+        var starts = new HashSet<int>();
+        var ends = new HashSet<int>();
+        var syls = Syllabify(phones, project);
+        int offset = 0;
+        foreach (var s in syls)
+        {
+            int len = s.Onset.Count + s.Nucleus.Count + s.Coda.Count;
+            if (len > 0)
+            {
+                starts.Add(offset);
+                ends.Add(offset + len - 1);
+            }
+            offset += len;
+        }
+        return (starts, ends);
+    }
+
+    private static string ResolveAlphaPlaceReplacement(
+        string targetPhone,
+        IReadOnlyList<string> phones,
+        int pos,
+        string? prevTarget,
+        string? nextTarget,
+        LanguageProject project)
+    {
+        var prevT = prevTarget?.Trim() ?? "";
+        var nextT = nextTarget?.Trim() ?? "";
+        string? condPhone = null;
+        if (!string.IsNullOrEmpty(nextT) && nextT is not "#" and not "$" and not "." && pos + 1 < phones.Count)
+            condPhone = phones[pos + 1];
+        else if (!string.IsNullOrEmpty(prevT) && prevT is not "#" and not "$" and not "." && pos > 0)
+            condPhone = phones[pos - 1];
+
+        if (string.IsNullOrEmpty(condPhone)) return targetPhone;
+
+        var targetPlace = ResolvePhoneme(condPhone, project).Features.Place.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(targetPlace)) return targetPhone;
+
+        var cleanTarget = StripStressMark(targetPhone);
+        var srcFeat = ResolvePhoneme(cleanTarget, project).Features;
+        var srcManner = srcFeat.Manner.ToLowerInvariant();
+        var srcVoicing = srcFeat.Voicing.ToLowerInvariant();
+        bool keepStress = HasStressMark(targetPhone);
+
+        var exactMatch = project.Phonemes.FirstOrDefault(p =>
+            p.Type == "C" &&
+            string.Equals(p.Features.Place, targetPlace, StringComparison.OrdinalIgnoreCase) &&
+            (string.IsNullOrEmpty(srcManner) || string.Equals(p.Features.Manner, srcManner, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(srcVoicing) || string.Equals(p.Features.Voicing, srcVoicing, StringComparison.OrdinalIgnoreCase)));
+        if (exactMatch is not null)
+            return keepStress && !HasStressMark(exactMatch.Symbol) ? $"ˈ{exactMatch.Symbol}" : exactMatch.Symbol;
+
+        if (srcManner == "nasal" || cleanTarget is "m" or "ɱ" or "n" or "ɲ" or "ŋ")
+        {
+            var mapped = NasalPlaceFallback.GetValueOrDefault(targetPlace, cleanTarget);
+            return keepStress ? $"ˈ{mapped}" : mapped;
+        }
+
+        foreach (var kv in ProjectFactory.EnumerateKnownFeatures())
+        {
+            if (string.Equals(kv.Value.Place, targetPlace, StringComparison.OrdinalIgnoreCase) &&
+                (string.IsNullOrEmpty(srcManner) || string.Equals(kv.Value.Manner, srcManner, StringComparison.OrdinalIgnoreCase)) &&
+                (string.IsNullOrEmpty(srcVoicing) || string.Equals(kv.Value.Voicing, srcVoicing, StringComparison.OrdinalIgnoreCase)))
+            {
+                return keepStress ? $"ˈ{kv.Key}" : kv.Key;
+            }
+        }
+
+        return targetPhone;
     }
 
     public static IReadOnlyList<string> ApplyRule(
@@ -316,6 +442,11 @@ public static class PhonologyEngine
 
         var target = rule.Target.Trim();
         var replacement = rule.Replacement.Trim();
+        var prevT = rule.PrevPhone?.Trim() ?? "";
+        var nextT = rule.NextPhone?.Trim() ?? "";
+        bool needsBounds = prevT is "$" or "." || nextT is "$" or ".";
+        var sylBounds = needsBounds ? ComputeSyllableBoundarySets(phones, project) : default;
+
         var isDeletion = replacement is "∅" or "0" or "";
         var isEpenthesis = target is "∅" or "0" or "";
 
@@ -328,34 +459,55 @@ public static class PhonologyEngine
             {
                 string? prev = i > 0 ? phones[i - 1] : null;
                 string? next = i < phones.Count ? phones[i] : null;
-                if ((!string.IsNullOrWhiteSpace(rule.PrevPhone) || !string.IsNullOrWhiteSpace(rule.NextPhone)) &&
-                    MatchesPhoneOrClass(prev, rule.PrevPhone, project, stressedSet, i - 1) &&
-                    MatchesPhoneOrClass(next, rule.NextPhone, project, stressedSet, i))
-                {
+                bool prevOk = prevT is "$" or "."
+                    ? sylBounds.Starts.Contains(i)
+                    : MatchesPhoneOrClass(prev, prevT, project, stressedSet, i - 1);
+                bool nextOk = nextT is "$" or "."
+                    ? sylBounds.Ends.Contains(i - 1)
+                    : MatchesPhoneOrClass(next, nextT, project, stressedSet, i);
+
+                if ((!string.IsNullOrEmpty(prevT) || !string.IsNullOrEmpty(nextT)) && prevOk && nextOk)
                     outList.AddRange(repPhones);
-                }
                 if (i < phones.Count) outList.Add(phones[i]);
             }
             return outList;
         }
 
+        bool isAlphaPlace = replacement == "[αplace]" || string.Equals(replacement, "[alpha-place]", StringComparison.OrdinalIgnoreCase);
         var result = new List<string>(phones.Count);
         var subPhones = isDeletion ? Array.Empty<string>() : replacement.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         for (int i = 0; i < phones.Count; i++)
         {
             var cur = phones[i];
-            string? prev = i > 0 ? phones[i - 1] : null;
-            string? next = i < phones.Count - 1 ? phones[i + 1] : null;
-
             bool targetHit = MatchesPhoneOrClass(cur, target, project, stressedSet, i);
-            bool ctxOk = MatchesPhoneOrClass(prev, rule.PrevPhone, project, stressedSet, i - 1)
-                && MatchesPhoneOrClass(next, rule.NextPhone, project, stressedSet, i + 1)
-                && MatchesCondition(cur, rule.Condition, project, stressedSet, i);
+            bool prevOk = prevT is "$" or "."
+                ? sylBounds.Starts.Contains(i)
+                : MatchesPhoneOrClass(i > 0 ? phones[i - 1] : null, prevT, project, stressedSet, i - 1);
+            bool nextOk = nextT is "$" or "."
+                ? sylBounds.Ends.Contains(i)
+                : MatchesPhoneOrClass(i < phones.Count - 1 ? phones[i + 1] : null, nextT, project, stressedSet, i + 1);
+            bool ctxOk = prevOk && nextOk && MatchesCondition(cur, rule.Condition, project, stressedSet, i);
 
             if (targetHit && ctxOk)
-                result.AddRange(subPhones);
+            {
+                if (isAlphaPlace)
+                {
+                    result.Add(ResolveAlphaPlaceReplacement(cur, phones, i, prevT, nextT, project));
+                }
+                else if (subPhones.Length > 0 && HasStressMark(cur) && !target.StartsWith('ˈ') && !HasStressMark(subPhones[0]))
+                {
+                    result.Add($"ˈ{subPhones[0]}");
+                    for (int s = 1; s < subPhones.Length; s++) result.Add(subPhones[s]);
+                }
+                else
+                {
+                    result.AddRange(subPhones);
+                }
+            }
             else
+            {
                 result.Add(cur);
+            }
         }
         return result;
     }
@@ -389,7 +541,11 @@ public static class PhonologyEngine
         }
 
         var syllables = Syllabify(cur, project);
-        int stressIdx = ResolveStressSyllableIndex(syllables.Count, project.StressPattern);
+        bool hasExplicitMark = cur.Any(HasStressMark);
+        var effectivePattern = hasExplicitMark && project.StressPattern == StressPattern.None
+            ? StressPattern.Lexical
+            : project.StressPattern;
+        int stressIdx = ResolveStressSyllableIndex(syllables.Count, effectivePattern, syllables);
         var issues = ValidateWordPhonotactics(cur, project);
         if (issues.Count > 0)
             steps.Add(new DerivationStep("Phonotactics", string.Join("; ", issues)));

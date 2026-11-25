@@ -214,12 +214,62 @@ public static class ProjectPersistence
         }
     }
 
+    private static string EscapeCsvCell(string? raw)
+    {
+        var value = raw ?? "";
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
+            return $"\"{value.Replace("\"", "\"\"")}\"";
+        return value;
+    }
+
+    private static List<string> ParseCsvLine(string line)
+    {
+        var cells = new List<string>();
+        var cur = new StringBuilder();
+        bool inQuotes = false;
+        for (int i = 0; i < line.Length; i++)
+        {
+            char ch = line[i];
+            if (ch == '"')
+            {
+                if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                {
+                    cur.Append('"');
+                    i++;
+                }
+                else
+                {
+                    inQuotes = !inQuotes;
+                }
+            }
+            else if (ch == ',' && !inQuotes)
+            {
+                cells.Add(cur.ToString());
+                cur.Clear();
+            }
+            else
+            {
+                cur.Append(ch);
+            }
+        }
+        cells.Add(cur.ToString());
+        return cells;
+    }
+
     public static string ExportLexiconCsv(IEnumerable<LexemeEntry> lexemes)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Lemma,Pos,UR");
+        sb.AppendLine("Lemma,Pos,UR,Spelling,Irregulars");
         foreach (var l in lexemes)
-            sb.AppendLine($"{l.Lemma},{l.Pos},{l.UR}");
+        {
+            var irregJson = l.Irregulars is { Count: > 0 } ? JsonSerializer.Serialize(l.Irregulars) : "";
+            sb.AppendLine(string.Join(",",
+                EscapeCsvCell(l.Lemma),
+                EscapeCsvCell(l.Pos),
+                EscapeCsvCell(l.UR),
+                EscapeCsvCell(l.Spelling),
+                EscapeCsvCell(irregJson)));
+        }
         return sb.ToString();
     }
 
@@ -238,13 +288,37 @@ public static class ProjectPersistence
 
             return content.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
                 .Skip(1)
-                .Select(line => line.Split(','))
-                .Where(parts => parts.Length >= 3 && !string.IsNullOrWhiteSpace(parts[0]))
-                .Select(parts => new LexemeEntry
+                .Select(ParseCsvLine)
+                .Where(parts => parts.Count >= 3 && !string.IsNullOrWhiteSpace(parts[0]))
+                .Select(parts =>
                 {
-                    Lemma = parts[0].Trim(),
-                    Pos = string.IsNullOrWhiteSpace(parts[1]) ? "N" : parts[1].Trim(),
-                    UR = parts[2].Trim()
+                    var entry = new LexemeEntry
+                    {
+                        Lemma = parts[0].Trim(),
+                        Pos = string.IsNullOrWhiteSpace(parts[1]) ? "N" : parts[1].Trim(),
+                        UR = parts[2].Trim(),
+                        Spelling = parts.Count > 3 && !string.IsNullOrWhiteSpace(parts[3]) ? parts[3].Trim() : null
+                    };
+                    if (parts.Count > 4 && !string.IsNullOrWhiteSpace(parts[4]))
+                    {
+                        var rawIrreg = parts[4].Trim();
+                        if (rawIrreg.StartsWith('{'))
+                        {
+                            try
+                            {
+                                entry.Irregulars = JsonSerializer.Deserialize<Dictionary<string, string>>(rawIrreg, ProjectFactory.JsonOptions);
+                            }
+                            catch
+                            {
+                                entry.IrregularsSummary = rawIrreg;
+                            }
+                        }
+                        else
+                        {
+                            entry.IrregularsSummary = rawIrreg;
+                        }
+                    }
+                    return entry;
                 })
                 .ToList();
         }

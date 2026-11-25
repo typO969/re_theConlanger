@@ -83,6 +83,8 @@ export interface Lexeme {
   lemma: string;
   pos: string;
   rootPhones: Record<string, string>;
+  spelling?: string;
+  irregulars?: Record<string, string>;
 }
 
 export interface Morpheme {
@@ -103,13 +105,14 @@ export interface AffixRule {
   featureValue: string;
   affix: string;
   isPrefix: boolean;
+  condition?: string;
   enabled: boolean;
 }
 
 export type WordOrder = 'SVO' | 'SOV' | 'VSO' | 'VOS' | 'OVS' | 'OSV';
 export type ClauseTemplate = 'Intransitive' | 'Transitive' | 'Copular';
 export type CapitalizationMode = 'None' | 'SentenceInitial' | 'AllWords';
-export type StressPattern = 'None' | 'Initial' | 'Penultimate' | 'Final';
+export type StressPattern = 'None' | 'Initial' | 'Penultimate' | 'Final' | 'Lexical';
 
 export interface PipelineSelection {
   syntaxGeneratorId: string;
@@ -192,6 +195,8 @@ export interface LexemeState {
   Lemma: string;
   Pos: string;
   UR: string;
+  Spelling?: string;
+  Irregulars?: Record<string, string>;
 }
 
 export interface AffixState {
@@ -201,7 +206,17 @@ export interface AffixState {
   FeatureValue: string;
   Affix: string;
   IsPrefix: boolean;
+  Condition?: string;
   Enabled: boolean;
+}
+
+export interface RealizedWordContext {
+  surface: string;
+  lemma?: string;
+  pos?: string;
+  features?: FeatBundle;
+  spelling?: string;
+  isIrregular?: boolean;
 }
 
 export interface OrthRuleState {

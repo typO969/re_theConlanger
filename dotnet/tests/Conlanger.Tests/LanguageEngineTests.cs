@@ -116,4 +116,46 @@ public sealed class LanguageEngineTests
 
         Assert.Contains(issues, i => i.Severity == DiagnosticSeverity.Error && i.Subsystem == "Phonology");
     }
+
+    [Fact]
+    public void EnglishPreset_ValidatesCleanlyAndHandlesPhonologyAllomorphyIrregulars()
+    {
+        var eng = ProjectFactory.CreateEnglishPresetProject();
+        var diagnostics = ProjectValidator.Validate(eng);
+        Assert.Empty(diagnostics);
+
+        var morphology = new MorphologyEngine();
+        Assert.Equal(new[] { "ˈk", "æ", "t", "s" }, morphology.InflectSingle("cat", "N", [new Feat("Number", "Pl")], eng));
+        Assert.Equal(new[] { "ˈf", "ɑː", "k", "s", "ɪ", "z" }, morphology.InflectSingle("fox", "N", [new Feat("Number", "Pl")], eng));
+        Assert.Equal(new[] { "ˈd", "ɔː", "g", "z" }, morphology.InflectSingle("dog", "N", [new Feat("Number", "Pl")], eng));
+        Assert.Equal(new[] { "ˈm", "aɪ", "s" }, morphology.InflectSingle("mouse", "N", [new Feat("Number", "Pl")], eng));
+        Assert.Equal(new[] { "ˈw", "ɛ", "n", "t" }, morphology.InflectSingle("go", "V", [new Feat("Tense", "Past")], eng));
+        Assert.Equal(new[] { "ˈg", "oʊ", "z" }, morphology.InflectSingle("go", "V", [new Feat("Tense", "Pres"), new Feat("Person", "3"), new Feat("Number", "Sing"), new Feat("Agreement", "3sg")], eng));
+
+        var water = PhonologyEngine.Derive(["ˈw", "ɔː", "t", "ɚ"], eng);
+        Assert.Equal(new[] { "ˈw", "ɔː", "ɾ", "ɚ" }, water.SurfacePhones);
+
+        var catAspirated = PhonologyEngine.Derive(["ˈk", "æ", "t"], eng);
+        Assert.Equal(new[] { "ˈkʰ", "æ", "t" }, catAspirated.SurfacePhones);
+
+        var tallDarkL = PhonologyEngine.Derive(["ˈt", "ɔː", "l"], eng);
+        Assert.Equal(new[] { "ˈtʰ", "ɔː", "ɫ" }, tallDarkL.SurfacePhones);
+
+        var inputAssim = PhonologyEngine.Derive(["ɪ", "n", "p", "ʊ", "t"], eng);
+        Assert.Equal(new[] { "ɪ", "m", "p", "ʊ", "t" }, inputAssim.SurfacePhones);
+    }
+
+    [Fact]
+    public void EnglishPreset_GeneratesCleanMorphophonemicSentences()
+    {
+        var eng = ProjectFactory.CreateEnglishPresetProject();
+        var engine = new LangEngine();
+
+        for (int seed = 1; seed <= 10; seed++)
+        {
+            var res = engine.GenerateSentence(eng, seed: seed, approxWords: 6);
+            Assert.False(string.IsNullOrWhiteSpace(res.Written));
+            Assert.Empty(res.Issues);
+        }
+    }
 }

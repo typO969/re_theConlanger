@@ -11,12 +11,15 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
   const [newLemma, setNewLemma] = useState('');
   const [newPos, setNewPos] = useState('');
   const [newPhonemes, setNewPhonemes] = useState('');
+  const [newSpelling, setNewSpelling] = useState('');
+  const [newIrregulars, setNewIrregulars] = useState('');
 
   const [newAffixName, setNewAffixName] = useState('');
   const [newAffixPos, setNewAffixPos] = useState('N');
   const [newFeatureName, setNewFeatureName] = useState('Number');
   const [newFeatureValue, setNewFeatureValue] = useState('Pl');
   const [newAffixValue, setNewAffixValue] = useState('-i');
+  const [newAffixCondition, setNewAffixCondition] = useState('');
   const [newAffixIsPrefix, setNewAffixIsPrefix] = useState(false);
 
   const [previewLemma, setPreviewLemma] = useState('person');
@@ -37,16 +40,43 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
     return engine.morphology.realizeForPreview(previewLemma, previewPos, features);
   }, [state, previewLemma, previewPos, previewFeatureName, previewFeatureValue, previewTick]);
 
+  const parseIrregularsText = (raw: string): Record<string, string> | undefined => {
+    const map: Record<string, string> = {};
+    for (const part of raw.split(';')) {
+      const idx = part.indexOf(':');
+      if (idx <= 0) continue;
+      const key = part.slice(0, idx).trim();
+      const val = part.slice(idx + 1).trim();
+      if (key && val) map[key] = val;
+    }
+    return Object.keys(map).length > 0 ? map : undefined;
+  };
+
+  const formatIrregulars = (irreg?: Record<string, string>): string => {
+    if (!irreg) return '';
+    return Object.entries(irreg)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('; ');
+  };
+
   const addLexeme = () => {
     if (!newLemma.trim()) return;
     const pos = newPos.trim() || 'N';
     const ur = newPhonemes.trim().split(/\s+/).filter(Boolean).join(' ');
+    const spelling = newSpelling.trim();
+    const irregulars = parseIrregularsText(newIrregulars);
     onUpdate(
       (prev) => ({
         ...prev,
         Lexemes: [
           ...prev.Lexemes.filter((l) => l.Lemma !== newLemma.trim()),
-          { Lemma: newLemma.trim(), Pos: pos, UR: ur },
+          {
+            Lemma: newLemma.trim(),
+            Pos: pos,
+            UR: ur,
+            ...(spelling ? { Spelling: spelling } : {}),
+            ...(irregulars ? { Irregulars: irregulars } : {}),
+          },
         ],
       }),
       'Lexicon updated'
@@ -54,6 +84,8 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
     setNewLemma('');
     setNewPos('');
     setNewPhonemes('');
+    setNewSpelling('');
+    setNewIrregulars('');
   };
 
   const removeLexeme = (lemma: string) => {
@@ -80,6 +112,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
             FeatureValue: newFeatureValue.trim(),
             Affix: newAffixValue.trim(),
             IsPrefix: newAffixIsPrefix,
+            Condition: newAffixCondition.trim(),
             Enabled: true,
           },
         ],
@@ -87,6 +120,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
       'Morphology rules updated'
     );
     setNewAffixName('');
+    setNewAffixCondition('');
   };
 
   const toggleAffix = (index: number) => {
@@ -97,6 +131,17 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
       }),
       'Morphology rules updated'
     );
+  };
+
+  const moveAffix = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= state.Affixes.length) return;
+    onUpdate((prev) => {
+      const list = [...prev.Affixes];
+      const [item] = list.splice(index, 1);
+      list.splice(target, 0, item);
+      return { ...prev, Affixes: list };
+    }, 'Morphology rule reordered');
   };
 
   const removeAffix = (index: number) => {
@@ -113,14 +158,16 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
     <div className="p-5 space-y-5">
       <div>
         <h3 className="text-base font-bold text-slate-900 mb-2">Lexicon</h3>
-        <div className="border border-slate-300 bg-white rounded max-h-48 overflow-y-auto">
+        <div className="border border-slate-300 bg-white rounded max-h-56 overflow-y-auto">
           <table className="w-full text-sm text-left border-collapse">
             <thead className="bg-slate-100 border-b border-slate-300 text-xs text-slate-700 sticky top-0">
               <tr>
                 <th className="px-3 py-1.5 font-semibold">Lemma</th>
-                <th className="px-3 py-1.5 font-semibold w-20">POS</th>
+                <th className="px-3 py-1.5 font-semibold w-16">POS</th>
                 <th className="px-3 py-1.5 font-semibold">UR</th>
-                <th className="px-3 py-1.5 w-24"></th>
+                <th className="px-3 py-1.5 font-semibold">Spelling</th>
+                <th className="px-3 py-1.5 font-semibold">Irregulars</th>
+                <th className="px-3 py-1.5 w-20"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -129,6 +176,10 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
                   <td className="px-3 py-1.5 font-medium">{lex.Lemma}</td>
                   <td className="px-3 py-1.5 font-mono text-xs">{lex.Pos}</td>
                   <td className="px-3 py-1.5 font-mono text-xs">{lex.UR}</td>
+                  <td className="px-3 py-1.5 text-xs text-slate-700">{lex.Spelling ?? ''}</td>
+                  <td className="px-3 py-1.5 font-mono text-[11px] text-slate-600">
+                    {formatIrregulars(lex.Irregulars)}
+                  </td>
                   <td className="px-3 py-1.5 text-right">
                     <button
                       type="button"
@@ -150,20 +201,34 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
             value={newLemma}
             onChange={(e) => setNewLemma(e.target.value)}
             placeholder="Lemma"
-            className="w-36 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
+            className="w-28 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
           />
           <input
             type="text"
             value={newPos}
             onChange={(e) => setNewPos(e.target.value)}
-            placeholder="POS (N/V/ADJ)"
+            placeholder="POS (N/V/DET)"
             className="w-24 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
           />
           <input
             type="text"
             value={newPhonemes}
             onChange={(e) => setNewPhonemes(e.target.value)}
-            placeholder="UR phonemes (e.g. k a t a)"
+            placeholder="UR (e.g. ˈk æ t)"
+            className="w-40 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
+          />
+          <input
+            type="text"
+            value={newSpelling}
+            onChange={(e) => setNewSpelling(e.target.value)}
+            placeholder="Spelling (opt)"
+            className="w-28 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
+          />
+          <input
+            type="text"
+            value={newIrregulars}
+            onChange={(e) => setNewIrregulars(e.target.value)}
+            placeholder="Irregulars (Number=Pl: ˈm aɪ s)"
             className="w-56 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
           />
           <button
@@ -178,39 +243,57 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 border border-slate-300 bg-white rounded max-h-48 overflow-y-auto">
+        <div className="lg:col-span-2 border border-slate-300 bg-white rounded max-h-56 overflow-y-auto">
           <table className="w-full text-sm text-left border-collapse">
             <thead className="bg-slate-100 border-b border-slate-300 text-xs text-slate-700 sticky top-0">
               <tr>
-                <th className="px-3 py-1.5 font-semibold w-12">On</th>
-                <th className="px-3 py-1.5 font-semibold">Name</th>
-                <th className="px-3 py-1.5 font-semibold">POS</th>
-                <th className="px-3 py-1.5 font-semibold">Feat</th>
-                <th className="px-3 py-1.5 font-semibold">Val</th>
-                <th className="px-3 py-1.5 font-semibold">Affix</th>
-                <th className="px-3 py-1.5 font-semibold">Kind</th>
-                <th className="px-3 py-1.5 w-20"></th>
+                <th className="px-2 py-1.5 font-semibold w-10">On</th>
+                <th className="px-2 py-1.5 font-semibold">Name</th>
+                <th className="px-2 py-1.5 font-semibold">POS</th>
+                <th className="px-2 py-1.5 font-semibold">Feat</th>
+                <th className="px-2 py-1.5 font-semibold">Val</th>
+                <th className="px-2 py-1.5 font-semibold">Affix</th>
+                <th className="px-2 py-1.5 font-semibold">Condition</th>
+                <th className="px-2 py-1.5 font-semibold">Kind</th>
+                <th className="px-2 py-1.5 w-28"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {state.Affixes.map((afx, idx) => (
                 <tr key={`${afx.Name}-${idx}`} className="hover:bg-slate-50">
-                  <td className="px-3 py-1.5">
+                  <td className="px-2 py-1.5">
                     <input
                       type="checkbox"
                       checked={afx.Enabled}
                       onChange={() => toggleAffix(idx)}
                     />
                   </td>
-                  <td className="px-3 py-1.5">{afx.Name}</td>
-                  <td className="px-3 py-1.5 font-mono text-xs">{afx.Pos}</td>
-                  <td className="px-3 py-1.5 text-xs">{afx.FeatureName}</td>
-                  <td className="px-3 py-1.5 text-xs">{afx.FeatureValue}</td>
-                  <td className="px-3 py-1.5 font-mono text-xs">{afx.Affix}</td>
-                  <td className="px-3 py-1.5 text-xs text-slate-500">
+                  <td className="px-2 py-1.5">{afx.Name}</td>
+                  <td className="px-2 py-1.5 font-mono text-xs">{afx.Pos}</td>
+                  <td className="px-2 py-1.5 text-xs">{afx.FeatureName}</td>
+                  <td className="px-2 py-1.5 text-xs">{afx.FeatureValue}</td>
+                  <td className="px-2 py-1.5 font-mono text-xs">{afx.Affix}</td>
+                  <td className="px-2 py-1.5 font-mono text-[11px] text-slate-600">{afx.Condition ?? ''}</td>
+                  <td className="px-2 py-1.5 text-xs text-slate-500">
                     {afx.IsPrefix ? 'Prefix' : 'Suffix'}
                   </td>
-                  <td className="px-3 py-1.5 text-right">
+                  <td className="px-2 py-1.5 text-right whitespace-nowrap space-x-1">
+                    <button
+                      type="button"
+                      onClick={() => moveAffix(idx, -1)}
+                      disabled={idx === 0}
+                      className="px-1.5 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded disabled:opacity-40"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveAffix(idx, 1)}
+                      disabled={idx === state.Affixes.length - 1}
+                      className="px-1.5 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded disabled:opacity-40"
+                    >
+                      ↓
+                    </button>
                     <button
                       type="button"
                       onClick={() => removeAffix(idx)}
@@ -226,12 +309,12 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
         </div>
 
         <div className="space-y-1.5">
-          <div className="text-sm font-semibold text-slate-800">Add Affix Rule</div>
+          <div className="text-sm font-semibold text-slate-800">Add Affix / Allomorph Rule</div>
           <input
             type="text"
             value={newAffixName}
             onChange={(e) => setNewAffixName(e.target.value)}
-            placeholder="Name (e.g. Plural)"
+            placeholder="Name (e.g. Plural /s/)"
             className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded"
           />
           <div className="grid grid-cols-2 gap-1.5">
@@ -246,7 +329,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
               type="text"
               value={newAffixValue}
               onChange={(e) => setNewAffixValue(e.target.value)}
-              placeholder="Affix (-i)"
+              placeholder="Affix (-s)"
               className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
             />
           </div>
@@ -266,6 +349,13 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
               className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded"
             />
           </div>
+          <input
+            type="text"
+            value={newAffixCondition}
+            onChange={(e) => setNewAffixCondition(e.target.value)}
+            placeholder="Stem condition (e.g. [+sibilant], [-voice])"
+            className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
+          />
           <label className="flex items-center gap-2 text-xs text-slate-700">
             <input
               type="checkbox"

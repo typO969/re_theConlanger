@@ -600,7 +600,7 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
           <h3 className="text-sm font-bold text-slate-900">
             Phonological Rules{' '}
             <span className="font-normal text-xs text-slate-500">
-              (supports ∅, #, V/C classes, [+voice], [-stressed], [manner=stop])
+              (supports ∅, #, $, V/C classes, [+voice], [-stressed], [manner=stop], [αplace])
             </span>
           </h3>
           <label className="flex items-center gap-2 text-xs">
@@ -619,6 +619,7 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
               <option value="Initial">Initial Syllable</option>
               <option value="Penultimate">Penultimate Syllable</option>
               <option value="Final">Final Syllable</option>
+              <option value="Lexical">Lexical (UR ˈ mark)</option>
             </select>
           </label>
         </div>
@@ -700,7 +701,7 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
                 type="text"
                 value={newRuleReplacement}
                 onChange={(e) => setNewRuleReplacement(e.target.value)}
-                placeholder="Replace (or ∅)"
+                placeholder="Replace (∅ or [αplace])"
                 className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
               />
             </div>
@@ -709,14 +710,14 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
                 type="text"
                 value={newRulePrev}
                 onChange={(e) => setNewRulePrev(e.target.value)}
-                placeholder="Prev (or #)"
+                placeholder="Prev (# or $)"
                 className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
               />
               <input
                 type="text"
                 value={newRuleNext}
                 onChange={(e) => setNewRuleNext(e.target.value)}
-                placeholder="Next (or #)"
+                placeholder="Next (# or $)"
                 className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
               />
             </div>

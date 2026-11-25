@@ -10,6 +10,53 @@ public class OrthographyEngine : IOrthographyRenderer
     public virtual string Name => "Rule-Driven Orthography (Default)";
     public virtual string Description => "Context-sensitive grapheme rules, exceptions, and capitalization.";
 
+    protected static List<string> MapWordDetailed(IReadOnlyList<string> wordPhones, LanguageProject project, IReadOnlyList<OrthRuleEntry> activeRules, out string wordText)
+    {
+        var joinedRaw = string.Concat(wordPhones);
+        var cleanWord = string.Concat(wordPhones.Select(PhonologyEngine.StripStressMark));
+
+        var exception = project.OrthographyExceptions.FirstOrDefault(e => e.Input == joinedRaw)
+            ?? project.OrthographyExceptions.FirstOrDefault(e => PhonologyEngine.StripStressMark(e.Input) == cleanWord || e.Input.Replace("ˈ", "", StringComparison.Ordinal) == cleanWord);
+
+        List<string> graphemeUnits;
+        if (exception is not null)
+        {
+            wordText = exception.Output;
+            graphemeUnits = exception.Output.Select(c => c.ToString()).ToList();
+        }
+        else
+        {
+            graphemeUnits = new List<string>(wordPhones.Count);
+            var cleanPhones = wordPhones.Select(PhonologyEngine.StripStressMark).ToList();
+            for (int i = 0; i < cleanPhones.Count; i++)
+            {
+                var p = cleanPhones[i];
+                var prev = i > 0 ? cleanPhones[i - 1] : null;
+                var next = i < cleanPhones.Count - 1 ? cleanPhones[i + 1] : null;
+
+                var match = activeRules.FirstOrDefault(r =>
+                    r.Phone == p &&
+                    (string.IsNullOrEmpty(r.PrevContext) || r.PrevContext == prev) &&
+                    (string.IsNullOrEmpty(r.NextContext) || r.NextContext == next)
+                ) ?? activeRules.FirstOrDefault(r => r.Phone == p && string.IsNullOrEmpty(r.PrevContext) && string.IsNullOrEmpty(r.NextContext));
+
+                var grapheme = match?.Grapheme ?? p;
+                if (!string.IsNullOrEmpty(grapheme))
+                    graphemeUnits.Add(grapheme);
+            }
+            wordText = string.Concat(graphemeUnits);
+        }
+
+        return graphemeUnits;
+    }
+
+    protected static string ApplyWordCapitalization(string wordText, int wordIdx, CapitalizationMode mode)
+    {
+        if ((mode == CapitalizationMode.AllWords || (mode == CapitalizationMode.SentenceInitial && wordIdx == 0)) && wordText.Length > 0)
+            return char.ToUpperInvariant(wordText[0]) + wordText[1..];
+        return wordText;
+    }
+
     public virtual OrthographyResult Render(IReadOnlyList<IReadOnlyList<string>> surfaceWords, LanguageProject project)
     {
         var activeRules = project.OrthographyRules
@@ -22,47 +69,110 @@ public class OrthographyEngine : IOrthographyRenderer
 
         for (int wordIdx = 0; wordIdx < surfaceWords.Count; wordIdx++)
         {
-            var wordPhones = surfaceWords[wordIdx];
-            var joinedWord = string.Concat(wordPhones);
+            var graphemeUnits = MapWordDetailed(surfaceWords[wordIdx], project, activeRules, out var wordText);
+            wordText = ApplyWordCapitalization(wordText, wordIdx, project.Capitalization);
+            renderedWords.Add(wordText);
 
-            var exception = project.OrthographyExceptions.FirstOrDefault(e => e.Input == joinedWord);
-            List<string> graphemeUnits;
+            for (int gIdx = 0; gIdx < graphemeUnits.Count; gIdx++)
+            {
+                string pos = graphemeUnits.Count == 1 ? "isolated"
+                    : gIdx == 0 ? "initial"
+                    : gIdx == graphemeUnits.Count - 1 ? "final"
+                    : "medial";
+                tokens.Add(new GraphemeToken(graphemeUnits[gIdx].ToLowerInvariant(), graphemeUnits[gIdx], wordIdx, pos));
+            }
+        }
+
+        return new OrthographyResult(string.Join(" ", renderedWords), tokens);
+    }
+
+    public virtual OrthographyResult RenderWords(IReadOnlyList<RealizedWordContext> words, LanguageProject project) =>
+        Render(words.Select(w => w.SurfacePhones).ToList(), project);
+}
+
+public sealed class MorphophonemicOrthography : OrthographyEngine
+{
+    public override string Id => "morphophonemic-orthography";
+    public override string Name => "Morphophonemic / Deep Orthography (English-Style)";
+    public override string Description => "Uses lexical historical spellings + morphological spelling rules alongside surface phonological exceptions.";
+
+    private static bool HasFeat(IReadOnlyList<Feat>? feats, string name, string value) =>
+        feats is not null && feats.Any(f =>
+            string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(f.Value, value, StringComparison.OrdinalIgnoreCase));
+
+    private static string InflectRegularSpelling(string baseSpelling, RealizedWordContext ctx)
+    {
+        if (ctx.Features is null || ctx.Features.Count == 0) return baseSpelling;
+
+        bool isPluralN = string.Equals(ctx.Pos, "N", StringComparison.OrdinalIgnoreCase) && HasFeat(ctx.Features, "Number", "Pl");
+        bool is3sgPres = (string.Equals(ctx.Pos, "V", StringComparison.OrdinalIgnoreCase) || string.Equals(ctx.Pos, "AUX", StringComparison.OrdinalIgnoreCase))
+            && HasFeat(ctx.Features, "Tense", "Pres")
+            && HasFeat(ctx.Features, "Person", "3")
+            && HasFeat(ctx.Features, "Number", "Sing");
+        bool isPastV = (string.Equals(ctx.Pos, "V", StringComparison.OrdinalIgnoreCase) || string.Equals(ctx.Pos, "AUX", StringComparison.OrdinalIgnoreCase))
+            && HasFeat(ctx.Features, "Tense", "Past");
+
+        if (isPluralN || is3sgPres)
+        {
+            if (Regex.IsMatch(baseSpelling, @"(s|x|z|ch|sh)$", RegexOptions.IgnoreCase))
+                return $"{baseSpelling}es";
+            if (Regex.IsMatch(baseSpelling, @"[^aeiou]y$", RegexOptions.IgnoreCase))
+                return $"{baseSpelling[..^1]}ies";
+            return $"{baseSpelling}s";
+        }
+
+        if (isPastV)
+        {
+            if (baseSpelling.EndsWith("e", StringComparison.OrdinalIgnoreCase))
+                return $"{baseSpelling}d";
+            if (Regex.IsMatch(baseSpelling, @"[^aeiou]y$", RegexOptions.IgnoreCase))
+                return $"{baseSpelling[..^1]}ied";
+            return $"{baseSpelling}ed";
+        }
+
+        return baseSpelling;
+    }
+
+    public override OrthographyResult RenderWords(IReadOnlyList<RealizedWordContext> words, LanguageProject project)
+    {
+        if (words.Count == 0) return new OrthographyResult("", Array.Empty<GraphemeToken>());
+
+        var activeRules = project.OrthographyRules
+            .Where(r => r.Enabled && !string.IsNullOrWhiteSpace(r.Phone))
+            .OrderByDescending(r => r.Phone.Length)
+            .ToList();
+
+        var renderedWords = new List<string>(words.Count);
+        var tokens = new List<GraphemeToken>();
+
+        for (int wordIdx = 0; wordIdx < words.Count; wordIdx++)
+        {
+            var ctx = words[wordIdx];
+            var joinedRaw = string.Concat(ctx.SurfacePhones);
+            var cleanSurface = string.Concat(ctx.SurfacePhones.Select(PhonologyEngine.StripStressMark));
+
+            var exception = project.OrthographyExceptions.FirstOrDefault(e => e.Input == joinedRaw)
+                ?? project.OrthographyExceptions.FirstOrDefault(e => e.Input.Replace("ˈ", "", StringComparison.Ordinal) == cleanSurface);
+
             string wordText;
-
+            List<string> graphemeUnits;
             if (exception is not null)
             {
                 wordText = exception.Output;
                 graphemeUnits = exception.Output.Select(c => c.ToString()).ToList();
             }
+            else if (!ctx.IsIrregular && !string.IsNullOrWhiteSpace(ctx.Spelling))
+            {
+                wordText = InflectRegularSpelling(ctx.Spelling.Trim(), ctx);
+                graphemeUnits = wordText.Select(c => c.ToString()).ToList();
+            }
             else
             {
-                graphemeUnits = new List<string>(wordPhones.Count);
-                for (int i = 0; i < wordPhones.Count; i++)
-                {
-                    var p = wordPhones[i];
-                    var prev = i > 0 ? wordPhones[i - 1] : null;
-                    var next = i < wordPhones.Count - 1 ? wordPhones[i + 1] : null;
-
-                    var match = activeRules.FirstOrDefault(r =>
-                        r.Phone == p &&
-                        (string.IsNullOrEmpty(r.PrevContext) || r.PrevContext == prev) &&
-                        (string.IsNullOrEmpty(r.NextContext) || r.NextContext == next)
-                    ) ?? activeRules.FirstOrDefault(r => r.Phone == p && string.IsNullOrEmpty(r.PrevContext) && string.IsNullOrEmpty(r.NextContext));
-
-                    var grapheme = match?.Grapheme ?? p;
-                    if (!string.IsNullOrEmpty(grapheme))
-                        graphemeUnits.Add(grapheme);
-                }
-                wordText = string.Concat(graphemeUnits);
+                graphemeUnits = MapWordDetailed(ctx.SurfacePhones, project, activeRules, out wordText);
             }
 
-            if (project.Capitalization == CapitalizationMode.AllWords ||
-                (project.Capitalization == CapitalizationMode.SentenceInitial && wordIdx == 0))
-            {
-                if (wordText.Length > 0)
-                    wordText = char.ToUpperInvariant(wordText[0]) + wordText[1..];
-            }
-
+            wordText = ApplyWordCapitalization(wordText, wordIdx, project.Capitalization);
             renderedWords.Add(wordText);
 
             for (int gIdx = 0; gIdx < graphemeUnits.Count; gIdx++)
@@ -95,6 +205,9 @@ public sealed class IpaBroadOrthography : OrthographyEngine
         string text = ipaWords.Count > 0 ? $"/{string.Join(" ", ipaWords)}/" : "";
         return new OrthographyResult(text, baseResult.Tokens);
     }
+
+    public override OrthographyResult RenderWords(IReadOnlyList<RealizedWordContext> words, LanguageProject project) =>
+        Render(words.Select(w => w.SurfacePhones).ToList(), project);
 }
 
 public static class WordGenerator
@@ -102,12 +215,13 @@ public static class WordGenerator
     private static Phoneme? PickWeightedPhoneme(IReadOnlyList<Phoneme> pool, Random rng)
     {
         if (pool.Count == 0) return null;
-        int total = pool.Sum(p => Math.Max(1, p.Weight));
+        int total = pool.Sum(p => Math.Max(0, p.Weight));
+        if (total <= 0) return pool[rng.Next(pool.Count)];
         int roll = rng.Next(total);
         int acc = 0;
         foreach (var item in pool)
         {
-            acc += Math.Max(1, item.Weight);
+            acc += Math.Max(0, item.Weight);
             if (roll < acc) return item;
         }
         return pool[^1];
@@ -254,19 +368,21 @@ public sealed class LangEngine
         var pluginRules = ResolvePluginRules(project);
 
         var tree = syntax.Generate(spec, project, rng);
-        var urWords = morphology.RealizeWords(tree, project);
+        var realizedWords = morphology.RealizeDetailed(tree, project);
 
-        var surfaceWords = new List<IReadOnlyList<string>>(urWords.Count);
+        var surfaceWords = new List<IReadOnlyList<string>>(realizedWords.Count);
+        var wordContexts = new List<RealizedWordContext>(realizedWords.Count);
         var allIssues = new List<string>();
-        foreach (var word in urWords)
+        foreach (var rw in realizedWords)
         {
-            var derived = PhonologyEngine.Derive(word, project, pluginRules);
+            var derived = PhonologyEngine.Derive(rw.Phones, project, pluginRules);
             surfaceWords.Add(derived.SurfacePhones);
+            wordContexts.Add(new RealizedWordContext(derived.SurfacePhones, rw.Lemma, rw.Pos, rw.Features, rw.Spelling, rw.IsIrregular));
             foreach (var issue in derived.PhonotacticIssues)
                 allIssues.Add($"{string.Concat(derived.SurfacePhones)}: {issue}");
         }
 
-        var orth = orthography.Render(surfaceWords, project);
+        var orth = orthography.RenderWords(wordContexts, project);
         return new SentenceGenerationResult(orth.Text, orth.Tokens, surfaceWords, allIssues, tree);
     }
 }
@@ -299,8 +415,8 @@ public static class ProjectValidator
             if (!seenLemmas.Add(lex.Lemma))
                 issues.Add(new(DiagnosticSeverity.Error, "Morphology", $"Duplicate lexeme lemma '{lex.Lemma}'."));
 
-            var phones = lex.UR.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (phones.Length == 0)
+            var phones = MorphologyEngine.SplitPhones(lex.UR);
+            if (phones.Count == 0)
             {
                 issues.Add(new(DiagnosticSeverity.Warning, "Morphology", $"Lexeme '{lex.Lemma}' has empty UR."));
             }
@@ -308,8 +424,9 @@ public static class ProjectValidator
             {
                 foreach (var ph in phones)
                 {
-                    if (seenPhon.Count > 0 && !seenPhon.Contains(ph))
-                        issues.Add(new(DiagnosticSeverity.Warning, "Phonology", $"Lexeme '{lex.Lemma}' UR uses unknown phone '{ph}'."));
+                    var cleanPh = PhonologyEngine.StripStressMark(ph);
+                    if (seenPhon.Count > 0 && !seenPhon.Contains(cleanPh))
+                        issues.Add(new(DiagnosticSeverity.Warning, "Phonology", $"Lexeme '{lex.Lemma}' UR uses unknown phone '{cleanPh}'."));
                 }
                 foreach (var pi in PhonologyEngine.ValidateWordPhonotactics(phones, project))
                     issues.Add(new(DiagnosticSeverity.Warning, "Phonotactics", $"'{lex.Lemma}' ({lex.UR}): {pi}"));

@@ -17,6 +17,7 @@ import {
   PhonologicalFeatures,
   PhonotacticsConfig,
   PipelineSelection,
+  RealizedWordContext,
   RuleSpec,
   SentenceSpec,
   StressPattern,
@@ -38,26 +39,70 @@ export function emptyFeatures(): PhonologicalFeatures {
   };
 }
 
+export function stripStressMark(symbol: string): string {
+  return symbol.replace(/^ˈ/, '');
+}
+
+export function hasStressMark(symbol: string): boolean {
+  return symbol.startsWith('ˈ');
+}
+
 const DEFAULT_IPA_FEATURES: Record<string, Partial<PhonologicalFeatures>> = {
   p: { voicing: 'voiceless', manner: 'stop', place: 'bilabial' },
+  'pʰ': { voicing: 'voiceless', manner: 'stop', place: 'bilabial', custom: 'aspirated' },
   t: { voicing: 'voiceless', manner: 'stop', place: 'alveolar' },
+  'tʰ': { voicing: 'voiceless', manner: 'stop', place: 'alveolar', custom: 'aspirated' },
   k: { voicing: 'voiceless', manner: 'stop', place: 'velar' },
+  'kʰ': { voicing: 'voiceless', manner: 'stop', place: 'velar', custom: 'aspirated' },
   b: { voicing: 'voiced', manner: 'stop', place: 'bilabial' },
   d: { voicing: 'voiced', manner: 'stop', place: 'alveolar' },
   g: { voicing: 'voiced', manner: 'stop', place: 'velar' },
-  s: { voicing: 'voiceless', manner: 'fricative', place: 'alveolar' },
-  z: { voicing: 'voiced', manner: 'fricative', place: 'alveolar' },
-  ʃ: { voicing: 'voiceless', manner: 'fricative', place: 'postalveolar' },
+  ʔ: { voicing: 'voiceless', manner: 'stop', place: 'glottal' },
+  'tʃ': { voicing: 'voiceless', manner: 'affricate', place: 'postalveolar', custom: 'sibilant' },
+  'dʒ': { voicing: 'voiced', manner: 'affricate', place: 'postalveolar', custom: 'sibilant' },
+  s: { voicing: 'voiceless', manner: 'fricative', place: 'alveolar', custom: 'sibilant' },
+  z: { voicing: 'voiced', manner: 'fricative', place: 'alveolar', custom: 'sibilant' },
+  ʃ: { voicing: 'voiceless', manner: 'fricative', place: 'postalveolar', custom: 'sibilant' },
+  ʒ: { voicing: 'voiced', manner: 'fricative', place: 'postalveolar', custom: 'sibilant' },
   f: { voicing: 'voiceless', manner: 'fricative', place: 'labiodental' },
+  v: { voicing: 'voiced', manner: 'fricative', place: 'labiodental' },
+  θ: { voicing: 'voiceless', manner: 'fricative', place: 'dental' },
+  ð: { voicing: 'voiced', manner: 'fricative', place: 'dental' },
+  h: { voicing: 'voiceless', manner: 'fricative', place: 'glottal' },
   m: { voicing: 'voiced', manner: 'nasal', place: 'bilabial' },
+  ɱ: { voicing: 'voiced', manner: 'nasal', place: 'labiodental' },
   n: { voicing: 'voiced', manner: 'nasal', place: 'alveolar' },
-  r: { voicing: 'voiced', manner: 'trill', place: 'alveolar' },
-  l: { voicing: 'voiced', manner: 'approximant', place: 'alveolar' },
+  ɲ: { voicing: 'voiced', manner: 'nasal', place: 'palatal' },
+  ŋ: { voicing: 'voiced', manner: 'nasal', place: 'velar' },
+  ɾ: { voicing: 'voiced', manner: 'tap', place: 'alveolar' },
+  r: { voicing: 'voiced', manner: 'trill', place: 'alveolar', custom: 'liquid' },
+  ɹ: { voicing: 'voiced', manner: 'approximant', place: 'postalveolar', custom: 'liquid rhotic' },
+  l: { voicing: 'voiced', manner: 'approximant', place: 'alveolar', custom: 'lateral liquid' },
+  ɫ: { voicing: 'voiced', manner: 'approximant', place: 'velar', custom: 'lateral dark liquid' },
+  w: { voicing: 'voiced', manner: 'approximant', place: 'bilabial', custom: 'glide' },
+  j: { voicing: 'voiced', manner: 'approximant', place: 'palatal', custom: 'glide' },
   a: { voicing: 'voiced', manner: 'vowel', height: 'low', backness: 'central', roundness: 'unrounded' },
+  'ɑː': { voicing: 'voiced', manner: 'vowel', height: 'low', backness: 'back', roundness: 'unrounded', custom: 'tense long' },
+  æ: { voicing: 'voiced', manner: 'vowel', height: 'low', backness: 'front', roundness: 'unrounded', custom: 'lax' },
   e: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'front', roundness: 'unrounded' },
+  'eɪ': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'front', roundness: 'unrounded', custom: 'diphthong tense' },
+  ɛ: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'front', roundness: 'unrounded', custom: 'lax' },
   i: { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'front', roundness: 'unrounded' },
+  'iː': { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'front', roundness: 'unrounded', custom: 'tense long' },
+  ɪ: { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'front', roundness: 'unrounded', custom: 'lax' },
   o: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'rounded' },
+  'oʊ': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'rounded', custom: 'diphthong tense' },
+  'ɔː': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'rounded', custom: 'tense long' },
   u: { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'back', roundness: 'rounded' },
+  'uː': { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'back', roundness: 'rounded', custom: 'tense long' },
+  ʊ: { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'back', roundness: 'rounded', custom: 'lax' },
+  ʌ: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'central', roundness: 'unrounded', custom: 'lax' },
+  ə: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'central', roundness: 'unrounded', custom: 'reduced' },
+  ɚ: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'central', roundness: 'unrounded', custom: 'rhotic reduced' },
+  'ɝː': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'central', roundness: 'unrounded', custom: 'rhotic stressed' },
+  'aɪ': { voicing: 'voiced', manner: 'vowel', height: 'low', backness: 'front', roundness: 'unrounded', custom: 'diphthong' },
+  'aʊ': { voicing: 'voiced', manner: 'vowel', height: 'low', backness: 'back', roundness: 'rounded', custom: 'diphthong' },
+  'ɔɪ': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'rounded', custom: 'diphthong' },
 };
 
 export function createPhoneme(symbol: string, type: 'C' | 'V', overrides?: Partial<Phoneme>): Phoneme {
@@ -87,18 +132,24 @@ export class Phonotactics {
     this.allowedCodas = new Set(config.allowedCodas);
   }
 
-  public isValidOnset(cluster: string): boolean {
-    if (cluster.length === 0) return true;
-    if (cluster.length > this.config.maxOnsetCluster) return false;
-    if (cluster.length === 1) return true;
-    return this.allowedOnsets.size === 0 || this.allowedOnsets.has(cluster);
+  public isValidOnset(cluster: string, segmentCount?: number): boolean {
+    const clean = cluster.replace(/[ˈʰ]/g, '');
+    if (clean.length === 0) return true;
+    const count = segmentCount ?? clean.length;
+    if (this.allowedOnsets.has(clean)) return true;
+    if (count > this.config.maxOnsetCluster) return false;
+    if (count === 1 || clean.length === 1) return true;
+    return this.allowedOnsets.size === 0 || this.allowedOnsets.has(clean);
   }
 
-  public isValidCoda(cluster: string): boolean {
-    if (cluster.length === 0) return true;
-    if (cluster.length > this.config.maxCodaCluster) return false;
-    if (cluster.length === 1) return true;
-    return this.allowedCodas.size === 0 || this.allowedCodas.has(cluster);
+  public isValidCoda(cluster: string, segmentCount?: number): boolean {
+    const clean = cluster.replace(/[ˈʰ]/g, '');
+    if (clean.length === 0) return true;
+    const count = segmentCount ?? clean.length;
+    if (this.allowedCodas.has(clean)) return true;
+    if (count > this.config.maxCodaCluster) return false;
+    if (count === 1 || clean.length === 1) return true;
+    return this.allowedCodas.size === 0 || this.allowedCodas.has(clean);
   }
 }
 
@@ -108,16 +159,16 @@ export class Syllabifier {
 
   constructor(vowels: readonly Phoneme[] = [], tactics?: Phonotactics) {
     this.vowelSet = new Set([
-      ...'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤ',
-      ...vowels.map((v) => v.symbol),
+      ...'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤɚ',
+      ...vowels.map((v) => stripStressMark(v.symbol)),
     ]);
     this.tactics = tactics;
   }
 
   public isVowel(p: string): boolean {
     if (!p) return false;
-    const clean = p.replace(/^ˈ/, '');
-    return this.vowelSet.has(clean) || this.vowelSet.has(clean[0]);
+    const clean = stripStressMark(p);
+    return this.vowelSet.has(clean) || (clean.length > 0 && this.vowelSet.has(clean[0]));
   }
 
   public split(phones: readonly string[]): Syllable[] {
@@ -150,10 +201,12 @@ export class Syllabifier {
 
       let bestSplit = v2;
       for (let split = Math.max(v1 + 1, v2 - maxOnset); split <= v2; split++) {
-        const onsetSlice = phones.slice(split, v2).join('');
-        const codaSlice = phones.slice(v1 + 1, split).join('');
-        const onsetOk = !this.tactics || this.tactics.isValidOnset(onsetSlice);
-        const codaOk = !this.tactics || this.tactics.isValidCoda(codaSlice);
+        const onsetPhones = phones.slice(split, v2);
+        const codaPhones = phones.slice(v1 + 1, split);
+        const onsetSlice = onsetPhones.map((p) => p.replace(/[ˈʰ]/g, '')).join('');
+        const codaSlice = codaPhones.map((p) => p.replace(/[ˈʰ]/g, '')).join('');
+        const onsetOk = !this.tactics || this.tactics.isValidOnset(onsetSlice, onsetPhones.length);
+        const codaOk = !this.tactics || this.tactics.isValidCoda(codaSlice, codaPhones.length);
         if (onsetOk && codaOk) {
           bestSplit = split;
           break;
@@ -178,12 +231,42 @@ export class Syllabifier {
   }
 }
 
-export function resolveStressSyllableIndex(syllableCount: number, pattern: StressPattern): number {
+export function resolveStressSyllableIndex(
+  syllableCount: number,
+  pattern: StressPattern,
+  syllables?: readonly Syllable[]
+): number {
   if (syllableCount <= 0 || pattern === 'None') return -1;
+  if (pattern === 'Lexical' && syllables) {
+    const marked = syllables.findIndex(
+      (s) =>
+        s.onset.some(hasStressMark) ||
+        s.nucleus.some(hasStressMark) ||
+        s.coda.some(hasStressMark)
+    );
+    if (marked >= 0) return marked;
+    return -1;
+  }
   if (pattern === 'Initial') return 0;
   if (pattern === 'Final') return syllableCount - 1;
-  // Penultimate
-  return syllableCount >= 2 ? syllableCount - 2 : 0;
+  if (pattern === 'Penultimate') return syllableCount >= 2 ? syllableCount - 2 : 0;
+  return -1;
+}
+
+function getEffectiveFeatures(symbol: string, inventory: readonly Phoneme[]): { phoneme?: Phoneme; features: PhonologicalFeatures } | null {
+  const clean = stripStressMark(symbol);
+  const phoneme = inventory.find((p) => stripStressMark(p.symbol) === clean);
+  if (phoneme) return { phoneme, features: phoneme.features };
+  const def = DEFAULT_IPA_FEATURES[clean];
+  if (def) {
+    return {
+      features: {
+        ...emptyFeatures(),
+        ...def,
+      },
+    };
+  }
+  return null;
 }
 
 function matchesSingleFeatureClause(
@@ -195,6 +278,7 @@ function matchesSingleFeatureClause(
 ): boolean {
   const cond = clause.trim();
   if (!cond) return true;
+  const clean = stripStressMark(symbol);
 
   if (cond.startsWith('+') || cond.startsWith('-')) {
     const positive = cond.startsWith('+');
@@ -205,9 +289,10 @@ function matchesSingleFeatureClause(
       return positive ? isStressed : !isStressed;
     }
 
-    const phoneme = inventory.find((p) => p.symbol === symbol);
-    if (!phoneme) return false;
-    const feat = phoneme.features;
+    const resolved = getEffectiveFeatures(clean, inventory);
+    if (!resolved) return false;
+    const feat = resolved.features;
+    const isVowel = resolved.phoneme ? resolved.phoneme.type === 'V' : feat.manner === 'vowel';
 
     if (name === 'voice' || name === 'voicing' || name === 'voiced') {
       const v = feat.voicing.toLowerCase();
@@ -218,11 +303,15 @@ function matchesSingleFeatureClause(
       return positive ? r === 'rounded' : r === 'unrounded';
     }
     if (name === 'sibilant') {
-      const isSib = ['s', 'z', 'ʃ', 'ʒ', 'tʃ', 'dʒ'].includes(symbol) || feat.custom.toLowerCase().includes('sibilant');
+      const isSib =
+        ['s', 'z', 'ʃ', 'ʒ', 'tʃ', 'dʒ'].includes(clean) ||
+        feat.custom.toLowerCase().includes('sibilant');
       return positive ? isSib : !isSib;
     }
     if (name === 'sonorant') {
-      const isSon = ['nasal', 'approximant', 'trill', 'tap', 'lateral', 'vowel'].includes(feat.manner.toLowerCase()) || phoneme.type === 'V';
+      const isSon =
+        ['nasal', 'approximant', 'trill', 'tap', 'lateral', 'vowel'].includes(feat.manner.toLowerCase()) ||
+        isVowel;
       return positive ? isSon : !isSon;
     }
     const allMeta = `${feat.manner} ${feat.place} ${feat.height} ${feat.backness} ${feat.custom}`.toLowerCase();
@@ -230,9 +319,9 @@ function matchesSingleFeatureClause(
   }
 
   if (cond.includes('=')) {
-    const phoneme = inventory.find((p) => p.symbol === symbol);
-    if (!phoneme) return false;
-    const feat = phoneme.features;
+    const resolved = getEffectiveFeatures(clean, inventory);
+    if (!resolved) return false;
+    const feat = resolved.features;
     const [rawKey, rawVal] = cond.split('=', 2);
     const key = rawKey.trim().toLowerCase();
     const val = rawVal.trim().toLowerCase();
@@ -284,19 +373,40 @@ function matchesPhoneOrClass(
   if (!expected) return true;
   if (expected === '#') return actual === null;
   if (actual === null) return false;
+  const cleanActual = stripStressMark(actual);
 
   if (expected === 'V') {
-    const ph = inventory.find((p) => p.symbol === actual);
-    return ph ? ph.type === 'V' : 'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤ'.includes(actual[0]);
+    const ph = inventory.find((p) => stripStressMark(p.symbol) === cleanActual);
+    return ph ? ph.type === 'V' : 'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤɚ'.includes(cleanActual[0] ?? '');
   }
   if (expected === 'C') {
-    const ph = inventory.find((p) => p.symbol === actual);
-    return ph ? ph.type === 'C' : !'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤ'.includes(actual[0]);
+    const ph = inventory.find((p) => stripStressMark(p.symbol) === cleanActual);
+    return ph ? ph.type === 'C' : !'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤɚ'.includes(cleanActual[0] ?? '');
   }
   if (expected.startsWith('[') && expected.endsWith(']')) {
-    return matchesCondition(actual, expected, inventory, stressedSet, actualIndex);
+    return matchesCondition(cleanActual, expected, inventory, stressedSet, actualIndex);
   }
-  return actual === expected;
+  return expected.startsWith('ˈ') ? actual === expected : cleanActual === expected;
+}
+
+function computeSyllableBoundarySets(
+  phones: readonly string[],
+  inventory: readonly Phoneme[],
+  syllabifier?: Syllabifier
+): { starts: Set<number>; ends: Set<number> } {
+  const starts = new Set<number>();
+  const ends = new Set<number>();
+  const syls = (syllabifier ?? new Syllabifier(inventory.filter((p) => p.type === 'V'))).split(phones);
+  let offset = 0;
+  for (const s of syls) {
+    const len = s.onset.length + s.nucleus.length + s.coda.length;
+    if (len > 0) {
+      starts.add(offset);
+      ends.add(offset + len - 1);
+    }
+    offset += len;
+  }
+  return { starts, ends };
 }
 
 function contextMatch(
@@ -306,21 +416,99 @@ function contextMatch(
   nextTarget: string,
   spanLen: number,
   inventory: readonly Phoneme[],
-  stressedSet?: ReadonlySet<number>
+  stressedSet?: ReadonlySet<number>,
+  sylBounds?: { starts: Set<number>; ends: Set<number> }
 ): boolean {
-  const prevPhone = pos > 0 ? phones[pos - 1] : null;
-  const prevOk = matchesPhoneOrClass(prevPhone, prevTarget, inventory, stressedSet, pos - 1);
+  let prevOk: boolean;
+  if (prevTarget === '$' || prevTarget === '.') {
+    prevOk = Boolean(sylBounds?.starts.has(pos));
+  } else {
+    const prevPhone = pos > 0 ? phones[pos - 1] : null;
+    prevOk = matchesPhoneOrClass(prevPhone, prevTarget, inventory, stressedSet, pos - 1);
+  }
+
   const afterIdx = pos + spanLen;
-  const nextPhone = afterIdx < phones.length ? phones[afterIdx] : null;
-  const nextOk = matchesPhoneOrClass(nextPhone, nextTarget, inventory, stressedSet, afterIdx);
+  let nextOk: boolean;
+  if (nextTarget === '$' || nextTarget === '.') {
+    nextOk = Boolean(sylBounds?.ends.has(pos + spanLen - 1));
+  } else {
+    const nextPhone = afterIdx < phones.length ? phones[afterIdx] : null;
+    nextOk = matchesPhoneOrClass(nextPhone, nextTarget, inventory, stressedSet, afterIdx);
+  }
   return prevOk && nextOk;
+}
+
+const NASAL_PLACE_FALLBACK: Record<string, string> = {
+  bilabial: 'm',
+  labiodental: 'ɱ',
+  dental: 'n',
+  alveolar: 'n',
+  postalveolar: 'ɲ',
+  palatal: 'ɲ',
+  velar: 'ŋ',
+};
+
+function resolveAlphaPlaceReplacement(
+  targetPhone: string,
+  phones: readonly string[],
+  pos: number,
+  prevTarget: string,
+  nextTarget: string,
+  inventory: readonly Phoneme[]
+): string {
+  let condPhone: string | null = null;
+  if (nextTarget && nextTarget !== '#' && nextTarget !== '$' && nextTarget !== '.' && pos + 1 < phones.length) {
+    condPhone = phones[pos + 1];
+  } else if (prevTarget && prevTarget !== '#' && prevTarget !== '$' && prevTarget !== '.' && pos > 0) {
+    condPhone = phones[pos - 1];
+  }
+  if (!condPhone) return targetPhone;
+
+  const condFeat = getEffectiveFeatures(condPhone, inventory)?.features;
+  const targetPlace = condFeat?.place.trim().toLowerCase() ?? '';
+  if (!targetPlace) return targetPhone;
+
+  const cleanTarget = stripStressMark(targetPhone);
+  const srcFeat = getEffectiveFeatures(cleanTarget, inventory)?.features;
+  const srcManner = srcFeat?.manner.toLowerCase() ?? '';
+  const srcVoicing = srcFeat?.voicing.toLowerCase() ?? '';
+
+  const exactInvMatch = inventory.find(
+    (p) =>
+      p.type === 'C' &&
+      p.features.place.toLowerCase() === targetPlace &&
+      (!srcManner || p.features.manner.toLowerCase() === srcManner) &&
+      (!srcVoicing || p.features.voicing.toLowerCase() === srcVoicing)
+  );
+  if (exactInvMatch) {
+    return hasStressMark(targetPhone) && !hasStressMark(exactInvMatch.symbol)
+      ? `ˈ${exactInvMatch.symbol}`
+      : exactInvMatch.symbol;
+  }
+
+  if (srcManner === 'nasal' || ['m', 'ɱ', 'n', 'ɲ', 'ŋ'].includes(cleanTarget)) {
+    const mapped = NASAL_PLACE_FALLBACK[targetPlace] ?? cleanTarget;
+    return hasStressMark(targetPhone) ? `ˈ${mapped}` : mapped;
+  }
+
+  for (const [sym, def] of Object.entries(DEFAULT_IPA_FEATURES)) {
+    if (
+      (def.place ?? '').toLowerCase() === targetPlace &&
+      (!srcManner || (def.manner ?? '').toLowerCase() === srcManner) &&
+      (!srcVoicing || (def.voicing ?? '').toLowerCase() === srcVoicing)
+    ) {
+      return hasStressMark(targetPhone) ? `ˈ${sym}` : sym;
+    }
+  }
+  return targetPhone;
 }
 
 export function applyRuleSpec(
   spec: RuleSpec,
   phones: readonly string[],
   inventory: readonly Phoneme[],
-  stressedSet?: ReadonlySet<number>
+  stressedSet?: ReadonlySet<number>,
+  syllabifier?: Syllabifier
 ): string[] {
   if (!spec.enabled) return [...phones];
 
@@ -328,6 +516,9 @@ export function applyRuleSpec(
   const replacement = spec.replacement.trim();
   const prevTarget = spec.prevPhone?.trim() || '';
   const nextTarget = spec.nextPhone?.trim() || '';
+  const needsBounds =
+    prevTarget === '$' || prevTarget === '.' || nextTarget === '$' || nextTarget === '.';
+  const sylBounds = needsBounds ? computeSyllableBoundarySets(phones, inventory, syllabifier) : undefined;
 
   // Epenthesis: target is ∅ or empty -> insert replacement between prev and next
   if (target === '∅' || target === '') {
@@ -337,8 +528,14 @@ export function applyRuleSpec(
     for (let i = 0; i <= phones.length; i++) {
       const prevPhone = i > 0 ? phones[i - 1] : null;
       const nextPhone = i < phones.length ? phones[i] : null;
-      const prevOk = matchesPhoneOrClass(prevPhone, prevTarget, inventory, stressedSet, i - 1);
-      const nextOk = matchesPhoneOrClass(nextPhone, nextTarget, inventory, stressedSet, i);
+      const prevOk =
+        prevTarget === '$' || prevTarget === '.'
+          ? Boolean(sylBounds?.starts.has(i))
+          : matchesPhoneOrClass(prevPhone, prevTarget, inventory, stressedSet, i - 1);
+      const nextOk =
+        nextTarget === '$' || nextTarget === '.'
+          ? Boolean(sylBounds?.ends.has(i - 1))
+          : matchesPhoneOrClass(nextPhone, nextTarget, inventory, stressedSet, i);
       if ((prevTarget || nextTarget) && prevOk && nextOk) {
         out.push(...repPhones);
       }
@@ -347,18 +544,27 @@ export function applyRuleSpec(
     return out;
   }
 
-  // Substitution or Deletion (supports exact symbol, C/V class, or [feature] target)
+  const isAlphaPlace =
+    replacement === '[αplace]' || replacement.toLowerCase() === '[alpha-place]';
   const output: string[] = [];
-  const repPhones = replacement === '∅' || replacement === '' ? [] : replacement.split(/\s+/).filter(Boolean);
+  const repPhones =
+    replacement === '∅' || replacement === '' ? [] : replacement.split(/\s+/).filter(Boolean);
+
   for (let i = 0; i < phones.length; i++) {
     const phone = phones[i];
     const targetHit = matchesPhoneOrClass(phone, target, inventory, stressedSet, i);
     if (
       targetHit &&
-      contextMatch(phones, i, prevTarget, nextTarget, 1, inventory, stressedSet) &&
+      contextMatch(phones, i, prevTarget, nextTarget, 1, inventory, stressedSet, sylBounds) &&
       matchesCondition(phone, spec.condition, inventory, stressedSet, i)
     ) {
-      output.push(...repPhones);
+      if (isAlphaPlace) {
+        output.push(resolveAlphaPlaceReplacement(phone, phones, i, prevTarget, nextTarget, inventory));
+      } else if (repPhones.length > 0 && hasStressMark(phone) && !target.startsWith('ˈ') && !hasStressMark(repPhones[0])) {
+        output.push(`ˈ${repPhones[0]}`, ...repPhones.slice(1));
+      } else {
+        output.push(...repPhones);
+      }
     } else {
       output.push(phone);
     }
@@ -411,9 +617,14 @@ export class Phonology {
 
   private computeStressedPhoneIndices(phones: readonly string[]): Set<number> {
     const stressed = new Set<number>();
-    if (this.stressPattern === 'None' || phones.length === 0) return stressed;
+    const hasExplicitMark = phones.some(hasStressMark);
+    if ((this.stressPattern === 'None' && !hasExplicitMark) || phones.length === 0) {
+      return stressed;
+    }
     const syls = this.syllabifier.split(phones);
-    const targetIdx = resolveStressSyllableIndex(syls.length, this.stressPattern);
+    const effectivePattern: StressPattern =
+      hasExplicitMark && this.stressPattern === 'None' ? 'Lexical' : this.stressPattern;
+    const targetIdx = resolveStressSyllableIndex(syls.length, effectivePattern, syls);
     if (targetIdx < 0) return stressed;
 
     let offset = 0;
@@ -447,7 +658,7 @@ export class Phonology {
     let stressedIndices = this.computeStressedPhoneIndices(current);
 
     for (const rule of this.rules) {
-      current = applyRuleSpec(rule, current, this.phonemes, stressedIndices);
+      current = applyRuleSpec(rule, current, this.phonemes, stressedIndices, this.syllabifier);
       stressedIndices = this.computeStressedPhoneIndices(current);
       steps.push({ label: rule.name + (rule.enabled ? '' : ' (disabled)'), value: current.join(' ') });
     }
@@ -459,7 +670,10 @@ export class Phonology {
     }
 
     const syllables = this.syllabifier.split(current);
-    const stressIndex = resolveStressSyllableIndex(syllables.length, this.stressPattern);
+    const hasExplicitMark = current.some(hasStressMark);
+    const effectivePattern: StressPattern =
+      hasExplicitMark && this.stressPattern === 'None' ? 'Lexical' : this.stressPattern;
+    const stressIndex = resolveStressSyllableIndex(syllables.length, effectivePattern, syllables);
     const issues = this.checkPhonotactics(current, syllables);
     if (issues.length > 0) {
       steps.push({ label: 'Phonotactics', value: issues.join('; ') });
@@ -491,12 +705,12 @@ export class Phonology {
 
     const syls = syllables ?? this.syllabifier.split(phones);
     syls.forEach((syl, idx) => {
-      const onset = syl.onset.join('');
-      const coda = syl.coda.join('');
-      if (onset && !this.tactics.isValidOnset(onset)) {
+      const onset = syl.onset.map((p) => p.replace(/[ˈʰ]/g, '')).join('');
+      const coda = syl.coda.map((p) => p.replace(/[ˈʰ]/g, '')).join('');
+      if (onset && !this.tactics.isValidOnset(onset, syl.onset.length)) {
         issues.push(`Illegal onset "${onset}" in syllable ${idx + 1}`);
       }
-      if (coda && !this.tactics.isValidCoda(coda)) {
+      if (coda && !this.tactics.isValidCoda(coda, syl.coda.length)) {
         issues.push(`Illegal coda "${coda}" in syllable ${idx + 1}`);
       }
     });
@@ -553,7 +767,14 @@ export class SyntaxNode {
   }
 
   public inOrder(): SyntaxNode[] {
-    if (this.pos === 'CLAUSE' || this.pos === 'NP') {
+    if (
+      this.children.length > 0 ||
+      this.pos === 'CLAUSE' ||
+      this.pos === 'NP' ||
+      this.pos === 'VP' ||
+      this.pos === 'PP' ||
+      this.pos === 'CP'
+    ) {
       return this.children.flatMap((c) => c.inOrder());
     }
     return [this];
@@ -682,22 +903,80 @@ export class ConfigurableSyntaxGenerator {
 export class Morphology {
   public readonly lexicon: InMemoryLexicon;
   public readonly affixRules: AffixRule[];
+  public readonly phonemes: Phoneme[];
 
-  constructor(lexicon: InMemoryLexicon, affixRules: AffixRule[]) {
+  constructor(lexicon: InMemoryLexicon, affixRules: AffixRule[], phonemes: Phoneme[] = []) {
     this.lexicon = lexicon;
     this.affixRules = affixRules;
+    this.phonemes = phonemes;
   }
 
-  public inflectNode(node: SyntaxNode): MorphemeToken[] {
+  private resolveIrregularStem(
+    lex: Lexeme,
+    features: FeatBundle
+  ): { ur: string; matchedFeatures: Set<string>; isIrregular: boolean } {
+    const irregulars = lex.irregulars;
+    if (irregulars) {
+      let bestScore = 0;
+      let bestUr = '';
+      let bestKeys = new Set<string>();
+
+      for (const [keySpec, form] of Object.entries(irregulars)) {
+        const clauses = keySpec
+          .split(',')
+          .map((c) => c.trim())
+          .filter(Boolean)
+          .map((c) => c.split('=', 2).map((s) => s.trim()))
+          .filter((pair) => pair.length === 2 && pair[0] && pair[1]);
+        if (clauses.length === 0) continue;
+        if (clauses.every(([k, v]) => features.has(k, v)) && clauses.length > bestScore) {
+          bestScore = clauses.length;
+          bestUr = form;
+          bestKeys = new Set(clauses.map(([k]) => k));
+        }
+      }
+
+      if (bestScore > 0) {
+        if (bestKeys.has('Person') || bestKeys.has('Tense')) {
+          bestKeys.add('Agreement');
+        }
+        return { ur: bestUr, matchedFeatures: bestKeys, isIrregular: true };
+      }
+    }
+
+    return {
+      ur: lex.rootPhones.UR ?? lex.lemma,
+      matchedFeatures: new Set<string>(),
+      isIrregular: false,
+    };
+  }
+
+  public inflectNodeDetailed(node: SyntaxNode): { tokens: MorphemeToken[]; isIrregular: boolean; spelling?: string } {
     const lex = this.lexicon.resolve(node.lemmaId);
-    const ur = lex.rootPhones.UR ?? lex.lemma;
+    const { ur, matchedFeatures, isIrregular } = this.resolveIrregularStem(lex, node.features);
     const basePhones = Morphology.splitPhones(ur);
-    const morphemes = [{ id: 'STEM', gloss: lex.lemma, underlyingPhones: basePhones }];
+    const morphemes = [
+      {
+        id: isIrregular ? 'STEM_IRREG' : 'STEM',
+        gloss: lex.lemma,
+        underlyingPhones: basePhones,
+      },
+    ];
+
+    const handledFeatures = new Set<string>(matchedFeatures);
 
     for (const rule of this.affixRules) {
-      if (!rule.enabled || rule.pos !== node.pos || !node.features.has(rule.featureName, rule.featureValue)) {
-        continue;
+      if (!rule.enabled || rule.pos !== node.pos) continue;
+      if (handledFeatures.has(rule.featureName)) continue;
+      if (!node.features.has(rule.featureName, rule.featureValue)) continue;
+
+      if (rule.condition?.trim()) {
+        const currentFlat = morphemes.flatMap((m) => m.underlyingPhones);
+        if (currentFlat.length === 0) continue;
+        const anchor = rule.isPrefix ? currentFlat[0] : currentFlat[currentFlat.length - 1];
+        if (!matchesCondition(anchor, rule.condition, this.phonemes)) continue;
       }
+
       const affixPhones = Morphology.splitPhones(rule.affix.replace(/-/g, ''));
       const morpheme = {
         id: `AFX_${rule.name}`,
@@ -709,9 +988,18 @@ export class Morphology {
       } else {
         morphemes.push(morpheme);
       }
+      handledFeatures.add(rule.featureName);
     }
 
-    return morphemes.map((m) => ({ morpheme: m, underlyingPhones: m.underlyingPhones }));
+    return {
+      tokens: morphemes.map((m) => ({ morpheme: m, underlyingPhones: m.underlyingPhones })),
+      isIrregular,
+      spelling: lex.spelling,
+    };
+  }
+
+  public inflectNode(node: SyntaxNode): MorphemeToken[] {
+    return this.inflectNodeDetailed(node).tokens;
   }
 
   public inflect(tree: SyntaxTree): MorphemeToken[] {
@@ -719,19 +1007,15 @@ export class Morphology {
   }
 
   public realizeForPreview(lemma: string, pos: string, features: FeatBundle): string {
-    const lex = this.lexicon.resolve(lemma);
-    let surface = lex.rootPhones.UR ?? lemma;
-
-    for (const rule of this.affixRules) {
-      if (!rule.enabled || rule.pos !== pos || !features.has(rule.featureName, rule.featureValue)) {
-        continue;
-      }
-      const cleanAffix = rule.affix.replace(/-/g, '');
-      surface = rule.isPrefix ? `${cleanAffix} ${surface}` : `${surface} ${cleanAffix}`;
-    }
-
-    return surface;
+    const node = new SyntaxNode(pos, lemma, features);
+    const tokens = this.inflectNode(node);
+    return tokens.flatMap((t) => t.underlyingPhones).join(' ');
   }
+
+  private static readonly MULTI_CHAR_SEGMENTS = new Set([
+    'iː', 'eɪ', 'oʊ', 'ɔː', 'uː', 'ɑː', 'ɝː', 'aɪ', 'aʊ', 'ɔɪ',
+    'tʃ', 'dʒ', 'pʰ', 'tʰ', 'kʰ',
+  ]);
 
   public static splitPhones(source: string): string[] {
     const trimmed = source.trim();
@@ -739,7 +1023,23 @@ export class Morphology {
     if (trimmed.includes(' ')) {
       return trimmed.split(/\s+/).filter(Boolean);
     }
-    return [...trimmed];
+    const noStress = trimmed.replace(/^ˈ/, '');
+    if (Morphology.MULTI_CHAR_SEGMENTS.has(noStress)) {
+      return [trimmed];
+    }
+    const chars = [...trimmed];
+    const result: string[] = [];
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
+      if (ch === 'ˈ' && i + 1 < chars.length) {
+        result.push(ch + chars[++i]);
+      } else if ((ch === 'ː' || ch === 'ʰ') && result.length > 0) {
+        result[result.length - 1] += ch;
+      } else {
+        result.push(ch);
+      }
+    }
+    return result;
   }
 }
 
@@ -760,6 +1060,11 @@ export class Orthography {
 
   public render(surfacePhones: string): string {
     return this.renderWithTokens(surfacePhones).text;
+  }
+
+  public renderWordsWithTokens(words: readonly RealizedWordContext[]): OrthographyResult {
+    const surfaceWithSpaces = words.map((w) => w.surface).join(' ');
+    return this.renderWithTokens(surfaceWithSpaces);
   }
 
   /**
@@ -798,8 +1103,11 @@ export class Orthography {
     return { text, tokens };
   }
 
-  private mapWordDetailed(word: string): { wordText: string; graphemes: string[] } {
-    const excepted = this.exceptions.find((e) => e.input === word);
+  protected mapWordDetailed(word: string): { wordText: string; graphemes: string[] } {
+    const cleanWord = word.replace(/ˈ/g, '');
+    const excepted =
+      this.exceptions.find((e) => e.input === word) ??
+      this.exceptions.find((e) => e.input.replace(/ˈ/g, '') === cleanWord);
     if (excepted) {
       return {
         wordText: excepted.output,
@@ -813,12 +1121,12 @@ export class Orthography {
 
     const graphemes: string[] = [];
     let out = '';
-    for (let i = 0; i < word.length; ) {
+    for (let i = 0; i < cleanWord.length; ) {
       let matched = false;
       for (const rule of orderedRules) {
-        if (i + rule.phone.length > word.length) continue;
-        if (word.slice(i, i + rule.phone.length) !== rule.phone) continue;
-        if (!this.matchesContext(word, i, rule)) continue;
+        if (i + rule.phone.length > cleanWord.length) continue;
+        if (cleanWord.slice(i, i + rule.phone.length) !== rule.phone) continue;
+        if (!this.matchesContext(cleanWord, i, rule)) continue;
 
         out += rule.grapheme;
         if (rule.grapheme) graphemes.push(rule.grapheme);
@@ -827,8 +1135,8 @@ export class Orthography {
         break;
       }
       if (!matched) {
-        out += word[i];
-        graphemes.push(word[i]);
+        out += cleanWord[i];
+        graphemes.push(cleanWord[i]);
         i++;
       }
     }
@@ -855,7 +1163,7 @@ export class Orthography {
     return true;
   }
 
-  private applyCapitalization(text: string): string {
+  protected applyCapitalization(text: string): string {
     if (!text.trim()) return text;
     if (this.capitalization === 'AllWords') {
       return text
@@ -1001,7 +1309,7 @@ export interface IMorphologyRealizerModule {
   id: string;
   name: string;
   description: string;
-  create: (lexicon: InMemoryLexicon, affixRules: AffixRule[]) => Morphology;
+  create: (lexicon: InMemoryLexicon, affixRules: AffixRule[], phonemes?: Phoneme[]) => Morphology;
 }
 
 export interface IOrthographyRendererModule {
@@ -1022,6 +1330,231 @@ class HeadFinalRichSyntaxGenerator extends ConfigurableSyntaxGenerator {
       approxWords: Math.max(spec.approxWords, 5),
     };
     return super.realize(boostedSpec, rng);
+  }
+}
+
+class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
+  private readonly lexRef: InMemoryLexicon;
+
+  constructor(lexicon: InMemoryLexicon, wordOrder: WordOrder = 'SVO', clauseTemplate: ClauseTemplate = 'Transitive') {
+    super(lexicon, wordOrder, clauseTemplate);
+    this.lexRef = lexicon;
+  }
+
+  public override realize(spec: SentenceSpec, rng: RNG): SyntaxTree {
+    const lexemes = this.lexRef.getAll();
+    const nouns = lexemes.filter((l) => l.pos === 'N');
+    const verbs = lexemes.filter((l) => l.pos === 'V');
+    const adjs = lexemes.filter((l) => l.pos === 'ADJ');
+    const dets = lexemes.filter((l) => l.pos === 'DET');
+    const prons = lexemes.filter((l) => l.pos === 'PRON');
+    const auxes = lexemes.filter((l) => l.pos === 'AUX');
+    const negs = lexemes.filter((l) => l.pos === 'NEG');
+    const preps = lexemes.filter((l) => l.pos === 'PREP');
+    const advs = lexemes.filter((l) => l.pos === 'ADV');
+
+    const pick = <T,>(list: T[]): T | undefined => (list.length > 0 ? list[rng.next(list.length)] : undefined);
+
+    const tense = spec.constraints?.Tense ?? 'Pres';
+    const constrainedNumber = spec.constraints?.Number;
+    const isNeg = spec.constraints?.Polarity === 'Neg' || (negs.length > 0 && rng.nextDouble() < 0.15);
+
+    const buildNp = (
+      rolePrefix: 'Subj' | 'Obj',
+      gramCase: 'Nom' | 'Acc',
+      avoidLemma?: string
+    ): { node: SyntaxNode; person: string; number: string; headLemma: string } => {
+      const eligibleProns = avoidLemma ? prons.filter((p) => p.lemma !== avoidLemma) : prons;
+      if (eligibleProns.length > 0 && rng.nextDouble() < 0.35) {
+        const pron = pick(eligibleProns)!;
+        const lower = pron.lemma.toLowerCase();
+        const person = lower === 'i' || lower === 'we' ? '1' : lower === 'you' ? '2' : '3';
+        const number = constrainedNumber ?? (lower === 'they' || lower === 'we' || lower === 'you' ? 'Pl' : 'Sing');
+        const pronNode = new SyntaxNode(
+          'PRON',
+          pron.lemma,
+          new FeatBundle([
+            { name: 'Role', value: rolePrefix },
+            { name: 'Person', value: person },
+            { name: 'Number', value: number },
+            { name: 'Case', value: gramCase },
+          ])
+        );
+        return { node: pronNode, person, number, headLemma: pron.lemma };
+      }
+
+      const pool = nouns.filter((n) => n.lemma !== avoidLemma);
+      const noun = pick(pool.length > 0 ? pool : nouns);
+      const nounLemma = noun?.lemma ?? 'person';
+      const number = constrainedNumber ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
+      const children: SyntaxNode[] = [];
+
+      if (dets.length > 0) {
+        const isMass = nounLemma.toLowerCase() === 'water';
+        const compatibleDets =
+          number === 'Pl' || isMass
+            ? dets.filter((d) => d.lemma.toLowerCase() !== 'a' && d.lemma.toLowerCase() !== 'an')
+            : dets;
+        const det = pick(compatibleDets.length > 0 ? compatibleDets : dets);
+        if (det) {
+          children.push(
+            new SyntaxNode(
+              'DET',
+              det.lemma,
+              new FeatBundle([
+                { name: 'Role', value: 'Det' },
+                { name: 'Number', value: number },
+              ])
+            )
+          );
+        }
+      }
+
+      if (spec.approxWords >= 4 && adjs.length > 0 && rng.nextDouble() < 0.65) {
+        const adj = pick(adjs)!;
+        children.push(new SyntaxNode('ADJ', adj.lemma, new FeatBundle([{ name: 'Role', value: 'Mod' }])));
+      }
+
+      children.push(
+        new SyntaxNode(
+          'N',
+          nounLemma,
+          new FeatBundle([
+            { name: 'Role', value: rolePrefix },
+            { name: 'Person', value: '3' },
+            { name: 'Number', value: number },
+            { name: 'Case', value: gramCase },
+          ])
+        )
+      );
+
+      const np = new SyntaxNode(
+        'NP',
+        `${rolePrefix}NP`,
+        new FeatBundle([{ name: 'Role', value: `${rolePrefix}NP` }]),
+        children
+      );
+      return { node: np, person: '3', number, headLemma: nounLemma };
+    };
+
+    const subj = buildNp('Subj', 'Nom');
+    const obj = buildNp('Obj', 'Acc', subj.headLemma);
+
+    const verbPool = this.clauseTemplate === 'Copular'
+      ? verbs.filter((v) => v.lemma === 'be')
+      : verbs.filter((v) => v.lemma !== 'be');
+    const chosenVerb =
+      this.clauseTemplate === 'Copular'
+        ? (this.lexRef.resolveExact('be')?.lemma ?? 'be')
+        : (pick(verbPool.length > 0 ? verbPool : verbs)?.lemma ?? 'see');
+
+    const vpChildren: SyntaxNode[] = [];
+    const wantFutureAux = tense === 'Fut' && auxes.some((a) => a.lemma === 'will');
+    const doAux = auxes.find((a) => a.lemma === 'do');
+    const advNode =
+      advs.length > 0 && spec.approxWords >= 5 && rng.nextDouble() < 0.45
+        ? new SyntaxNode('ADV', pick(advs)!.lemma, new FeatBundle([{ name: 'Role', value: 'AdvMod' }]))
+        : null;
+
+    if (wantFutureAux) {
+      vpChildren.push(
+        new SyntaxNode('AUX', 'will', new FeatBundle([{ name: 'Role', value: 'Aux' }, { name: 'Tense', value: 'Pres' }]))
+      );
+      if (isNeg && negs.length > 0) {
+        vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
+      }
+      if (advNode) vpChildren.push(advNode);
+      vpChildren.push(
+        new SyntaxNode(
+          'V',
+          chosenVerb,
+          new FeatBundle([{ name: 'Role', value: 'Verb' }, { name: 'Finiteness', value: 'Bare' }])
+        )
+      );
+    } else if (isNeg && negs.length > 0 && chosenVerb !== 'be' && doAux) {
+      const auxFeats: Feat[] = [
+        { name: 'Role', value: 'Aux' },
+        { name: 'Tense', value: tense },
+        { name: 'Person', value: subj.person },
+        { name: 'Number', value: subj.number },
+      ];
+      if (tense === 'Pres' && subj.person === '3' && subj.number === 'Sing') {
+        auxFeats.push({ name: 'Agreement', value: '3sg' });
+      }
+      vpChildren.push(new SyntaxNode('AUX', doAux.lemma, new FeatBundle(auxFeats)));
+      vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
+      if (advNode) vpChildren.push(advNode);
+      vpChildren.push(
+        new SyntaxNode(
+          'V',
+          chosenVerb,
+          new FeatBundle([{ name: 'Role', value: 'Verb' }, { name: 'Finiteness', value: 'Bare' }])
+        )
+      );
+    } else {
+      if (advNode && chosenVerb !== 'be') vpChildren.push(advNode);
+      const verbFeats: Feat[] = [
+        { name: 'Role', value: this.clauseTemplate === 'Copular' ? 'Copula' : 'Verb' },
+        { name: 'Tense', value: tense },
+        { name: 'Person', value: subj.person },
+        { name: 'Number', value: subj.number },
+      ];
+      if (tense === 'Pres' && subj.person === '3' && subj.number === 'Sing') {
+        verbFeats.push({ name: 'Agreement', value: '3sg' });
+      }
+      vpChildren.push(new SyntaxNode('V', chosenVerb, new FeatBundle(verbFeats)));
+      if (isNeg && negs.length > 0 && chosenVerb === 'be') {
+        vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
+      }
+      if (advNode && chosenVerb === 'be') vpChildren.push(advNode);
+    }
+
+    const vNode =
+      vpChildren.length === 1
+        ? vpChildren[0]
+        : new SyntaxNode('VP', 'VP', new FeatBundle([{ name: 'Role', value: 'VP' }]), vpChildren);
+
+    const roles: Record<string, SyntaxNode> =
+      this.clauseTemplate === 'Intransitive'
+        ? { S: subj.node, V: vNode }
+        : this.clauseTemplate === 'Copular'
+          ? {
+              S: subj.node,
+              V: vNode,
+              O: new SyntaxNode(
+                'ADJ',
+                pick(adjs)?.lemma ?? 'small',
+                new FeatBundle([{ name: 'Role', value: 'Pred' }])
+              ),
+            }
+          : { S: subj.node, V: vNode, O: obj.node };
+
+    const canonical: Record<WordOrder, string[]> = {
+      SVO: ['S', 'V', 'O'],
+      SOV: ['S', 'O', 'V'],
+      VSO: ['V', 'S', 'O'],
+      VOS: ['V', 'O', 'S'],
+      OVS: ['O', 'V', 'S'],
+      OSV: ['O', 'S', 'V'],
+    };
+
+    const root = new SyntaxNode('CLAUSE', this.clauseTemplate);
+    for (const r of canonical[this.wordOrder]) {
+      if (roles[r]) root.children.push(roles[r]);
+    }
+
+    if (spec.approxWords >= 6 && preps.length > 0 && nouns.length > 0) {
+      const prep = pick(preps)!;
+      const pobj = buildNp('Obj', 'Acc');
+      root.children.push(
+        new SyntaxNode('PP', 'PP', new FeatBundle([{ name: 'Role', value: 'PP' }]), [
+          new SyntaxNode('PREP', prep.lemma, new FeatBundle([{ name: 'Role', value: 'Prep' }])),
+          pobj.node,
+        ])
+      );
+    }
+
+    return new SyntaxTree(root);
   }
 }
 
@@ -1066,6 +1599,82 @@ class IpaBroadOrthography extends Orthography {
   }
 }
 
+class MorphophonemicOrthography extends Orthography {
+  private inflectRegularSpelling(baseSpelling: string, ctx: RealizedWordContext): string {
+    const feats = ctx.features;
+    if (!feats) return baseSpelling;
+
+    const isPluralN = ctx.pos === 'N' && feats.has('Number', 'Pl');
+    const is3sgPres =
+      (ctx.pos === 'V' || ctx.pos === 'AUX') &&
+      feats.has('Tense', 'Pres') &&
+      feats.has('Person', '3') &&
+      feats.has('Number', 'Sing');
+    const isPastV = (ctx.pos === 'V' || ctx.pos === 'AUX') && feats.has('Tense', 'Past');
+
+    if (isPluralN || is3sgPres) {
+      if (/(s|x|z|ch|sh)$/i.test(baseSpelling)) return `${baseSpelling}es`;
+      if (/[^aeiou]y$/i.test(baseSpelling)) return `${baseSpelling.slice(0, -1)}ies`;
+      return `${baseSpelling}s`;
+    }
+
+    if (isPastV) {
+      if (baseSpelling.endsWith('e')) return `${baseSpelling}d`;
+      if (/[^aeiou]y$/i.test(baseSpelling)) return `${baseSpelling.slice(0, -1)}ied`;
+      return `${baseSpelling}ed`;
+    }
+
+    return baseSpelling;
+  }
+
+  public override renderWordsWithTokens(words: readonly RealizedWordContext[]): OrthographyResult {
+    if (words.length === 0) return { text: '', tokens: [] };
+
+    const mappedWords: string[] = [];
+    const tokens: GraphemeToken[] = [];
+
+    words.forEach((ctx, wordIndex) => {
+      const cleanSurface = ctx.surface.replace(/ˈ/g, '');
+      const excepted =
+        this.exceptions.find((e) => e.input === ctx.surface) ??
+        this.exceptions.find((e) => e.input.replace(/ˈ/g, '') === cleanSurface);
+
+      let wordText: string;
+      let graphemes: string[];
+
+      if (excepted) {
+        wordText = excepted.output;
+        graphemes = [...excepted.output];
+      } else if (ctx.spelling && ctx.spelling.trim() && !ctx.isIrregular) {
+        wordText = this.inflectRegularSpelling(ctx.spelling.trim(), ctx);
+        graphemes = [...wordText];
+      } else {
+        const detailed = this.mapWordDetailed(ctx.surface);
+        wordText = detailed.wordText;
+        graphemes = detailed.graphemes;
+      }
+
+      mappedWords.push(wordText);
+      graphemes.forEach((g, idx) => {
+        let positionInWord: GraphemeToken['positionInWord'] = 'medial';
+        if (graphemes.length === 1) positionInWord = 'isolated';
+        else if (idx === 0) positionInWord = 'initial';
+        else if (idx === graphemes.length - 1) positionInWord = 'final';
+
+        tokens.push({
+          id: g.toLowerCase(),
+          grapheme: g,
+          wordIndex,
+          positionInWord,
+        });
+      });
+    });
+
+    const text = this.applyCapitalization(mappedWords.join(' '));
+    return { text, tokens };
+  }
+}
+
 export const BUILTIN_SYNTAX_MODULES: readonly ISyntaxGeneratorModule[] = [
   {
     id: 'configurable-syntax',
@@ -1079,20 +1688,26 @@ export const BUILTIN_SYNTAX_MODULES: readonly ISyntaxGeneratorModule[] = [
     description: 'Always expands subject/object NPs with adjective modifiers regardless of word target.',
     create: (lex, wo, ct) => new HeadFinalRichSyntaxGenerator(lex, wo, ct),
   },
+  {
+    id: 'phrase-structure-syntax',
+    name: 'Living-Language Phrase Structure (DET, PRON, AUX, PP)',
+    description: 'Hierarchical clauses supporting determiners, pronouns with Case/Person/Number, auxiliaries, negation, and PPs.',
+    create: (lex, wo, ct) => new PhraseStructureSyntaxGenerator(lex, wo, ct),
+  },
 ];
 
 export const BUILTIN_MORPHOLOGY_MODULES: readonly IMorphologyRealizerModule[] = [
   {
     id: 'standard-morphology',
     name: 'Affixation Realizer (Default)',
-    description: 'Lexicon-backed stem plus ordered prefix/suffix rules.',
-    create: (lex, affixes) => new Morphology(lex, affixes),
+    description: 'Lexicon-backed stem, irregular suppletion, and conditioned prefix/suffix allomorphy.',
+    create: (lex, affixes, phonemes = []) => new Morphology(lex, affixes, phonemes),
   },
   {
     id: 'reduplicative-plural',
     name: 'CV Reduplication + Affixes (Phase 4)',
     description: 'Prepends initial CV stem reduplication for Number=Pl alongside active affixes.',
-    create: (lex, affixes) => new ReduplicativePluralMorphology(lex, affixes),
+    create: (lex, affixes, phonemes = []) => new ReduplicativePluralMorphology(lex, affixes, phonemes),
   },
 ];
 
@@ -1102,6 +1717,12 @@ export const BUILTIN_ORTHOGRAPHY_MODULES: readonly IOrthographyRendererModule[] 
     name: 'Rule-Driven Orthography (Default)',
     description: 'Context-sensitive grapheme rules, exceptions, and capitalization.',
     create: (rules, exc, cap) => new Orthography(rules, exc, cap),
+  },
+  {
+    id: 'morphophonemic-orthography',
+    name: 'Morphophonemic / Deep Orthography (English-Style)',
+    description: 'Uses lexical historical spellings + morphological spelling rules alongside surface phonological exceptions.',
+    create: (rules, exc, cap) => new MorphophonemicOrthography(rules, exc, cap),
   },
   {
     id: 'ipa-broad',
@@ -1214,14 +1835,26 @@ export class LangEngine {
     issues: string[];
   } {
     const sTree = this.syntax.realize(spec, rng);
-    const wordOutputs = sTree.linearize().map((node) => {
-      const morphemes = this.morphology.inflectNode(node);
-      return this.phonology.derive(morphemes);
+    const linearized = sTree.linearize();
+    const wordInfos = linearized.map((node) => {
+      const { tokens, isIrregular, spelling } = this.morphology.inflectNodeDetailed(node);
+      const derived = this.phonology.derive(tokens);
+      return {
+        derived,
+        context: {
+          surface: derived.finalSurface,
+          lemma: node.lemmaId,
+          pos: node.pos,
+          features: node.features,
+          spelling,
+          isIrregular,
+        } satisfies RealizedWordContext,
+      };
     });
 
-    const surfaceWithSpaces = wordOutputs.map((w) => w.finalSurface).join(' ');
-    const orthResult = this.orthography.renderWithTokens(surfaceWithSpaces);
-    const issues = wordOutputs.flatMap((w) => w.phonotacticIssues);
+    const surfaceWithSpaces = wordInfos.map((w) => w.derived.finalSurface).join(' ');
+    const orthResult = this.orthography.renderWordsWithTokens(wordInfos.map((w) => w.context));
+    const issues = wordInfos.flatMap((w) => w.derived.phonotacticIssues);
 
     return {
       written: orthResult.text,
@@ -1274,11 +1907,12 @@ export function validateProject(state: LanguageProjectState): DiagnosticIssue[] 
       issues.push({ severity: 'warning', subsystem: 'Morphology', message: `Lexeme "${lex.Lemma}" has empty UR.` });
     } else {
       for (const ph of phones) {
-        if (!seenPhon.has(ph)) {
+        const cleanPh = stripStressMark(ph);
+        if (!seenPhon.has(cleanPh)) {
           issues.push({
             severity: 'warning',
             subsystem: 'Phonology',
-            message: `Lexeme "${lex.Lemma}" uses phone "${ph}" which is not in the inventory.`,
+            message: `Lexeme "${lex.Lemma}" uses phone "${cleanPh}" which is not in the inventory.`,
           });
         }
       }
@@ -1385,6 +2019,7 @@ export function createDefaultProjectState(): LanguageProjectState {
         FeatureValue: 'Pl',
         Affix: '-i',
         IsPrefix: false,
+        Condition: '',
         Enabled: true,
       },
       {
@@ -1394,6 +2029,7 @@ export function createDefaultProjectState(): LanguageProjectState {
         FeatureValue: 'Past',
         Affix: '-ta',
         IsPrefix: false,
+        Condition: '',
         Enabled: true,
       },
     ],
@@ -1409,6 +2045,252 @@ export function createDefaultProjectState(): LanguageProjectState {
     Capitalization: 'SentenceInitial',
     WritingSystem: createDefaultWritingSystem(),
     Pipeline: { ...DEFAULT_PIPELINE_SELECTION },
+  };
+}
+
+export function createEnglishPresetProjectState(): LanguageProjectState {
+  const consonants = [
+    'p', 't', 'k', 'b', 'd', 'g',
+    'tʃ', 'dʒ',
+    'f', 'v', 'θ', 'ð', 's', 'z', 'ʃ', 'ʒ', 'h',
+    'm', 'n', 'ŋ',
+    'l', 'ɹ', 'w', 'j',
+    'pʰ', 'tʰ', 'kʰ', 'ɾ', 'ɫ', 'ɱ', 'ɲ',
+  ];
+  const vowels = [
+    'iː', 'ɪ', 'eɪ', 'ɛ', 'æ',
+    'ɑː', 'ɔː', 'oʊ', 'ʊ', 'uː',
+    'ʌ', 'ə', 'ɚ', 'ɝː', 'aɪ', 'aʊ', 'ɔɪ',
+  ];
+  const allophones = new Set(['pʰ', 'tʰ', 'kʰ', 'ɾ', 'ɫ', 'ɱ', 'ɲ']);
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) =>
+      createPhoneme(c, 'C', { weight: allophones.has(c) ? 0 : 2 })
+    ),
+    ...vowels.map((v) => createPhoneme(v, 'V', { weight: v === 'ə' ? 3 : 2 })),
+  ];
+
+  return {
+    SchemaVersion: 2,
+    Name: 'General American English',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 2 },
+      { pattern: 'CVC', weight: 3 },
+      { pattern: '(C)CVC(C)', weight: 2 },
+    ],
+    Phonotactics: {
+      allowedOnsets: [
+        'p', 't', 'k', 'b', 'd', 'g', 'f', 'v', 'θ', 'ð', 's', 'z', 'ʃ', 'h', 'm', 'n', 'l', 'ɹ', 'w', 'j',
+        'tʃ', 'dʒ', 'pʰ', 'tʰ', 'kʰ',
+        'pl', 'pr', 'pɹ', 'bl', 'br', 'bɹ', 'kl', 'kr', 'kɹ', 'kw', 'gl', 'gr', 'gɹ',
+        'tr', 'tɹ', 'dr', 'dɹ', 'fl', 'fr', 'fɹ', 'θr', 'θɹ', 'sl', 'sm', 'sn', 'sp', 'st', 'sk', 'sw',
+        'spl', 'spr', 'spɹ', 'str', 'stɹ', 'skr', 'skɹ',
+      ],
+      allowedCodas: [
+        'p', 't', 'k', 'b', 'd', 'g', 'f', 'v', 'θ', 'ð', 's', 'z', 'ʃ', 'ʒ', 'm', 'n', 'ŋ', 'l', 'ɫ', 'ɹ',
+        'tʃ', 'dʒ', 'ɾ',
+        'st', 'sk', 'sp', 'nt', 'nd', 'ns', 'nz', 'mp', 'ŋk', 'lt', 'ld', 'ɫt', 'ɫd', 'lk', 'lp',
+        'rt', 'rd', 'rk', 'rp', 'rs', 'rz', 'ɹt', 'ɹd', 'ɹk', 'ɹp', 'ɹs', 'ɹz', 'ks', 'ts', 'dz', 'ps',
+      ],
+      maxOnsetCluster: 3,
+      maxCodaCluster: 4,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: {
+      hyphenateSyllables: false,
+      allowDuplicates: true,
+    },
+    StressPattern: 'Lexical',
+    PhonologyRules: [
+      {
+        Name: 'Aspiration (p/t/k in stressed onset)',
+        Target: '[manner=stop, -voice]',
+        Replacement: '',
+        PrevPhone: '$',
+        NextPhone: '[+stressed]',
+        Condition: '',
+        Enabled: false,
+      },
+      {
+        Name: 'Aspirate /p/ in stressed onset',
+        Target: 'p',
+        Replacement: 'pʰ',
+        PrevPhone: '$',
+        NextPhone: '[+stressed]',
+        Condition: '',
+        Enabled: true,
+      },
+      {
+        Name: 'Aspirate /t/ in stressed onset',
+        Target: 't',
+        Replacement: 'tʰ',
+        PrevPhone: '$',
+        NextPhone: '[+stressed]',
+        Condition: '',
+        Enabled: true,
+      },
+      {
+        Name: 'Aspirate /k/ in stressed onset',
+        Target: 'k',
+        Replacement: 'kʰ',
+        PrevPhone: '$',
+        NextPhone: '[+stressed]',
+        Condition: '',
+        Enabled: true,
+      },
+      {
+        Name: 'Intervocalic /t/ Flapping',
+        Target: 't',
+        Replacement: 'ɾ',
+        PrevPhone: 'V',
+        NextPhone: '[-stressed]',
+        Condition: '',
+        Enabled: true,
+      },
+      {
+        Name: 'Nasal Place Assimilation',
+        Target: 'n',
+        Replacement: '[αplace]',
+        PrevPhone: null,
+        NextPhone: '[manner=stop]',
+        Condition: '',
+        Enabled: true,
+      },
+      {
+        Name: 'Syllable-Final Dark L',
+        Target: 'l',
+        Replacement: 'ɫ',
+        PrevPhone: null,
+        NextPhone: '$',
+        Condition: '',
+        Enabled: true,
+      },
+    ],
+    Lexemes: [
+      { Lemma: 'the', Pos: 'DET', UR: 'ð ə', Spelling: 'the' },
+      { Lemma: 'a', Pos: 'DET', UR: 'ə', Spelling: 'a' },
+      { Lemma: 'I', Pos: 'PRON', UR: 'ˈaɪ', Spelling: 'I', Irregulars: { 'Case=Acc': 'ˈm iː' } },
+      { Lemma: 'she', Pos: 'PRON', UR: 'ˈʃ iː', Spelling: 'she', Irregulars: { 'Case=Acc': 'ˈh ɝː' } },
+      { Lemma: 'they', Pos: 'PRON', UR: 'ˈð eɪ', Spelling: 'they', Irregulars: { 'Case=Acc': 'ˈð ɛ m' } },
+      {
+        Lemma: 'be',
+        Pos: 'V',
+        UR: 'ˈb iː',
+        Spelling: 'be',
+        Irregulars: {
+          'Person=1,Number=Sing,Tense=Pres': 'ˈæ m',
+          'Person=3,Number=Sing,Tense=Pres': 'ˈɪ z',
+          'Number=Pl,Tense=Pres': 'ˈɑː ɹ',
+          'Number=Sing,Tense=Past': 'ˈw ʌ z',
+          'Number=Pl,Tense=Past': 'ˈw ɝː',
+        },
+      },
+      { Lemma: 'do', Pos: 'AUX', UR: 'ˈd uː', Spelling: 'do', Irregulars: { 'Person=3,Number=Sing,Tense=Pres': 'ˈd ʌ z', 'Tense=Past': 'ˈd ɪ d' } },
+      { Lemma: 'will', Pos: 'AUX', UR: 'ˈw ɪ l', Spelling: 'will' },
+      { Lemma: 'not', Pos: 'NEG', UR: 'ˈn ɑː t', Spelling: 'not' },
+      { Lemma: 'in', Pos: 'PREP', UR: 'ɪ n', Spelling: 'in' },
+      { Lemma: 'near', Pos: 'PREP', UR: 'ˈn ɪ ɹ', Spelling: 'near' },
+      { Lemma: 'quickly', Pos: 'ADV', UR: 'ˈk w ɪ k l iː', Spelling: 'quickly' },
+      { Lemma: 'person', Pos: 'N', UR: 'ˈp ɝː s ə n', Spelling: 'person', Irregulars: { 'Number=Pl': 'ˈp iː p ə l' } },
+      { Lemma: 'mouse', Pos: 'N', UR: 'ˈm aʊ s', Spelling: 'mouse', Irregulars: { 'Number=Pl': 'ˈm aɪ s' } },
+      { Lemma: 'fish', Pos: 'N', UR: 'ˈf ɪ ʃ', Spelling: 'fish', Irregulars: { 'Number=Pl': 'ˈf ɪ ʃ' } },
+      { Lemma: 'cat', Pos: 'N', UR: 'ˈk æ t', Spelling: 'cat' },
+      { Lemma: 'dog', Pos: 'N', UR: 'ˈd ɔː g', Spelling: 'dog' },
+      { Lemma: 'fox', Pos: 'N', UR: 'ˈf ɑː k s', Spelling: 'fox' },
+      { Lemma: 'water', Pos: 'N', UR: 'ˈw ɔː t ɚ', Spelling: 'water', Irregulars: { 'Number=Pl': 'ˈw ɔː t ɚ z' } },
+      { Lemma: 'park', Pos: 'N', UR: 'ˈp ɑː ɹ k', Spelling: 'park' },
+      { Lemma: 'knight', Pos: 'N', UR: 'ˈn aɪ t', Spelling: 'knight' },
+      { Lemma: 'walk', Pos: 'V', UR: 'ˈw ɔː k', Spelling: 'walk' },
+      { Lemma: 'chase', Pos: 'V', UR: 'ˈtʃ eɪ s', Spelling: 'chase' },
+      { Lemma: 'see', Pos: 'V', UR: 'ˈs iː', Spelling: 'see', Irregulars: { 'Tense=Past': 'ˈs ɔː' } },
+      { Lemma: 'go', Pos: 'V', UR: 'ˈg oʊ', Spelling: 'go', Irregulars: { 'Tense=Past': 'ˈw ɛ n t', 'Person=3,Number=Sing,Tense=Pres': 'ˈg oʊ z' } },
+      { Lemma: 'small', Pos: 'ADJ', UR: 'ˈs m ɔː l', Spelling: 'small' },
+      { Lemma: 'tall', Pos: 'ADJ', UR: 'ˈt ɔː l', Spelling: 'tall' },
+    ],
+    Affixes: [
+      { Name: 'Plural /ɪz/', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-ɪ z', IsPrefix: false, Condition: '[+sibilant]', Enabled: true },
+      { Name: 'Plural /s/', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-s', IsPrefix: false, Condition: '[-voice]', Enabled: true },
+      { Name: 'Plural /z/', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-z', IsPrefix: false, Condition: '', Enabled: true },
+      { Name: 'Past /ɪd/', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-ɪ d', IsPrefix: false, Condition: '[place=alveolar, manner=stop]', Enabled: true },
+      { Name: 'Past /t/', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-t', IsPrefix: false, Condition: '[-voice]', Enabled: true },
+      { Name: 'Past /d/', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-d', IsPrefix: false, Condition: '', Enabled: true },
+      { Name: '3sg /ɪz/', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-ɪ z', IsPrefix: false, Condition: '[+sibilant]', Enabled: true },
+      { Name: '3sg /s/', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-s', IsPrefix: false, Condition: '[-voice]', Enabled: true },
+      { Name: '3sg /z/', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-z', IsPrefix: false, Condition: '', Enabled: true },
+    ],
+    WordOrder: 'SVO',
+    ClauseTemplate: 'Transitive',
+    OrthographyRules: [
+      { Phone: 'tʃ', Grapheme: 'ch', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'dʒ', Grapheme: 'j', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ʃ', Grapheme: 'sh', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ʒ', Grapheme: 'zh', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'θ', Grapheme: 'th', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ð', Grapheme: 'th', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ŋ', Grapheme: 'ng', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɱ', Grapheme: 'm', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɲ', Grapheme: 'n', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'pʰ', Grapheme: 'p', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'tʰ', Grapheme: 't', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'kʰ', Grapheme: 'k', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɾ', Grapheme: 't', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɫ', Grapheme: 'l', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɹ', Grapheme: 'r', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'j', Grapheme: 'y', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'iː', Grapheme: 'ee', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɪ', Grapheme: 'i', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'eɪ', Grapheme: 'ay', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɛ', Grapheme: 'e', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'æ', Grapheme: 'a', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɑː', Grapheme: 'o', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɔː', Grapheme: 'aw', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'oʊ', Grapheme: 'o', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ʊ', Grapheme: 'oo', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'uː', Grapheme: 'oo', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ʌ', Grapheme: 'u', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ə', Grapheme: 'a', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɚ', Grapheme: 'er', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɝː', Grapheme: 'er', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'aɪ', Grapheme: 'i', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'aʊ', Grapheme: 'ou', PrevContext: null, NextContext: null, Enabled: true },
+      { Phone: 'ɔɪ', Grapheme: 'oy', PrevContext: null, NextContext: null, Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'miː', Output: 'me' },
+      { Input: 'hɝː', Output: 'her' },
+      { Input: 'hɚ', Output: 'her' },
+      { Input: 'ðɛm', Output: 'them' },
+      { Input: 'aɪ', Output: 'I' },
+      { Input: 'ʃiː', Output: 'she' },
+      { Input: 'ðeɪ', Output: 'they' },
+      { Input: 'maɪs', Output: 'mice' },
+      { Input: 'piːpəl', Output: 'people' },
+      { Input: 'pʰiːpəl', Output: 'people' },
+      { Input: 'wɛnt', Output: 'went' },
+      { Input: 'sɔː', Output: 'saw' },
+      { Input: 'wʌz', Output: 'was' },
+      { Input: 'wɝː', Output: 'were' },
+      { Input: 'ɪz', Output: 'is' },
+      { Input: 'ɑːɹ', Output: 'are' },
+      { Input: 'æm', Output: 'am' },
+      { Input: 'dʌz', Output: 'does' },
+      { Input: 'dɪd', Output: 'did' },
+      { Input: 'goʊz', Output: 'goes' },
+      { Input: 'ðə', Output: 'the' },
+      { Input: 'ə', Output: 'a' },
+      { Input: 'wɔːɾɚz', Output: 'waters' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
   };
 }
 
@@ -1491,6 +2373,8 @@ export function buildEngineFromState(state: LanguageProjectState): LangEngine {
       lemma: l.Lemma,
       pos: l.Pos,
       rootPhones: { UR: l.UR },
+      spelling: l.Spelling,
+      irregulars: l.Irregulars,
     }))
   );
 
@@ -1506,8 +2390,10 @@ export function buildEngineFromState(state: LanguageProjectState): LangEngine {
       featureValue: a.FeatureValue,
       affix: a.Affix,
       isPrefix: a.IsPrefix,
+      condition: a.Condition ?? '',
       enabled: a.Enabled,
-    }))
+    })),
+    state.Phonemes
   );
 
   const syntaxMod =
@@ -1539,6 +2425,10 @@ export function buildEngineFromState(state: LanguageProjectState): LangEngine {
 export function formatSyntaxTree(node: SyntaxNode, depth = 0, parenthesesRole = false): string {
   const indent = '  '.repeat(depth);
   const role = node.features.items.find((f) => f.name === 'Role')?.value;
+  const extras = node.features.items
+    .filter((f) => f.name !== 'Role')
+    .map((f) => `${f.name}=${f.value}`)
+    .join(', ');
   let header: string;
   if (!role) {
     header = `${node.pos}:${node.lemmaId}`;
@@ -1546,6 +2436,9 @@ export function formatSyntaxTree(node: SyntaxNode, depth = 0, parenthesesRole = 
     header = `${node.pos}:${node.lemmaId} (${role})`;
   } else {
     header = `${node.pos}:${node.lemmaId} [${role}]`;
+  }
+  if (extras) {
+    header += ` {${extras}}`;
   }
 
   const lines = [indent + header, ...node.children.map((c) => formatSyntaxTree(c, depth + 1, parenthesesRole))];

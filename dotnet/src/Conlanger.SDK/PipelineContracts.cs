@@ -55,6 +55,24 @@ public interface IPhonoRule
     );
 }
 
+public sealed record InflectedWord(
+    IReadOnlyList<string> Phones,
+    string Lemma,
+    string Pos,
+    IReadOnlyList<Feat>? Features = null,
+    string? Spelling = null,
+    bool IsIrregular = false
+);
+
+public sealed record RealizedWordContext(
+    IReadOnlyList<string> SurfacePhones,
+    string Lemma,
+    string Pos,
+    IReadOnlyList<Feat>? Features = null,
+    string? Spelling = null,
+    bool IsIrregular = false
+);
+
 public interface IMorphologyRealizer
 {
     string Id { get; }
@@ -62,6 +80,19 @@ public interface IMorphologyRealizer
     string Description { get; }
     IReadOnlyList<IReadOnlyList<string>> RealizeWords(SyntaxTree tree, LanguageProject project);
     string RealizeForPreview(string lemma, string pos, IReadOnlyList<Feat> features, LanguageProject project);
+
+    IReadOnlyList<InflectedWord> RealizeDetailed(SyntaxTree tree, LanguageProject project)
+    {
+        var leaves = tree.Leaves().Where(l => !string.IsNullOrWhiteSpace(l.Lemma)).ToList();
+        var words = RealizeWords(tree, project);
+        var result = new List<InflectedWord>(words.Count);
+        for (int i = 0; i < words.Count; i++)
+        {
+            var leaf = i < leaves.Count ? leaves[i] : null;
+            result.Add(new InflectedWord(words[i], leaf?.Lemma ?? "", leaf?.Category ?? "N", leaf?.Features));
+        }
+        return result;
+    }
 }
 
 public interface IOrthographyRenderer
@@ -70,6 +101,9 @@ public interface IOrthographyRenderer
     string Name { get; }
     string Description { get; }
     OrthographyResult Render(IReadOnlyList<IReadOnlyList<string>> surfaceWords, LanguageProject project);
+
+    OrthographyResult RenderWords(IReadOnlyList<RealizedWordContext> words, LanguageProject project) =>
+        Render(words.Select(w => w.SurfacePhones).ToList(), project);
 }
 
 public interface IPipelineExtensionProvider

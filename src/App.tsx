@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LanguageProjectState } from './core/types';
 import {
   createDefaultProjectState,
+  createEnglishPresetProjectState,
   normalizeLoadedProjectState,
   validateProject,
 } from './core/languageEngine';
@@ -114,6 +115,16 @@ export const App: React.FC = () => {
     historyRef.current?.push(fresh, 'Reset to default');
     setHistoryVersion((v) => v + 1);
     setStatusMessage('Reset project to defaults');
+  };
+
+  const handleLoadEnglishPreset = () => {
+    setBackups(createBackupSnapshot(projectState, 'before-english-preset'));
+    const preset = createEnglishPresetProjectState();
+    setProjectState(preset);
+    setCurrentProjectFile('(unsaved)');
+    historyRef.current?.push(preset, 'Loaded General American English preset');
+    setHistoryVersion((v) => v + 1);
+    setStatusMessage('Loaded General American English showcase preset');
   };
 
   const handleSave = (saveAs: boolean) => {
@@ -272,6 +283,13 @@ export const App: React.FC = () => {
             className="px-3 py-1 text-xs font-medium bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-slate-700"
           >
             New / Reset
+          </button>
+          <button
+            type="button"
+            onClick={handleLoadEnglishPreset}
+            className="px-3 py-1 text-xs font-medium bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 rounded text-indigo-800"
+          >
+            English Preset
           </button>
           <input
             ref={loadProjectInputRef}

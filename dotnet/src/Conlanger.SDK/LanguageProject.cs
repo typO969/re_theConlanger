@@ -12,7 +12,7 @@ public enum ClauseTemplate { Intransitive, Transitive, Copular }
 public enum CapitalizationMode { None, SentenceInitial, AllWords }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
-public enum StressPattern { None, Initial, Penultimate, Final }
+public enum StressPattern { None, Initial, Penultimate, Final, Lexical }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum FlowDirection { LTR, RTL, TTB_LTR, TTB_RTL, Boustrophedon }
@@ -80,6 +80,37 @@ public sealed class LexemeEntry
     public string Lemma { get; set; } = "";
     public string Pos { get; set; } = "N";
     public string UR { get; set; } = "";
+    public string? Spelling { get; set; }
+    public Dictionary<string, string>? Irregulars { get; set; }
+
+    [JsonIgnore]
+    public string IrregularsSummary
+    {
+        get => Irregulars is null || Irregulars.Count == 0
+            ? ""
+            : string.Join("; ", Irregulars.Select(kv => $"{kv.Key} -> {kv.Value}"));
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                Irregulars = null;
+                return;
+            }
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var part in value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                int arrow = part.IndexOf("->", StringComparison.Ordinal);
+                int idx = arrow >= 0 ? arrow : part.IndexOf(':');
+                if (idx <= 0) continue;
+                int sepLen = arrow >= 0 ? 2 : 1;
+                var k = part[..idx].Trim();
+                var v = part[(idx + sepLen)..].Trim();
+                if (!string.IsNullOrEmpty(k) && !string.IsNullOrEmpty(v))
+                    dict[k] = v;
+            }
+            Irregulars = dict.Count > 0 ? dict : null;
+        }
+    }
 }
 
 public sealed class AffixEntry
@@ -90,6 +121,7 @@ public sealed class AffixEntry
     public string FeatureValue { get; set; } = "Pl";
     public string Affix { get; set; } = "";
     public bool IsPrefix { get; set; }
+    public string? Condition { get; set; }
     public bool Enabled { get; set; } = true;
 }
 

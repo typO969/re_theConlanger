@@ -115,11 +115,14 @@ public sealed class MainViewModel : ViewModelBase
     private string _newLexLemma = "";
     private string _newLexPos = "N";
     private string _newLexUr = "";
+    private string _newLexSpelling = "";
+    private string _newLexIrregulars = "";
     private string _newAffixName = "";
     private string _newAffixPos = "N";
     private string _newAffixFeatName = "Number";
     private string _newAffixFeatVal = "Pl";
     private string _newAffixForm = "-i";
+    private string _newAffixCondition = "";
     private bool _newAffixIsPrefix;
     private string _morphPreviewLemma = "person";
     private string _morphPreviewPos = "N";
@@ -194,6 +197,7 @@ public sealed class MainViewModel : ViewModelBase
         _history.PushSnapshot(_project);
 
         NewProjectCommand = new AsyncRelayCommand(ResetProjectAsync);
+        LoadEnglishPresetCommand = new RelayCommand(LoadEnglishPreset);
         UndoCommand = new RelayCommand(Undo, () => _history.CanUndo);
         RedoCommand = new RelayCommand(Redo, () => _history.CanRedo);
         RefreshAllCommand = new RelayCommand(RefreshDerivedViews);
@@ -216,6 +220,8 @@ public sealed class MainViewModel : ViewModelBase
         RemoveLexemeCommand = new RelayCommand(p => RemoveLexeme(p as LexemeEntry));
         AddAffixCommand = new RelayCommand(AddAffix, () => !string.IsNullOrWhiteSpace(NewAffixName));
         RemoveAffixCommand = new RelayCommand(p => RemoveAffix(p as AffixEntry));
+        MoveAffixUpCommand = new RelayCommand(p => MoveAffix(p as AffixEntry, -1));
+        MoveAffixDownCommand = new RelayCommand(p => MoveAffix(p as AffixEntry, 1));
         RefreshMorphPreviewCommand = new RelayCommand(RefreshMorphPreview);
 
         SampleSyntaxSeedCommand = new RelayCommand(() => { SyntaxPreviewSeed++; RefreshSyntaxPreview(); });
@@ -433,11 +439,14 @@ public sealed class MainViewModel : ViewModelBase
     public string NewLexLemma { get => _newLexLemma; set { if (SetField(ref _newLexLemma, value)) AddLexemeCommand.RaiseCanExecuteChanged(); } }
     public string NewLexPos { get => _newLexPos; set => SetField(ref _newLexPos, value); }
     public string NewLexUr { get => _newLexUr; set => SetField(ref _newLexUr, value); }
+    public string NewLexSpelling { get => _newLexSpelling; set => SetField(ref _newLexSpelling, value); }
+    public string NewLexIrregulars { get => _newLexIrregulars; set => SetField(ref _newLexIrregulars, value); }
     public string NewAffixName { get => _newAffixName; set { if (SetField(ref _newAffixName, value)) AddAffixCommand.RaiseCanExecuteChanged(); } }
     public string NewAffixPos { get => _newAffixPos; set => SetField(ref _newAffixPos, value); }
     public string NewAffixFeatName { get => _newAffixFeatName; set => SetField(ref _newAffixFeatName, value); }
     public string NewAffixFeatVal { get => _newAffixFeatVal; set => SetField(ref _newAffixFeatVal, value); }
     public string NewAffixForm { get => _newAffixForm; set => SetField(ref _newAffixForm, value); }
+    public string NewAffixCondition { get => _newAffixCondition; set => SetField(ref _newAffixCondition, value); }
     public bool NewAffixIsPrefix { get => _newAffixIsPrefix; set => SetField(ref _newAffixIsPrefix, value); }
     public string MorphPreviewLemma { get => _morphPreviewLemma; set { if (SetField(ref _morphPreviewLemma, value)) RefreshMorphPreview(); } }
     public string MorphPreviewPos { get => _morphPreviewPos; set { if (SetField(ref _morphPreviewPos, value)) RefreshMorphPreview(); } }
@@ -666,6 +675,7 @@ public sealed class MainViewModel : ViewModelBase
 
     // Commands
     public AsyncRelayCommand NewProjectCommand { get; }
+    public RelayCommand LoadEnglishPresetCommand { get; }
     public RelayCommand UndoCommand { get; }
     public RelayCommand RedoCommand { get; }
     public RelayCommand RefreshAllCommand { get; }
@@ -686,6 +696,8 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand RemoveLexemeCommand { get; }
     public RelayCommand AddAffixCommand { get; }
     public RelayCommand RemoveAffixCommand { get; }
+    public RelayCommand MoveAffixUpCommand { get; }
+    public RelayCommand MoveAffixDownCommand { get; }
     public RelayCommand RefreshMorphPreviewCommand { get; }
     public RelayCommand SampleSyntaxSeedCommand { get; }
     public RelayCommand AddOrthRuleCommand { get; }
@@ -886,7 +898,7 @@ public sealed class MainViewModel : ViewModelBase
 
     private void RunDerivationPreview()
     {
-        var ur = TestWordUr.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var ur = MorphologyEngine.SplitPhones(TestWordUr);
         var res = PhonologyEngine.Derive(ur, _project, _engine.ResolvePluginRules(_project));
         var sylText = string.Join(".", res.Syllables.Select((s, idx) =>
             (idx == res.StressIndex ? "ˈ" : "") + string.Concat(s.Onset) + string.Concat(s.Nucleus) + string.Concat(s.Coda)));
@@ -900,14 +912,21 @@ public sealed class MainViewModel : ViewModelBase
         var lemma = NewLexLemma.Trim();
         if (string.IsNullOrEmpty(lemma)) return;
         _project.Lexemes.RemoveAll(l => string.Equals(l.Lemma, lemma, StringComparison.OrdinalIgnoreCase));
-        _project.Lexemes.Add(new LexemeEntry
+        var entry = new LexemeEntry
         {
             Lemma = lemma,
             Pos = string.IsNullOrWhiteSpace(NewLexPos) ? "N" : NewLexPos.Trim(),
-            UR = string.Join(" ", NewLexUr.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
-        });
+            UR = string.Join(" ", MorphologyEngine.SplitPhones(NewLexUr)),
+            Spelling = string.IsNullOrWhiteSpace(NewLexSpelling) ? null : NewLexSpelling.Trim()
+        };
+        if (!string.IsNullOrWhiteSpace(NewLexIrregulars))
+            entry.IrregularsSummary = NewLexIrregulars.Trim();
+
+        _project.Lexemes.Add(entry);
         NewLexLemma = "";
         NewLexUr = "";
+        NewLexSpelling = "";
+        NewLexIrregulars = "";
         SyncCollectionsFromProject();
         CommitAndRefresh($"Added lexeme '{lemma}'");
     }
@@ -931,9 +950,11 @@ public sealed class MainViewModel : ViewModelBase
             FeatureValue = NewAffixFeatVal.Trim(),
             Affix = NewAffixForm.Trim(),
             IsPrefix = NewAffixIsPrefix,
+            Condition = string.IsNullOrWhiteSpace(NewAffixCondition) ? null : NewAffixCondition.Trim(),
             Enabled = true
         });
         NewAffixName = "";
+        NewAffixCondition = "";
         CommitAndRefresh("Added affix rule");
     }
 
@@ -942,6 +963,16 @@ public sealed class MainViewModel : ViewModelBase
         if (a is null) return;
         Affixes.Remove(a);
         CommitAndRefresh("Removed affix rule");
+    }
+
+    private void MoveAffix(AffixEntry? a, int delta)
+    {
+        if (a is null) return;
+        int idx = Affixes.IndexOf(a);
+        int next = idx + delta;
+        if (idx < 0 || next < 0 || next >= Affixes.Count) return;
+        Affixes.Move(idx, next);
+        CommitAndRefresh("Reordered affix rule");
     }
 
     private void RefreshMorphPreview()
@@ -1148,9 +1179,9 @@ public sealed class MainViewModel : ViewModelBase
         StatusMessage = $"Generated {words.Count} candidate word(s)";
     }
 
-    private IReadOnlyList<string> RealizeSingleWord(IMorphologyRealizer morph, string lemma, string pos, IReadOnlyList<Feat> features) =>
-        morph.RealizeWords(new SyntaxTree(new SyntaxNode(pos, lemma, features)), _project).FirstOrDefault()
-        ?? Array.Empty<string>();
+    private InflectedWord RealizeSingleWordDetailed(IMorphologyRealizer morph, string lemma, string pos, IReadOnlyList<Feat> features) =>
+        morph.RealizeDetailed(new SyntaxTree(new SyntaxNode(pos, lemma, features)), _project).FirstOrDefault()
+        ?? new InflectedWord(Array.Empty<string>(), lemma, pos, features);
 
     private void RefreshInspectors()
     {
@@ -1161,29 +1192,47 @@ public sealed class MainViewModel : ViewModelBase
         var orth = _engine.ResolveOrthography(_project);
         var pluginRules = _engine.ResolvePluginRules(_project);
 
-        var presPhones = RealizeSingleWord(morph, lex.Lemma, lex.Pos, Array.Empty<Feat>());
-        var pastPhones = RealizeSingleWord(morph, lex.Lemma, lex.Pos, new[] { new Feat("Tense", "Past") });
-        var plurPhones = RealizeSingleWord(morph, lex.Lemma, lex.Pos, new[] { new Feat("Number", "Pl") });
+        var presWord = RealizeSingleWordDetailed(morph, lex.Lemma, lex.Pos, Array.Empty<Feat>());
+        var pastFeats = new[] { new Feat("Tense", "Past") };
+        var pastWord = RealizeSingleWordDetailed(morph, lex.Lemma, lex.Pos, pastFeats);
+        var plurFeats = new[] { new Feat("Number", "Pl") };
+        var plurWord = RealizeSingleWordDetailed(morph, lex.Lemma, lex.Pos, plurFeats);
+        var sg3Feats = new[] { new Feat("Tense", "Pres"), new Feat("Person", "3"), new Feat("Number", "Sing"), new Feat("Agreement", "3sg") };
+        var sg3Word = RealizeSingleWordDetailed(morph, lex.Lemma, lex.Pos, sg3Feats);
+        var accFeats = new[] { new Feat("Case", "Acc") };
+        var accWord = RealizeSingleWordDetailed(morph, lex.Lemma, lex.Pos, accFeats);
+
+        var presDerived = PhonologyEngine.Derive(presWord.Phones, _project, pluginRules);
+        var presCtx = new RealizedWordContext(presDerived.SurfacePhones, lex.Lemma, lex.Pos, Array.Empty<Feat>(), lex.Spelling, presWord.IsIrregular);
 
         var lines = new List<string>
         {
             $"Lemma: {lex.Lemma}",
             $"POS: {lex.Pos}",
             $"UR: {lex.UR}",
-            $"SR(Pres): {string.Join(" ", presPhones)}",
-            $"SR(Past): {string.Join(" ", pastPhones)}",
-            $"SR(Plural): {string.Join(" ", plurPhones)}",
-            $"Orth(Pres): {orth.Render(new[] { PhonologyEngine.Derive(presPhones, _project, pluginRules).SurfacePhones }, _project).Text}",
+            $"Spelling: {(string.IsNullOrWhiteSpace(lex.Spelling) ? "(phonemic)" : lex.Spelling)}",
+            $"Irregulars: {(lex.Irregulars is { Count: > 0 } ? lex.IrregularsSummary : "(none)")}",
+            $"SR(Pres): {string.Join(" ", presWord.Phones)}",
+            $"SR(Past): {string.Join(" ", pastWord.Phones)}",
+            $"SR(Plural): {string.Join(" ", plurWord.Phones)}",
+            $"SR(3sg): {string.Join(" ", sg3Word.Phones)}",
+            $"SR(Acc): {string.Join(" ", accWord.Phones)}",
+            $"Orth(Pres): {orth.RenderWords(new[] { presCtx }, _project).Text}",
             "",
             "-- Enabled Affix Paradigm --"
         };
 
         foreach (var afx in _project.Affixes.Where(a => a.Enabled && string.Equals(a.Pos, lex.Pos, StringComparison.OrdinalIgnoreCase)))
         {
-            var inflected = RealizeSingleWord(morph, lex.Lemma, lex.Pos, new[] { new Feat(afx.FeatureName, afx.FeatureValue) });
-            var derivedForm = PhonologyEngine.Derive(inflected, _project, pluginRules);
-            var writtenForm = orth.Render(new[] { derivedForm.SurfacePhones }, _project).Text;
-            lines.Add($"{afx.Name} [{afx.FeatureName}={afx.FeatureValue}]: {string.Join(" ", inflected)} -> {writtenForm}");
+            var feats = afx.FeatureName == "Agreement" && afx.FeatureValue == "3sg"
+                ? sg3Feats
+                : new[] { new Feat(afx.FeatureName, afx.FeatureValue) };
+            var inflected = RealizeSingleWordDetailed(morph, lex.Lemma, lex.Pos, feats);
+            var derivedForm = PhonologyEngine.Derive(inflected.Phones, _project, pluginRules);
+            var ctx = new RealizedWordContext(derivedForm.SurfacePhones, lex.Lemma, lex.Pos, feats, lex.Spelling, inflected.IsIrregular);
+            var writtenForm = orth.RenderWords(new[] { ctx }, _project).Text;
+            var condStr = string.IsNullOrWhiteSpace(afx.Condition) ? "" : $" / {afx.Condition}";
+            lines.Add($"{afx.Name} [{afx.FeatureName}={afx.FeatureValue}{condStr}]: {string.Join(" ", derivedForm.SurfacePhones)} -> {writtenForm}");
         }
         InspectorLexemeText = string.Join(Environment.NewLine, lines);
 
@@ -1296,6 +1345,23 @@ public sealed class MainViewModel : ViewModelBase
         ReplaceCollection(BackupSnapshots, backups);
         LoadProject(ProjectFactory.CreateStarterProject(), "(unsaved)", "");
         StatusMessage = "Reset project to starter defaults";
+    }
+
+    private void LoadEnglishPreset()
+    {
+        LoadProject(ProjectFactory.CreateEnglishPresetProject(), "general-american-english.clproj.json", "");
+        TestWordUr = "ˈw ɔː t ɚ";
+        MorphPreviewLemma = "fox";
+        MorphPreviewPos = "N";
+        MorphPreviewFeatName = "Number";
+        MorphPreviewFeatVal = "Pl";
+        OnPropertyChanged(nameof(TestWordUr));
+        OnPropertyChanged(nameof(MorphPreviewLemma));
+        OnPropertyChanged(nameof(MorphPreviewPos));
+        OnPropertyChanged(nameof(MorphPreviewFeatName));
+        OnPropertyChanged(nameof(MorphPreviewFeatVal));
+        GenerateBatchSentences();
+        StatusMessage = "Loaded General American English showcase preset";
     }
 
     private async Task OpenRecentAsync(RecentProjectRecord? rec)

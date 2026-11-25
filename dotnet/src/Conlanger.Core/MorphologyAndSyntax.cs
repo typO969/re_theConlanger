@@ -86,11 +86,16 @@ public class ConfigurableSyntaxGenerator : ISyntaxGenerator
     {
         var indent = new string(' ', depth * 2);
         var role = node.Features?.FirstOrDefault(f => f.Name == "Role")?.Value;
+        var extras = node.Features is null
+            ? ""
+            : string.Join(", ", node.Features.Where(f => f.Name != "Role").Select(f => $"{f.Name}={f.Value}"));
         string header = string.IsNullOrEmpty(role)
             ? $"{node.Category}:{node.Lemma}"
             : parenthesesRole
                 ? $"{node.Category}:{node.Lemma} ({role})"
                 : $"{node.Category}:{node.Lemma} [{role}]";
+        if (!string.IsNullOrEmpty(extras))
+            header += $" {{{extras}}}";
 
         var sb = new StringBuilder();
         sb.Append(indent).Append(header);
@@ -113,11 +118,218 @@ public sealed class ExpandedModifierSyntaxGenerator : ConfigurableSyntaxGenerato
         base.Generate(spec with { ApproxWords = Math.Max(spec.ApproxWords, 5) }, project, rng);
 }
 
+public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
+{
+    public override string Id => "phrase-structure-syntax";
+    public override string Name => "Living-Language Phrase Structure (DET, PRON, AUX, PP)";
+    public override string Description => "Hierarchical clauses supporting determiners, pronouns with Case/Person/Number, auxiliaries, negation, and PPs.";
+
+    public override SyntaxTree Generate(SentenceSpec spec, LanguageProject project, Random rng)
+    {
+        var nouns = project.Lexemes.Where(l => string.Equals(l.Pos, "N", StringComparison.OrdinalIgnoreCase)).ToList();
+        var verbs = project.Lexemes.Where(l => string.Equals(l.Pos, "V", StringComparison.OrdinalIgnoreCase)).ToList();
+        var adjs = project.Lexemes.Where(l => string.Equals(l.Pos, "ADJ", StringComparison.OrdinalIgnoreCase)).ToList();
+        var dets = project.Lexemes.Where(l => string.Equals(l.Pos, "DET", StringComparison.OrdinalIgnoreCase)).ToList();
+        var prons = project.Lexemes.Where(l => string.Equals(l.Pos, "PRON", StringComparison.OrdinalIgnoreCase)).ToList();
+        var auxes = project.Lexemes.Where(l => string.Equals(l.Pos, "AUX", StringComparison.OrdinalIgnoreCase)).ToList();
+        var negs = project.Lexemes.Where(l => string.Equals(l.Pos, "NEG", StringComparison.OrdinalIgnoreCase)).ToList();
+        var preps = project.Lexemes.Where(l => string.Equals(l.Pos, "PREP", StringComparison.OrdinalIgnoreCase)).ToList();
+        var advs = project.Lexemes.Where(l => string.Equals(l.Pos, "ADV", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        T? Pick<T>(IReadOnlyList<T> list) where T : class =>
+            list.Count == 0 ? null : list[rng.Next(list.Count)];
+
+        string? Constraint(string key) =>
+            spec.Constraints is not null && spec.Constraints.TryGetValue(key, out var val) ? val : null;
+
+        string tense = Constraint("Tense") ?? "Pres";
+        string? constrainedNumber = Constraint("Number");
+        bool isNeg = string.Equals(Constraint("Polarity"), "Neg", StringComparison.OrdinalIgnoreCase)
+            || (negs.Count > 0 && rng.NextDouble() < 0.15);
+
+        (SyntaxNode Node, string Person, string Number, string HeadLemma) BuildNp(string rolePrefix, string gramCase, string? avoidLemma = null)
+        {
+            var eligibleProns = avoidLemma is null
+                ? prons
+                : prons.Where(p => !string.Equals(p.Lemma, avoidLemma, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (eligibleProns.Count > 0 && rng.NextDouble() < 0.35)
+            {
+                var pron = Pick(eligibleProns)!;
+                var lower = pron.Lemma.ToLowerInvariant();
+                string person = lower is "i" or "we" ? "1" : lower == "you" ? "2" : "3";
+                string number = constrainedNumber ?? (lower is "they" or "we" or "you" ? "Pl" : "Sing");
+                var pNode = new SyntaxNode("PRON", pron.Lemma, new[]
+                {
+                    new Feat("Role", rolePrefix),
+                    new Feat("Person", person),
+                    new Feat("Number", number),
+                    new Feat("Case", gramCase)
+                });
+                return (pNode, person, number, pron.Lemma);
+            }
+
+            var pool = avoidLemma is null
+                ? nouns
+                : nouns.Where(n => !string.Equals(n.Lemma, avoidLemma, StringComparison.OrdinalIgnoreCase)).ToList();
+            var noun = Pick(pool.Count > 0 ? pool : nouns);
+            string nounLemma = noun?.Lemma ?? "person";
+            string num = constrainedNumber ?? (rng.NextDouble() < 0.35 ? "Pl" : "Sing");
+            var children = new List<SyntaxNode>();
+
+            if (dets.Count > 0)
+            {
+                bool isMass = string.Equals(nounLemma, "water", StringComparison.OrdinalIgnoreCase);
+                var compatDets = string.Equals(num, "Pl", StringComparison.OrdinalIgnoreCase) || isMass
+                    ? dets.Where(d => !d.Lemma.Equals("a", StringComparison.OrdinalIgnoreCase) && !d.Lemma.Equals("an", StringComparison.OrdinalIgnoreCase)).ToList()
+                    : dets;
+                var det = Pick(compatDets.Count > 0 ? compatDets : dets);
+                if (det is not null)
+                {
+                    children.Add(new SyntaxNode("DET", det.Lemma, new[]
+                    {
+                        new Feat("Role", "Det"),
+                        new Feat("Number", num)
+                    }));
+                }
+            }
+
+            if (spec.ApproxWords >= 4 && adjs.Count > 0 && rng.NextDouble() < 0.65)
+            {
+                var adj = Pick(adjs)!;
+                children.Add(new SyntaxNode("ADJ", adj.Lemma, new[] { new Feat("Role", "Mod") }));
+            }
+
+            children.Add(new SyntaxNode("N", nounLemma, new[]
+            {
+                new Feat("Role", rolePrefix),
+                new Feat("Person", "3"),
+                new Feat("Number", num),
+                new Feat("Case", gramCase)
+            }));
+
+            var np = new SyntaxNode("NP", $"{rolePrefix}NP", new[] { new Feat("Role", $"{rolePrefix}NP") }, children);
+            return (np, "3", num, nounLemma);
+        }
+
+        var subj = BuildNp("Subj", "Nom");
+        var obj = BuildNp("Obj", "Acc", subj.HeadLemma);
+
+        bool isCopular = string.Equals(spec.ClauseType, "Copular", StringComparison.OrdinalIgnoreCase);
+        var verbPool = isCopular
+            ? verbs.Where(v => string.Equals(v.Lemma, "be", StringComparison.OrdinalIgnoreCase)).ToList()
+            : verbs.Where(v => !string.Equals(v.Lemma, "be", StringComparison.OrdinalIgnoreCase)).ToList();
+        string chosenVerb = isCopular
+            ? (verbs.FirstOrDefault(v => string.Equals(v.Lemma, "be", StringComparison.OrdinalIgnoreCase))?.Lemma ?? "be")
+            : (Pick(verbPool.Count > 0 ? verbPool : verbs)?.Lemma ?? "see");
+
+        var vpChildren = new List<SyntaxNode>();
+        bool wantFutAux = string.Equals(tense, "Fut", StringComparison.OrdinalIgnoreCase)
+            && auxes.Any(a => string.Equals(a.Lemma, "will", StringComparison.OrdinalIgnoreCase));
+        var doAux = auxes.FirstOrDefault(a => string.Equals(a.Lemma, "do", StringComparison.OrdinalIgnoreCase));
+        SyntaxNode? advNode = advs.Count > 0 && spec.ApproxWords >= 5 && rng.NextDouble() < 0.45
+            ? new SyntaxNode("ADV", Pick(advs)!.Lemma, new[] { new Feat("Role", "AdvMod") })
+            : null;
+
+        if (wantFutAux)
+        {
+            vpChildren.Add(new SyntaxNode("AUX", "will", new[] { new Feat("Role", "Aux"), new Feat("Tense", "Pres") }));
+            if (isNeg && negs.Count > 0)
+                vpChildren.Add(new SyntaxNode("NEG", negs[0].Lemma, new[] { new Feat("Role", "Neg") }));
+            if (advNode is not null) vpChildren.Add(advNode);
+            vpChildren.Add(new SyntaxNode("V", chosenVerb, new[] { new Feat("Role", "Verb"), new Feat("Finiteness", "Bare") }));
+        }
+        else if (isNeg && negs.Count > 0 && !string.Equals(chosenVerb, "be", StringComparison.OrdinalIgnoreCase) && doAux is not null)
+        {
+            var auxFeats = new List<Feat>
+            {
+                new("Role", "Aux"),
+                new("Tense", tense),
+                new("Person", subj.Person),
+                new("Number", subj.Number)
+            };
+            if (string.Equals(tense, "Pres", StringComparison.OrdinalIgnoreCase) && subj.Person == "3" && subj.Number == "Sing")
+                auxFeats.Add(new Feat("Agreement", "3sg"));
+            vpChildren.Add(new SyntaxNode("AUX", doAux.Lemma, auxFeats));
+            vpChildren.Add(new SyntaxNode("NEG", negs[0].Lemma, new[] { new Feat("Role", "Neg") }));
+            if (advNode is not null) vpChildren.Add(advNode);
+            vpChildren.Add(new SyntaxNode("V", chosenVerb, new[] { new Feat("Role", "Verb"), new Feat("Finiteness", "Bare") }));
+        }
+        else
+        {
+            bool isBe = string.Equals(chosenVerb, "be", StringComparison.OrdinalIgnoreCase);
+            if (advNode is not null && !isBe) vpChildren.Add(advNode);
+            var verbFeats = new List<Feat>
+            {
+                new("Role", isCopular ? "Copula" : "Verb"),
+                new("Tense", tense),
+                new("Person", subj.Person),
+                new("Number", subj.Number)
+            };
+            if (string.Equals(tense, "Pres", StringComparison.OrdinalIgnoreCase) && subj.Person == "3" && subj.Number == "Sing")
+                verbFeats.Add(new Feat("Agreement", "3sg"));
+            vpChildren.Add(new SyntaxNode("V", chosenVerb, verbFeats));
+            if (isNeg && negs.Count > 0 && isBe)
+                vpChildren.Add(new SyntaxNode("NEG", negs[0].Lemma, new[] { new Feat("Role", "Neg") }));
+            if (advNode is not null && isBe) vpChildren.Add(advNode);
+        }
+
+        var vNode = vpChildren.Count == 1
+            ? vpChildren[0]
+            : new SyntaxNode("VP", "VP", new[] { new Feat("Role", "VP") }, vpChildren);
+
+        bool isIntrans = string.Equals(spec.ClauseType, "Intransitive", StringComparison.OrdinalIgnoreCase);
+        var roles = new Dictionary<string, SyntaxNode> { ["S"] = subj.Node, ["V"] = vNode };
+        if (!isIntrans)
+        {
+            roles["O"] = isCopular
+                ? new SyntaxNode("ADJ", Pick(adjs)?.Lemma ?? "small", new[] { new Feat("Role", "Pred") })
+                : obj.Node;
+        }
+
+        string[] order = project.WordOrder switch
+        {
+            WordOrder.SOV => ["S", "O", "V"],
+            WordOrder.VSO => ["V", "S", "O"],
+            WordOrder.VOS => ["V", "O", "S"],
+            WordOrder.OVS => ["O", "V", "S"],
+            WordOrder.OSV => ["O", "S", "V"],
+            _ => ["S", "V", "O"]
+        };
+
+        var rootChildren = new List<SyntaxNode>();
+        foreach (var r in order)
+        {
+            if (roles.TryGetValue(r, out var rn))
+                rootChildren.Add(rn);
+        }
+
+        if (spec.ApproxWords >= 6 && preps.Count > 0 && nouns.Count > 0)
+        {
+            var prep = Pick(preps)!;
+            var pobj = BuildNp("Obj", "Acc");
+            rootChildren.Add(new SyntaxNode("PP", "PP", new[] { new Feat("Role", "PP") }, new[]
+            {
+                new SyntaxNode("PREP", prep.Lemma, new[] { new Feat("Role", "Prep") }),
+                pobj.Node
+            }));
+        }
+
+        return new SyntaxTree(new SyntaxNode("CLAUSE", spec.ClauseType, null, rootChildren));
+    }
+}
+
 public class MorphologyEngine : IMorphologyRealizer
 {
     public virtual string Id => "standard-morphology";
     public virtual string Name => "Affixation Realizer (Default)";
-    public virtual string Description => "Lexicon-backed stem plus ordered prefix/suffix rules.";
+    public virtual string Description => "Lexicon-backed stem, irregular suppletion, and conditioned prefix/suffix allomorphy.";
+
+    private static readonly HashSet<string> MultiCharSegments = new(StringComparer.Ordinal)
+    {
+        "iː", "eɪ", "oʊ", "ɔː", "uː", "ɑː", "ɝː", "aɪ", "aʊ", "ɔɪ",
+        "tʃ", "dʒ", "pʰ", "tʰ", "kʰ"
+    };
 
     public static List<string> SplitPhones(string source)
     {
@@ -125,7 +337,29 @@ public class MorphologyEngine : IMorphologyRealizer
         if (string.IsNullOrEmpty(trimmed)) return new List<string>();
         if (trimmed.Contains(' '))
             return trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ToList();
-        return trimmed.Select(ch => ch.ToString()).ToList();
+
+        var noStress = PhonologyEngine.StripStressMark(trimmed);
+        if (MultiCharSegments.Contains(noStress))
+            return [trimmed];
+
+        var result = new List<string>();
+        for (int i = 0; i < trimmed.Length; i++)
+        {
+            char ch = trimmed[i];
+            if (ch == 'ˈ' && i + 1 < trimmed.Length)
+            {
+                result.Add($"{ch}{trimmed[++i]}");
+            }
+            else if ((ch == 'ː' || ch == 'ʰ') && result.Count > 0)
+            {
+                result[^1] += ch;
+            }
+            else
+            {
+                result.Add(ch.ToString());
+            }
+        }
+        return result;
     }
 
     protected static List<string> ResolveStemPhones(string lemma, LanguageProject project)
@@ -136,9 +370,61 @@ public class MorphologyEngine : IMorphologyRealizer
             : SplitPhones(lemma);
     }
 
-    public virtual List<string> InflectSingle(string lemma, string pos, IReadOnlyList<Feat>? features, LanguageProject project)
+    private static (string Ur, HashSet<string> MatchedFeatures, bool IsIrregular) ResolveIrregularStem(
+        LexemeEntry? lex,
+        string fallbackLemma,
+        IReadOnlyList<Feat>? features)
     {
-        var wordPhones = ResolveStemPhones(lemma, project);
+        if (lex?.Irregulars is { Count: > 0 } && features is { Count: > 0 })
+        {
+            int bestScore = 0;
+            string bestUr = "";
+            var bestKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (keySpec, form) in lex.Irregulars)
+            {
+                var clauses = keySpec.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(c => c.Split('=', 2))
+                    .Where(p => p.Length == 2 && !string.IsNullOrWhiteSpace(p[0]) && !string.IsNullOrWhiteSpace(p[1]))
+                    .Select(p => (Key: p[0].Trim(), Val: p[1].Trim()))
+                    .ToList();
+                if (clauses.Count == 0) continue;
+
+                bool allMatch = clauses.All(cl => features.Any(f =>
+                    string.Equals(f.Name, cl.Key, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(f.Value, cl.Val, StringComparison.OrdinalIgnoreCase)));
+                if (allMatch && clauses.Count > bestScore)
+                {
+                    bestScore = clauses.Count;
+                    bestUr = form;
+                    bestKeys = new HashSet<string>(clauses.Select(c => c.Key), StringComparer.OrdinalIgnoreCase);
+                }
+            }
+
+            if (bestScore > 0)
+            {
+                if (bestKeys.Contains("Person") || bestKeys.Contains("Tense"))
+                    bestKeys.Add("Agreement");
+                return (bestUr, bestKeys, true);
+            }
+        }
+
+        var defaultUr = lex is not null && !string.IsNullOrWhiteSpace(lex.UR) ? lex.UR : fallbackLemma;
+        return (defaultUr, new HashSet<string>(StringComparer.OrdinalIgnoreCase), false);
+    }
+
+    public virtual (List<string> Phones, bool IsIrregular, string? Spelling) InflectSingleDetailed(
+        string lemma,
+        string pos,
+        IReadOnlyList<Feat>? features,
+        LanguageProject project)
+    {
+        var lex = project.Lexemes.FirstOrDefault(l => string.Equals(l.Lemma, lemma, StringComparison.Ordinal))
+            ?? project.Lexemes.FirstOrDefault(l => string.Equals(l.Lemma, lemma, StringComparison.OrdinalIgnoreCase));
+        var (ur, matchedFeatures, isIrregular) = ResolveIrregularStem(lex, lemma, features);
+        var wordPhones = SplitPhones(ur);
+        var handledFeatures = new HashSet<string>(matchedFeatures, StringComparer.OrdinalIgnoreCase);
+
         if (features is not null)
         {
             foreach (var rule in project.Affixes.Where(a => a.Enabled))
@@ -146,18 +432,32 @@ public class MorphologyEngine : IMorphologyRealizer
                 bool posMatch = string.Equals(rule.Pos, pos, StringComparison.OrdinalIgnoreCase)
                     || (string.Equals(pos, "V", StringComparison.OrdinalIgnoreCase) && string.Equals(rule.Pos, "Cop", StringComparison.OrdinalIgnoreCase));
                 if (!posMatch) continue;
+                if (handledFeatures.Contains(rule.FeatureName)) continue;
+
                 bool featMatch = features.Any(f =>
                     string.Equals(f.Name, rule.FeatureName, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(f.Value, rule.FeatureValue, StringComparison.OrdinalIgnoreCase));
                 if (!featMatch) continue;
 
+                if (!string.IsNullOrWhiteSpace(rule.Condition))
+                {
+                    if (wordPhones.Count == 0) continue;
+                    var anchor = rule.IsPrefix ? wordPhones[0] : wordPhones[^1];
+                    if (!PhonologyEngine.MatchesCondition(anchor, rule.Condition, project)) continue;
+                }
+
                 var affixPhones = SplitPhones(rule.Affix.Replace("-", ""));
                 if (rule.IsPrefix) wordPhones.InsertRange(0, affixPhones);
                 else wordPhones.AddRange(affixPhones);
+
+                handledFeatures.Add(rule.FeatureName);
             }
         }
-        return wordPhones;
+        return (wordPhones, isIrregular, lex?.Spelling);
     }
+
+    public virtual List<string> InflectSingle(string lemma, string pos, IReadOnlyList<Feat>? features, LanguageProject project) =>
+        InflectSingleDetailed(lemma, pos, features, project).Phones;
 
     public virtual IReadOnlyList<IReadOnlyList<string>> RealizeWords(SyntaxTree tree, LanguageProject project)
     {
@@ -165,7 +465,19 @@ public class MorphologyEngine : IMorphologyRealizer
         foreach (var leaf in tree.Leaves())
         {
             if (string.IsNullOrWhiteSpace(leaf.Lemma)) continue;
-            words.Add(InflectSingle(leaf.Lemma, leaf.Category, leaf.Features, project));
+            words.Add(InflectSingleDetailed(leaf.Lemma, leaf.Category, leaf.Features, project).Phones);
+        }
+        return words;
+    }
+
+    public virtual IReadOnlyList<InflectedWord> RealizeDetailed(SyntaxTree tree, LanguageProject project)
+    {
+        var words = new List<InflectedWord>();
+        foreach (var leaf in tree.Leaves())
+        {
+            if (string.IsNullOrWhiteSpace(leaf.Lemma)) continue;
+            var (phones, isIrreg, spelling) = InflectSingleDetailed(leaf.Lemma, leaf.Category, leaf.Features, project);
+            words.Add(new InflectedWord(phones, leaf.Lemma, leaf.Category, leaf.Features, spelling, isIrreg));
         }
         return words;
     }
@@ -180,9 +492,13 @@ public sealed class ReduplicativePluralMorphology : MorphologyEngine
     public override string Name => "CV Reduplication + Affixes (Phase 4)";
     public override string Description => "Prepends initial CV stem reduplication for Number=Pl alongside active affixes.";
 
-    public override List<string> InflectSingle(string lemma, string pos, IReadOnlyList<Feat>? features, LanguageProject project)
+    public override (List<string> Phones, bool IsIrregular, string? Spelling) InflectSingleDetailed(
+        string lemma,
+        string pos,
+        IReadOnlyList<Feat>? features,
+        LanguageProject project)
     {
-        var phones = base.InflectSingle(lemma, pos, features, project);
+        var (phones, isIrreg, spelling) = base.InflectSingleDetailed(lemma, pos, features, project);
         if (string.Equals(pos, "N", StringComparison.OrdinalIgnoreCase) &&
             features is not null &&
             features.Any(f => string.Equals(f.Name, "Number", StringComparison.OrdinalIgnoreCase) && string.Equals(f.Value, "Pl", StringComparison.OrdinalIgnoreCase)))
@@ -191,7 +507,7 @@ public sealed class ReduplicativePluralMorphology : MorphologyEngine
             if (stem.Count >= 2)
                 phones.InsertRange(0, stem.Take(2));
         }
-        return phones;
+        return (phones, isIrreg, spelling);
     }
 }
 
@@ -223,11 +539,13 @@ public sealed class PipelineRegistry
         var reg = new PipelineRegistry();
         reg._syntaxGenerators.Add(new ConfigurableSyntaxGenerator());
         reg._syntaxGenerators.Add(new ExpandedModifierSyntaxGenerator());
+        reg._syntaxGenerators.Add(new PhraseStructureSyntaxGenerator());
 
         reg._morphologyRealizers.Add(new MorphologyEngine());
         reg._morphologyRealizers.Add(new ReduplicativePluralMorphology());
 
         reg._orthographyRenderers.Add(new OrthographyEngine());
+        reg._orthographyRenderers.Add(new MorphophonemicOrthography());
         reg._orthographyRenderers.Add(new IpaBroadOrthography());
 
         reg._phonoRules.Add(new BuiltInPhonoRule(

@@ -60,7 +60,13 @@ export class ProjectHistory {
 export function importLexiconFromText(filename: string, content: string): LexemeState[] {
   const lower = filename.toLowerCase();
   if (lower.endsWith('.json')) {
-    const parsed = JSON.parse(content) as Array<{ Lemma?: string; Pos?: string; UR?: string }>;
+    const parsed = JSON.parse(content) as Array<{
+      Lemma?: string;
+      Pos?: string;
+      UR?: string;
+      Spelling?: string;
+      Irregulars?: Record<string, string>;
+    }>;
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((r) => typeof r.Lemma === 'string' && r.Lemma.trim().length > 0)
@@ -68,6 +74,8 @@ export function importLexiconFromText(filename: string, content: string): Lexeme
         Lemma: r.Lemma!.trim(),
         Pos: r.Pos?.trim() || 'N',
         UR: (r.UR ?? '').trim(),
+        ...(r.Spelling?.trim() ? { Spelling: r.Spelling.trim() } : {}),
+        ...(r.Irregulars && Object.keys(r.Irregulars).length > 0 ? { Irregulars: r.Irregulars } : {}),
       }));
   }
 
@@ -75,15 +83,43 @@ export function importLexiconFromText(filename: string, content: string): Lexeme
   return lines
     .map((line) => line.split(','))
     .filter((parts) => parts.length >= 3 && parts[0].trim().length > 0)
-    .map((parts) => ({
-      Lemma: parts[0].trim(),
-      Pos: parts[1].trim() || 'N',
-      UR: parts[2].trim(),
-    }));
+    .map((parts) => {
+      const spelling = parts[3]?.trim();
+      let irregulars: Record<string, string> | undefined;
+      const rawIrreg = parts.slice(4).join(',').trim();
+      if (rawIrreg) {
+        try {
+          const parsed = JSON.parse(rawIrreg.replace(/^"|"$/g, '').replace(/""/g, '"'));
+          if (parsed && typeof parsed === 'object') irregulars = parsed;
+        } catch {
+          // ignore malformed optional irregular column
+        }
+      }
+      return {
+        Lemma: parts[0].trim(),
+        Pos: parts[1].trim() || 'N',
+        UR: parts[2].trim(),
+        ...(spelling ? { Spelling: spelling } : {}),
+        ...(irregulars && Object.keys(irregulars).length > 0 ? { Irregulars: irregulars } : {}),
+      };
+    });
 }
 
 export function exportLexiconToCsv(lexemes: readonly LexemeState[]): string {
-  const lines = ['Lemma,Pos,UR', ...lexemes.map((l) => `${l.Lemma},${l.Pos},${l.UR}`)];
+  const hasExtended = lexemes.some((l) => Boolean(l.Spelling) || (l.Irregulars && Object.keys(l.Irregulars).length > 0));
+  if (!hasExtended) {
+    const lines = ['Lemma,Pos,UR', ...lexemes.map((l) => `${l.Lemma},${l.Pos},${l.UR}`)];
+    return lines.join('\n');
+  }
+  const lines = [
+    'Lemma,Pos,UR,Spelling,Irregulars',
+    ...lexemes.map((l) => {
+      const irreg = l.Irregulars && Object.keys(l.Irregulars).length > 0
+        ? `"${JSON.stringify(l.Irregulars).replace(/"/g, '""')}"`
+        : '';
+      return `${l.Lemma},${l.Pos},${l.UR},${l.Spelling ?? ''},${irreg}`;
+    }),
+  ];
   return lines.join('\n');
 }
 

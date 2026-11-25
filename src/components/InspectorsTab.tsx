@@ -37,15 +37,39 @@ export const InspectorsTab: React.FC<InspectorsTabProps> = ({ state }) => {
       lex.pos,
       new FeatBundle([{ name: 'Number', value: 'Pl' }])
     );
+    const acc = engine.morphology.realizeForPreview(
+      lex.lemma,
+      lex.pos,
+      new FeatBundle([{ name: 'Case', value: 'Acc' }])
+    );
+    const sg3 = engine.morphology.realizeForPreview(
+      lex.lemma,
+      lex.pos,
+      new FeatBundle([
+        { name: 'Person', value: '3' },
+        { name: 'Number', value: 'Sing' },
+        { name: 'Tense', value: 'Pres' },
+        { name: 'Agreement', value: '3sg' },
+      ])
+    );
     const orthPres = engine.orthography.render(pres.replace(/\s+/g, ''));
+    const irregSummary = lex.irregulars
+      ? Object.entries(lex.irregulars)
+          .map(([k, v]) => `${k}=${v}`)
+          .join('; ')
+      : '(none)';
 
     const lexText = [
       `Lemma: ${lex.lemma}`,
       `POS: ${lex.pos}`,
       `UR: ${ur}`,
+      `Spelling: ${lex.spelling ?? '(rule-driven)'}`,
+      `Irregulars: ${irregSummary}`,
       `SR(Pres): ${pres}`,
+      `SR(3sg): ${sg3}`,
       `SR(Past): ${past}`,
       `SR(Plural): ${plural}`,
+      `SR(Acc): ${acc}`,
       `Orth(Pres): ${orthPres}`,
     ].join('\n');
 
