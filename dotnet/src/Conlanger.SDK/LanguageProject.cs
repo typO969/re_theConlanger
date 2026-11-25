@@ -23,6 +23,18 @@ public enum DiagnosticSeverity { Error, Warning }
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum AffixType { Prefix, Suffix, Infix, Circumfix, Template }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum AlignmentSystem { NomAcc, ErgAbs, Tripartite }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ModifierOrder { BeforeNoun, AfterNoun }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum AdpositionOrder { Preposition, Postposition }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum QuestionStrategy { Inversion, Particle }
+
 public sealed record Feat(string Name, string Value);
 
 public sealed record PhonologicalFeatures
@@ -199,6 +211,45 @@ public sealed class WritingSystemConfig
     public List<FeaturicAssemblyRule> FeaturicRules { get; set; } = new();
 }
 
+public sealed class SyntaxConfig
+{
+    [JsonPropertyName("alignment")]
+    public AlignmentSystem Alignment { get; set; } = AlignmentSystem.NomAcc;
+
+    [JsonPropertyName("adjectiveOrder")]
+    public ModifierOrder AdjectiveOrder { get; set; } = ModifierOrder.BeforeNoun;
+
+    [JsonPropertyName("determinerOrder")]
+    public ModifierOrder DeterminerOrder { get; set; } = ModifierOrder.BeforeNoun;
+
+    [JsonPropertyName("adpositionType")]
+    public AdpositionOrder AdpositionType { get; set; } = AdpositionOrder.Preposition;
+
+    [JsonPropertyName("questionStrategy")]
+    public QuestionStrategy QuestionStrategy { get; set; } = QuestionStrategy.Inversion;
+
+    [JsonPropertyName("proDrop")]
+    public bool ProDrop { get; set; }
+
+    [JsonPropertyName("polypersonalAgreement")]
+    public bool PolypersonalAgreement { get; set; }
+
+    [JsonPropertyName("allowEmbeddedClauses")]
+    public bool AllowEmbeddedClauses { get; set; }
+
+    [JsonPropertyName("allowRelativeClauses")]
+    public bool AllowRelativeClauses { get; set; }
+
+    [JsonPropertyName("allowPassive")]
+    public bool AllowPassive { get; set; }
+
+    [JsonPropertyName("maxClauseDepth")]
+    public int MaxClauseDepth { get; set; } = 1;
+
+    [JsonPropertyName("customRules")]
+    public List<string> CustomRules { get; set; } = new();
+}
+
 public sealed class PipelineSelection
 {
     [JsonPropertyName("syntaxGeneratorId")]
@@ -241,6 +292,7 @@ public sealed class LanguageProject
     public List<AffixEntry> Affixes { get; set; } = new();
     public WordOrder WordOrder { get; set; } = WordOrder.SVO;
     public ClauseTemplate ClauseTemplate { get; set; } = ClauseTemplate.Transitive;
+    public SyntaxConfig SyntaxConfig { get; set; } = new();
     public List<OrthRuleEntry> OrthographyRules { get; set; } = new();
     public List<OrthExceptionEntry> OrthographyExceptions { get; set; } = new();
     public CapitalizationMode Capitalization { get; set; } = CapitalizationMode.SentenceInitial;

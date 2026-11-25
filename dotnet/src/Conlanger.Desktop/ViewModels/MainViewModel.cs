@@ -134,7 +134,13 @@ public sealed class MainViewModel : ViewModelBase
 
     // Syntax tab state
     private int _syntaxPreviewSeed = 1;
-    private int _syntaxApproxWords = 4;
+    private int _syntaxApproxWords = 6;
+    private string _syntaxMoodPreview = "Decl";
+    private string _syntaxVoicePreview = "Auto";
+    private string _syntaxTensePreview = "Pres";
+    private string _syntaxWrittenPreview = "";
+    private string _syntaxSurfacePreview = "";
+    private string _syntaxIgtPreview = "";
     private string _syntaxLinearPreview = "";
     private string _syntaxTreeSummary = "";
 
@@ -171,6 +177,8 @@ public sealed class MainViewModel : ViewModelBase
     private string _outputSeedText = "";
     private string _constraintFeatName = "Tense";
     private string _constraintFeatVal = "Past";
+    private string _outputMoodFilter = "Decl";
+    private string _outputVoiceFilter = "Auto";
     private string _batchOutputText = "";
     private int _wordCount = 15;
     private int _syllablesPerWord = 2;
@@ -345,6 +353,13 @@ public sealed class MainViewModel : ViewModelBase
     public Array StressPatterns => Enum.GetValues(typeof(StressPattern));
     public Array FlowDirections => Enum.GetValues(typeof(Conlanger.SDK.FlowDirection));
     public Array AffixTypes => Enum.GetValues(typeof(AffixType));
+    public Array AlignmentSystems => Enum.GetValues(typeof(AlignmentSystem));
+    public Array ModifierOrders => Enum.GetValues(typeof(ModifierOrder));
+    public Array AdpositionOrders => Enum.GetValues(typeof(AdpositionOrder));
+    public Array QuestionStrategies => Enum.GetValues(typeof(QuestionStrategy));
+    public IReadOnlyList<string> SyntaxMoodOptions { get; } = ["Decl", "YNQuestion", "Imp"];
+    public IReadOnlyList<string> SyntaxVoiceOptions { get; } = ["Auto", "Active", "Passive"];
+    public IReadOnlyList<string> SyntaxTenseOptions { get; } = ["Pres", "Past", "Fut"];
     public IReadOnlyList<string> FeaturicContexts { get; } = ["any", "initial", "medial", "final"];
 
     // Toolbar properties
@@ -492,8 +507,79 @@ public sealed class MainViewModel : ViewModelBase
         get => _project.ClauseTemplate;
         set { _project.ClauseTemplate = value; OnPropertyChanged(); CommitAndRefresh("Clause template updated"); }
     }
-    public int SyntaxApproxWords { get => _syntaxApproxWords; set { if (SetField(ref _syntaxApproxWords, Math.Clamp(value, 1, 8))) RefreshSyntaxPreview(); } }
+    public AlignmentSystem SelectedAlignment
+    {
+        get => _project.SyntaxConfig.Alignment;
+        set { _project.SyntaxConfig.Alignment = value; OnPropertyChanged(); CommitAndRefresh("Case alignment updated"); }
+    }
+    public ModifierOrder SelectedAdjectiveOrder
+    {
+        get => _project.SyntaxConfig.AdjectiveOrder;
+        set { _project.SyntaxConfig.AdjectiveOrder = value; OnPropertyChanged(); CommitAndRefresh("Adjective order updated"); }
+    }
+    public ModifierOrder SelectedDeterminerOrder
+    {
+        get => _project.SyntaxConfig.DeterminerOrder;
+        set { _project.SyntaxConfig.DeterminerOrder = value; OnPropertyChanged(); CommitAndRefresh("Determiner order updated"); }
+    }
+    public AdpositionOrder SelectedAdpositionType
+    {
+        get => _project.SyntaxConfig.AdpositionType;
+        set { _project.SyntaxConfig.AdpositionType = value; OnPropertyChanged(); CommitAndRefresh("Adposition order updated"); }
+    }
+    public QuestionStrategy SelectedQuestionStrategy
+    {
+        get => _project.SyntaxConfig.QuestionStrategy;
+        set { _project.SyntaxConfig.QuestionStrategy = value; OnPropertyChanged(); CommitAndRefresh("Question strategy updated"); }
+    }
+    public bool ProDrop
+    {
+        get => _project.SyntaxConfig.ProDrop;
+        set { _project.SyntaxConfig.ProDrop = value; OnPropertyChanged(); CommitAndRefresh("Pro-drop setting updated"); }
+    }
+    public bool PolypersonalAgreement
+    {
+        get => _project.SyntaxConfig.PolypersonalAgreement;
+        set { _project.SyntaxConfig.PolypersonalAgreement = value; OnPropertyChanged(); CommitAndRefresh("Polypersonal agreement updated"); }
+    }
+    public bool AllowEmbeddedClauses
+    {
+        get => _project.SyntaxConfig.AllowEmbeddedClauses;
+        set { _project.SyntaxConfig.AllowEmbeddedClauses = value; OnPropertyChanged(); CommitAndRefresh("Embedded clause setting updated"); }
+    }
+    public bool AllowRelativeClauses
+    {
+        get => _project.SyntaxConfig.AllowRelativeClauses;
+        set { _project.SyntaxConfig.AllowRelativeClauses = value; OnPropertyChanged(); CommitAndRefresh("Relative clause setting updated"); }
+    }
+    public bool AllowPassive
+    {
+        get => _project.SyntaxConfig.AllowPassive;
+        set { _project.SyntaxConfig.AllowPassive = value; OnPropertyChanged(); CommitAndRefresh("Passive voice setting updated"); }
+    }
+    public int MaxClauseDepth
+    {
+        get => _project.SyntaxConfig.MaxClauseDepth;
+        set { _project.SyntaxConfig.MaxClauseDepth = Math.Clamp(value, 0, 3); OnPropertyChanged(); CommitAndRefresh("Max clause depth updated"); }
+    }
+    public string CustomSyntaxRulesText
+    {
+        get => string.Join(Environment.NewLine, _project.SyntaxConfig.CustomRules);
+        set
+        {
+            _project.SyntaxConfig.CustomRules = value.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            OnPropertyChanged();
+            CommitAndRefresh("Custom CFG rules updated");
+        }
+    }
+    public int SyntaxApproxWords { get => _syntaxApproxWords; set { if (SetField(ref _syntaxApproxWords, Math.Clamp(value, 1, 10))) RefreshSyntaxPreview(); } }
     public int SyntaxPreviewSeed { get => _syntaxPreviewSeed; set { if (SetField(ref _syntaxPreviewSeed, value)) RefreshSyntaxPreview(); } }
+    public string SyntaxMoodPreview { get => _syntaxMoodPreview; set { if (SetField(ref _syntaxMoodPreview, value)) RefreshSyntaxPreview(); } }
+    public string SyntaxVoicePreview { get => _syntaxVoicePreview; set { if (SetField(ref _syntaxVoicePreview, value)) RefreshSyntaxPreview(); } }
+    public string SyntaxTensePreview { get => _syntaxTensePreview; set { if (SetField(ref _syntaxTensePreview, value)) RefreshSyntaxPreview(); } }
+    public string SyntaxWrittenPreview { get => _syntaxWrittenPreview; set => SetField(ref _syntaxWrittenPreview, value); }
+    public string SyntaxSurfacePreview { get => _syntaxSurfacePreview; set => SetField(ref _syntaxSurfacePreview, value); }
+    public string SyntaxIgtPreview { get => _syntaxIgtPreview; set => SetField(ref _syntaxIgtPreview, value); }
     public string SyntaxLinearPreview { get => _syntaxLinearPreview; set => SetField(ref _syntaxLinearPreview, value); }
     public string SyntaxTreeSummary { get => _syntaxTreeSummary; set => SetField(ref _syntaxTreeSummary, value); }
 
@@ -634,6 +720,8 @@ public sealed class MainViewModel : ViewModelBase
     public string OutputSeedText { get => _outputSeedText; set => SetField(ref _outputSeedText, value); }
     public string ConstraintFeatName { get => _constraintFeatName; set => SetField(ref _constraintFeatName, value); }
     public string ConstraintFeatVal { get => _constraintFeatVal; set => SetField(ref _constraintFeatVal, value); }
+    public string OutputMoodFilter { get => _outputMoodFilter; set => SetField(ref _outputMoodFilter, value); }
+    public string OutputVoiceFilter { get => _outputVoiceFilter; set => SetField(ref _outputVoiceFilter, value); }
     public string BatchOutputText { get => _batchOutputText; set => SetField(ref _batchOutputText, value); }
     public int WordCount { get => _wordCount; set => SetField(ref _wordCount, Math.Max(1, value)); }
     public int SyllablesPerWord { get => _syllablesPerWord; set => SetField(ref _syllablesPerWord, Math.Max(1, value)); }
@@ -822,6 +910,18 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedStressPattern));
         OnPropertyChanged(nameof(SelectedWordOrder));
         OnPropertyChanged(nameof(SelectedClauseTemplate));
+        OnPropertyChanged(nameof(SelectedAlignment));
+        OnPropertyChanged(nameof(SelectedAdjectiveOrder));
+        OnPropertyChanged(nameof(SelectedDeterminerOrder));
+        OnPropertyChanged(nameof(SelectedAdpositionType));
+        OnPropertyChanged(nameof(SelectedQuestionStrategy));
+        OnPropertyChanged(nameof(ProDrop));
+        OnPropertyChanged(nameof(PolypersonalAgreement));
+        OnPropertyChanged(nameof(AllowEmbeddedClauses));
+        OnPropertyChanged(nameof(AllowRelativeClauses));
+        OnPropertyChanged(nameof(AllowPassive));
+        OnPropertyChanged(nameof(MaxClauseDepth));
+        OnPropertyChanged(nameof(CustomSyntaxRulesText));
         OnPropertyChanged(nameof(SelectedCapitalization));
         OnPropertyChanged(nameof(SelectedFlowDirection));
         OnPropertyChanged(nameof(CursiveBonding));
@@ -1016,10 +1116,20 @@ public sealed class MainViewModel : ViewModelBase
 
     private void RefreshSyntaxPreview()
     {
-        var syntax = _engine.ResolveSyntax(_project);
-        var tree = syntax.Generate(new SentenceSpec(_project.ClauseTemplate.ToString(), SyntaxApproxWords, new Dictionary<string, string> { ["Tense"] = "Past" }), _project, new Random(SyntaxPreviewSeed));
-        SyntaxLinearPreview = string.Join(" ", tree.Leaves().Select(l => $"{l.Lemma}/{l.Category}"));
-        SyntaxTreeSummary = ConfigurableSyntaxGenerator.FormatSyntaxTree(tree.Root, 0, false);
+        var constraints = new Dictionary<string, string>
+        {
+            ["Tense"] = SyntaxTensePreview,
+            ["Mood"] = SyntaxMoodPreview
+        };
+        if (SyntaxVoicePreview is "Active" or "Passive")
+            constraints["Voice"] = SyntaxVoicePreview;
+
+        var res = _engine.GenerateSentence(_project, SyntaxPreviewSeed, SyntaxApproxWords, constraints);
+        SyntaxWrittenPreview = res.Written;
+        SyntaxSurfacePreview = string.Join(" ", res.SurfaceWords.Select(w => string.Concat(w)));
+        SyntaxLinearPreview = string.Join(" ", res.Tree.Leaves().Select(l => $"{l.Lemma}/{l.Category}"));
+        SyntaxIgtPreview = LangEngine.FormatInterlinearGloss(_engine, res.Tree, _project);
+        SyntaxTreeSummary = ConfigurableSyntaxGenerator.FormatSyntaxTree(res.Tree.Root, 0, false);
     }
 
     private void AddOrthRule()
@@ -1186,6 +1296,10 @@ public sealed class MainViewModel : ViewModelBase
         var constraints = new Dictionary<string, string>();
         if (!string.IsNullOrWhiteSpace(ConstraintFeatName) && !string.IsNullOrWhiteSpace(ConstraintFeatVal))
             constraints[ConstraintFeatName.Trim()] = ConstraintFeatVal.Trim();
+        if (!constraints.ContainsKey("Mood"))
+            constraints["Mood"] = OutputMoodFilter;
+        if (OutputVoiceFilter is "Active" or "Passive" && !constraints.ContainsKey("Voice"))
+            constraints["Voice"] = OutputVoiceFilter;
 
         int baseSeed = int.TryParse(OutputSeedText, out var parsed) ? parsed : Environment.TickCount;
         var list = new List<string>(SampleCount);
@@ -1268,8 +1382,11 @@ public sealed class MainViewModel : ViewModelBase
         InspectorLexemeText = string.Join(Environment.NewLine, lines);
 
         var syntax = _engine.ResolveSyntax(_project);
-        var tree = syntax.Generate(new SentenceSpec(_project.ClauseTemplate.ToString(), 5, new Dictionary<string, string> { ["Tense"] = "Past" }), _project, new Random(3));
-        InspectorSyntaxTreeText = ConfigurableSyntaxGenerator.FormatSyntaxTree(tree.Root, 0, true);
+        var tree = syntax.Generate(new SentenceSpec(_project.ClauseTemplate.ToString(), 6, new Dictionary<string, string> { ["Tense"] = "Past" }), _project, new Random(3));
+        InspectorSyntaxTreeText = ConfigurableSyntaxGenerator.FormatSyntaxTree(tree.Root, 0, true)
+            + Environment.NewLine + Environment.NewLine
+            + "-- Interlinear Gloss (IGT) --" + Environment.NewLine
+            + LangEngine.FormatInterlinearGloss(_engine, tree, _project);
 
         var urPhones = MorphologyEngine.SplitPhones(lex.UR);
         var derived = PhonologyEngine.Derive(urPhones, _project, pluginRules);

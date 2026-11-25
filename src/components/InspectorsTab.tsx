@@ -1,6 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { FeatBundle, LanguageProjectState } from '../core/types';
-import { buildEngineFromState, formatSyntaxTree, Morphology } from '../core/languageEngine';
+import {
+  buildEngineFromState,
+  formatInterlinearGloss,
+  formatSyntaxTree,
+  Morphology,
+} from '../core/languageEngine';
 import { RNG } from '../core/rng';
 
 interface InspectorsTabProps {
@@ -79,10 +84,10 @@ export const InspectorsTab: React.FC<InspectorsTabProps> = ({ state }) => {
     ].join('\n');
 
     const tree = engine.syntax.realize(
-      { clauseType: 'decl', approxWords: 5, constraints: { Tense: 'Past' } },
+      { clauseType: state.ClauseTemplate, approxWords: 6, constraints: { Tense: 'Past' } },
       new RNG(3)
     );
-    const treeText = formatSyntaxTree(tree.root, 0, true);
+    const treeText = `${formatSyntaxTree(tree.root, 0, true)}\n\n-- Interlinear Gloss (IGT) --\n${formatInterlinearGloss(engine, tree)}`;
 
     const urPhones = Morphology.splitPhones(ur);
     const derived = engine.phonology.derive([

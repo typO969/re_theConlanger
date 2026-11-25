@@ -174,6 +174,7 @@ public static class ProjectFactory
             },
             WordOrder = WordOrder.SVO,
             ClauseTemplate = ClauseTemplate.Transitive,
+            SyntaxConfig = new SyntaxConfig(),
             OrthographyRules = new()
             {
                 new() { Phone = "ʃ", Grapheme = "sh", Enabled = true },
@@ -238,7 +239,8 @@ public static class ProjectFactory
                     "p", "t", "k", "b", "d", "g", "f", "v", "θ", "ð", "s", "z", "ʃ", "ʒ", "m", "n", "ŋ", "l", "ɫ", "ɹ",
                     "tʃ", "dʒ", "ɾ",
                     "st", "sk", "sp", "nt", "nd", "ns", "nz", "mp", "ŋk", "lt", "ld", "ɫt", "ɫd", "lk", "lp",
-                    "rt", "rd", "rk", "rp", "rs", "rz", "ɹt", "ɹd", "ɹk", "ɹp", "ɹs", "ɹz", "ks", "ts", "dz", "ps"
+                    "rt", "rd", "rk", "rp", "rs", "rz", "ɹt", "ɹd", "ɹk", "ɹp", "ɹs", "ɹz", "ks", "ts", "dz", "ps",
+                    "gz", "bz", "vz", "mz", "ɹks", "ɹts", "ɹdz", "kt", "gd", "bd", "zd", "pt", "ft"
                 },
                 MaxOnsetCluster = 3,
                 MaxCodaCluster = 4,
@@ -259,6 +261,10 @@ public static class ProjectFactory
             {
                 new() { Lemma = "the", Pos = "DET", UR = "ð ə", Spelling = "the" },
                 new() { Lemma = "a", Pos = "DET", UR = "ə", Spelling = "a" },
+                new() { Lemma = "that", Pos = "COMP", UR = "ð æ t", Spelling = "that" },
+                new() { Lemma = "who", Pos = "REL", UR = "h uː", Spelling = "who" },
+                new() { Lemma = "and", Pos = "CONJ", UR = "æ n d", Spelling = "and" },
+                new() { Lemma = "by", Pos = "PREP", UR = "b aɪ", Spelling = "by" },
                 new() { Lemma = "I", Pos = "PRON", UR = "ˈaɪ", Spelling = "I", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Case=Acc"] = "ˈm iː" } },
                 new() { Lemma = "she", Pos = "PRON", UR = "ˈʃ iː", Spelling = "she", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Case=Acc"] = "ˈh ɝː" } },
                 new() { Lemma = "they", Pos = "PRON", UR = "ˈð eɪ", Spelling = "they", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Case=Acc"] = "ˈð ɛ m" } },
@@ -299,8 +305,8 @@ public static class ProjectFactory
                 new() { Lemma = "knight", Pos = "N", UR = "ˈn aɪ t", Spelling = "knight" },
                 new() { Lemma = "walk", Pos = "V", UR = "ˈw ɔː k", Spelling = "walk" },
                 new() { Lemma = "chase", Pos = "V", UR = "ˈtʃ eɪ s", Spelling = "chase" },
-                new() { Lemma = "see", Pos = "V", UR = "ˈs iː", Spelling = "see", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Tense=Past"] = "ˈs ɔː" } },
-                new() { Lemma = "go", Pos = "V", UR = "ˈg oʊ", Spelling = "go", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Tense=Past"] = "ˈw ɛ n t", ["Person=3,Number=Sing,Tense=Pres"] = "ˈg oʊ z" } },
+                new() { Lemma = "see", Pos = "V", UR = "ˈs iː", Spelling = "see", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Tense=Past"] = "ˈs ɔː", ["Aspect=Part"] = "ˈs iː n" } },
+                new() { Lemma = "go", Pos = "V", UR = "ˈg oʊ", Spelling = "go", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Tense=Past"] = "ˈw ɛ n t", ["Person=3,Number=Sing,Tense=Pres"] = "ˈg oʊ z", ["Aspect=Part"] = "ˈg ɔː n" } },
                 new() { Lemma = "small", Pos = "ADJ", UR = "ˈs m ɔː l", Spelling = "small" },
                 new() { Lemma = "tall", Pos = "ADJ", UR = "ˈt ɔː l", Spelling = "tall" }
             },
@@ -312,12 +318,22 @@ public static class ProjectFactory
                 new() { Name = "Past /ɪd/", Pos = "V", FeatureName = "Tense", FeatureValue = "Past", Affix = "-ɪ d", IsPrefix = false, Condition = "[place=alveolar, manner=stop]", Enabled = true },
                 new() { Name = "Past /t/", Pos = "V", FeatureName = "Tense", FeatureValue = "Past", Affix = "-t", IsPrefix = false, Condition = "[-voice]", Enabled = true },
                 new() { Name = "Past /d/", Pos = "V", FeatureName = "Tense", FeatureValue = "Past", Affix = "-d", IsPrefix = false, Condition = "", Enabled = true },
+                new() { Name = "Participle /ɪd/", Pos = "V", FeatureName = "Aspect", FeatureValue = "Part", Affix = "-ɪ d", IsPrefix = false, Condition = "[place=alveolar, manner=stop]", Enabled = true },
+                new() { Name = "Participle /t/", Pos = "V", FeatureName = "Aspect", FeatureValue = "Part", Affix = "-t", IsPrefix = false, Condition = "[-voice]", Enabled = true },
+                new() { Name = "Participle /d/", Pos = "V", FeatureName = "Aspect", FeatureValue = "Part", Affix = "-d", IsPrefix = false, Condition = "", Enabled = true },
                 new() { Name = "3sg /ɪz/", Pos = "V", FeatureName = "Agreement", FeatureValue = "3sg", Affix = "-ɪ z", IsPrefix = false, Condition = "[+sibilant]", Enabled = true },
                 new() { Name = "3sg /s/", Pos = "V", FeatureName = "Agreement", FeatureValue = "3sg", Affix = "-s", IsPrefix = false, Condition = "[-voice]", Enabled = true },
                 new() { Name = "3sg /z/", Pos = "V", FeatureName = "Agreement", FeatureValue = "3sg", Affix = "-z", IsPrefix = false, Condition = "", Enabled = true }
             },
             WordOrder = WordOrder.SVO,
             ClauseTemplate = ClauseTemplate.Transitive,
+            SyntaxConfig = new SyntaxConfig
+            {
+                AllowEmbeddedClauses = true,
+                AllowRelativeClauses = true,
+                AllowPassive = true,
+                MaxClauseDepth = 1
+            },
             OrthographyRules = new()
             {
                 new() { Phone = "tʃ", Grapheme = "ch", Enabled = true },
@@ -368,6 +384,8 @@ public static class ProjectFactory
                 new() { Input = "pʰiːpəl", Output = "people" },
                 new() { Input = "wɛnt", Output = "went" },
                 new() { Input = "sɔː", Output = "saw" },
+                new() { Input = "siːn", Output = "seen" },
+                new() { Input = "gɔːn", Output = "gone" },
                 new() { Input = "wʌz", Output = "was" },
                 new() { Input = "wɝː", Output = "were" },
                 new() { Input = "ɪz", Output = "is" },
@@ -378,6 +396,10 @@ public static class ProjectFactory
                 new() { Input = "goʊz", Output = "goes" },
                 new() { Input = "ðə", Output = "the" },
                 new() { Input = "ə", Output = "a" },
+                new() { Input = "ðæt", Output = "that" },
+                new() { Input = "huː", Output = "who" },
+                new() { Input = "ænd", Output = "and" },
+                new() { Input = "baɪ", Output = "by" },
                 new() { Input = "wɔːɾɚz", Output = "waters" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
@@ -412,6 +434,9 @@ public static class ProjectFactory
         project.Pipeline ??= new PipelineSelection();
         project.Phonotactics ??= new PhonotacticsConfig();
         project.GeneratorOptions ??= new GeneratorOptions();
+        project.SyntaxConfig ??= new SyntaxConfig();
+        project.SyntaxConfig.CustomRules ??= new();
+        project.SyntaxConfig.MaxClauseDepth = Math.Clamp(project.SyntaxConfig.MaxClauseDepth, 0, 3);
         project.SchemaVersion = 2;
     }
 

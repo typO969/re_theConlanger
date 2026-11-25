@@ -1,6 +1,7 @@
 import {
   AffixRule,
   AffixType,
+  AlignmentSystem,
   CapitalizationMode,
   ClauseTemplate,
   DerivationStep,
@@ -20,9 +21,11 @@ import {
   PipelineSelection,
   RealizedWordContext,
   RuleSpec,
+  SentenceMood,
   SentenceSpec,
   StressPattern,
   Syllable,
+  SyntaxConfig,
   WordOrder,
 } from './types';
 import { RNG } from './rng';
@@ -1126,114 +1129,382 @@ export class SyntaxTree {
   }
 }
 
+export const DEFAULT_SYNTAX_CONFIG: SyntaxConfig = {
+  alignment: 'NomAcc',
+  adjectiveOrder: 'BeforeNoun',
+  determinerOrder: 'BeforeNoun',
+  adpositionType: 'Preposition',
+  questionStrategy: 'Inversion',
+  proDrop: false,
+  polypersonalAgreement: false,
+  allowEmbeddedClauses: false,
+  allowRelativeClauses: false,
+  allowPassive: false,
+  maxClauseDepth: 1,
+  customRules: [],
+};
+
+export function normalizeSyntaxConfig(raw?: Partial<SyntaxConfig>): SyntaxConfig {
+  return {
+    ...DEFAULT_SYNTAX_CONFIG,
+    ...(raw ?? {}),
+    maxClauseDepth: Math.max(0, Math.min(3, raw?.maxClauseDepth ?? DEFAULT_SYNTAX_CONFIG.maxClauseDepth)),
+    customRules: Array.isArray(raw?.customRules) ? raw!.customRules : [],
+  };
+}
+
+export function resolveAlignmentCases(
+  alignment: AlignmentSystem,
+  hasDirectObject: boolean
+): { subjCase: string; objCase: string; obliqueCase: string } {
+  if (alignment === 'ErgAbs') {
+    return {
+      subjCase: hasDirectObject ? 'Erg' : 'Abs',
+      objCase: 'Abs',
+      obliqueCase: 'Obl',
+    };
+  }
+  if (alignment === 'Tripartite') {
+    return {
+      subjCase: hasDirectObject ? 'Erg' : 'Intrans',
+      objCase: 'Acc',
+      obliqueCase: 'Obl',
+    };
+  }
+  return { subjCase: 'Nom', objCase: 'Acc', obliqueCase: 'Acc' };
+}
+
+export function parseCustomCfgRules(rules?: readonly string[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  if (!rules) return map;
+  for (const raw of rules) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#') || line.startsWith('//')) continue;
+    const arrowIdx = line.indexOf('->');
+    if (arrowIdx <= 0) continue;
+    const lhs = line.slice(0, arrowIdx).trim().toUpperCase();
+    const rhs = line
+      .slice(arrowIdx + 2)
+      .trim()
+      .split(/\s+/)
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+    if (lhs && rhs.length > 0 && !map.has(lhs)) {
+      map.set(lhs, rhs);
+    }
+  }
+  return map;
+}
+
+export function resolveMoodFromSpec(spec: SentenceSpec): SentenceMood {
+  const raw = spec.constraints?.Mood?.trim().toLowerCase() ?? '';
+  if (raw === 'ynquestion' || raw === 'question' || raw === 'interrogative' || spec.clauseType.toLowerCase() === 'ynquestion') {
+    return 'YNQuestion';
+  }
+  if (raw === 'imp' || raw === 'imperative' || spec.clauseType.toLowerCase() === 'imp') {
+    return 'Imp';
+  }
+  return 'Decl';
+}
+
+export function formatAgrCode(person: string, number: string): string {
+  return `${person}${number.toLowerCase() === 'pl' ? 'pl' : 'sg'}`;
+}
+
 export class ConfigurableSyntaxGenerator {
-  private readonly lexicon: InMemoryLexicon;
+  protected readonly lexicon: InMemoryLexicon;
   public wordOrder: WordOrder;
   public clauseTemplate: ClauseTemplate;
+  public syntaxConfig: SyntaxConfig;
 
   constructor(
     lexicon: InMemoryLexicon,
     wordOrder: WordOrder = 'SVO',
-    clauseTemplate: ClauseTemplate = 'Transitive'
+    clauseTemplate: ClauseTemplate = 'Transitive',
+    syntaxConfig: SyntaxConfig = DEFAULT_SYNTAX_CONFIG
   ) {
     this.lexicon = lexicon;
     this.wordOrder = wordOrder;
     this.clauseTemplate = clauseTemplate;
+    this.syntaxConfig = normalizeSyntaxConfig(syntaxConfig);
   }
 
   public realize(spec: SentenceSpec, rng: RNG): SyntaxTree {
-    const nodes = this.buildClauseNodes(spec, rng);
-    const order = this.expandWordOrder(this.wordOrder, Object.keys(nodes));
-    const root = new SyntaxNode('CLAUSE', this.clauseTemplate);
-
-    for (const role of order) {
-      const node = nodes[role];
-      if (node) root.children.push(node);
-    }
-
-    return new SyntaxTree(root);
+    return new SyntaxTree(this.buildClauseNode(spec, rng, 0, null));
   }
 
-  private pickFrom(items: Lexeme[], rng: RNG, fallback: string): string {
-    if (items.length === 0) return fallback;
-    return items[rng.next(items.length)].lemma;
-  }
-
-  private buildClauseNodes(spec: SentenceSpec, rng: RNG): Record<string, SyntaxNode> {
+  protected buildClauseNode(
+    spec: SentenceSpec,
+    rng: RNG,
+    depth: number,
+    relHead: { headLemma: string; number: string; headClass?: string } | null
+  ): SyntaxNode {
+    const cfg = this.syntaxConfig;
+    const cfgMap = parseCustomCfgRules(cfg.customRules);
     const lexemes = this.lexicon.getAll();
     const nouns = lexemes.filter((l) => l.pos === 'N');
     const verbs = lexemes.filter((l) => l.pos === 'V');
     const adjs = lexemes.filter((l) => l.pos === 'ADJ');
+    const qParts = lexemes.filter((l) => l.pos === 'Q' || l.pos === 'PART');
+    const rels = lexemes.filter((l) => l.pos === 'REL');
+    const comps = lexemes.filter((l) => l.pos === 'COMP');
+    const preps = lexemes.filter((l) => l.pos === 'PREP' || l.pos === 'POSTP');
 
-    const subjLemma = this.pickFrom(nouns, rng, 'person');
-    const otherNouns = nouns.filter((n) => n.lemma !== subjLemma);
-    const objLemma = this.pickFrom(otherNouns.length > 0 ? otherNouns : nouns, rng, subjLemma);
-    const verbLemma = this.pickFrom(verbs, rng, 'see');
-    const predLemma = this.pickFrom(adjs, rng, nouns[0]?.lemma ?? 'small');
+    const pickFrom = (items: Lexeme[], fallback: string): string =>
+      items.length === 0 ? fallback : items[rng.next(items.length)].lemma;
 
+    const mood = depth === 0 ? resolveMoodFromSpec(spec) : 'Decl';
     const tense = spec.constraints?.Tense ?? 'Pres';
-    const numSubj = spec.constraints?.Number ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
-    const numObj = spec.constraints?.Number ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
+    const forcePassive = spec.constraints?.Voice?.toLowerCase() === 'passive';
+    const forbidPassive = spec.constraints?.Voice?.toLowerCase() === 'active';
+    const isPassive =
+      this.clauseTemplate === 'Transitive' &&
+      relHead === null &&
+      mood !== 'Imp' &&
+      (forcePassive || (!forbidPassive && cfg.allowPassive && rng.nextDouble() < 0.25));
 
-    const subjLex = nouns.find((n) => n.lemma === subjLemma);
-    const objLex = nouns.find((n) => n.lemma === objLemma);
+    const maxDepth = Math.max(0, cfg.maxClauseDepth);
+    const canEmbed =
+      depth < maxDepth &&
+      this.clauseTemplate === 'Transitive' &&
+      !isPassive &&
+      relHead === null &&
+      mood === 'Decl' &&
+      (spec.constraints?.Embedded === 'true' ||
+        spec.constraints?.Embedded === 'Complement' ||
+        (cfg.allowEmbeddedClauses &&
+          comps.length > 0 &&
+          spec.constraints?.Embedded !== 'false' &&
+          rng.nextDouble() < 0.3));
+
+    const hasDirectObject = this.clauseTemplate === 'Transitive' && !isPassive && !canEmbed;
+    const cases = resolveAlignmentCases(cfg.alignment, hasDirectObject);
+
+    const subjNumber = relHead ? relHead.number : (spec.constraints?.Number ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing'));
+    const objNumber = spec.constraints?.Number ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
+
+    const buildBasicNp = (
+      rolePrefix: 'Subj' | 'Obj',
+      gramCase: string,
+      number: string,
+      allowAdj: boolean,
+      avoidLemma?: string
+    ): { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string } => {
+      const pool = avoidLemma ? nouns.filter((n) => n.lemma !== avoidLemma) : nouns;
+      const nounLex = (pool.length > 0 ? pool : nouns)[rng.next(Math.max(1, (pool.length > 0 ? pool : nouns).length))];
+      const nounLemma = nounLex?.lemma ?? 'person';
+      const headClass = nounLex?.lexClass?.trim();
+
+      const nFeats: Feat[] = [
+        { name: 'Role', value: rolePrefix },
+        { name: 'Person', value: '3' },
+        { name: 'Number', value: number },
+        { name: 'Case', value: gramCase },
+      ];
+      if (headClass) nFeats.push({ name: 'Class', value: headClass });
+      const nLeaf = new SyntaxNode('N', nounLemma, new FeatBundle(nFeats));
+
+      let adjLeaf: SyntaxNode | null = null;
+      if (allowAdj && adjs.length > 0) {
+        const adjLemma = pickFrom(adjs, 'small');
+        const adjFeats: Feat[] = [
+          { name: 'Role', value: 'Mod' },
+          { name: 'Number', value: number },
+        ];
+        if (headClass) adjFeats.push({ name: 'Class', value: headClass });
+        adjLeaf = new SyntaxNode('ADJ', adjLemma, new FeatBundle(adjFeats));
+      }
+
+      let relCp: SyntaxNode | null = null;
+      const wantRel =
+        depth < maxDepth &&
+        relHead === null &&
+        rolePrefix === 'Subj' &&
+        (spec.constraints?.Relative === 'true' ||
+          (cfg.allowRelativeClauses && rels.length + comps.length > 0 && rng.nextDouble() < 0.3));
+      if (wantRel) {
+        const relWord = rels[0] ?? comps[0];
+        const innerClause = this.buildClauseNode(
+          { clauseType: 'Transitive', approxWords: 3, constraints: { Tense: tense } },
+          rng,
+          depth + 1,
+          { headLemma: nounLemma, number, headClass }
+        );
+        const relChildren: SyntaxNode[] = [];
+        if (cfg.adpositionType === 'Postposition' && this.wordOrder === 'SOV') {
+          relChildren.push(innerClause);
+          if (relWord) relChildren.push(this.newRoleNode(relWord.pos, relWord.lemma, 'Rel', []));
+        } else {
+          if (relWord) relChildren.push(this.newRoleNode(relWord.pos, relWord.lemma, 'Rel', []));
+          relChildren.push(innerClause);
+        }
+        relCp = new SyntaxNode('CP', 'RelCP', new FeatBundle([{ name: 'Role', value: 'RelCP' }]), relChildren);
+      }
+
+      if (!adjLeaf && !relCp) {
+        return { node: nLeaf, person: '3', number, headLemma: nounLemma, headClass };
+      }
+
+      const npCfg = cfgMap.get('NP');
+      const orderedChildren: SyntaxNode[] = [];
+      if (npCfg) {
+        for (const sym of npCfg) {
+          if (sym === 'ADJ' && adjLeaf) orderedChildren.push(adjLeaf);
+          else if (sym === 'N') orderedChildren.push(nLeaf);
+          else if ((sym === 'REL' || sym === 'CP') && relCp) orderedChildren.push(relCp);
+        }
+        if (!orderedChildren.includes(nLeaf)) orderedChildren.push(nLeaf);
+        if (adjLeaf && !orderedChildren.includes(adjLeaf)) orderedChildren.unshift(adjLeaf);
+        if (relCp && !orderedChildren.includes(relCp)) orderedChildren.push(relCp);
+      } else {
+        if (relCp && cfg.adpositionType === 'Postposition' && this.wordOrder === 'SOV') {
+          orderedChildren.push(relCp);
+        }
+        if (adjLeaf && cfg.adjectiveOrder === 'BeforeNoun') orderedChildren.push(adjLeaf);
+        orderedChildren.push(nLeaf);
+        if (adjLeaf && cfg.adjectiveOrder === 'AfterNoun') orderedChildren.push(adjLeaf);
+        if (relCp && !(cfg.adpositionType === 'Postposition' && this.wordOrder === 'SOV')) {
+          orderedChildren.push(relCp);
+        }
+      }
+
+      return {
+        node: new SyntaxNode('NP', `${rolePrefix}NP`, new FeatBundle([{ name: 'Role', value: `${rolePrefix}NP` }]), orderedChildren),
+        person: '3',
+        number,
+        headLemma: nounLemma,
+        headClass,
+      };
+    };
+
+    const subj = relHead
+      ? { node: null as SyntaxNode | null, person: '3', number: relHead.number, headLemma: relHead.headLemma, headClass: relHead.headClass }
+      : buildBasicNp('Subj', cases.subjCase, subjNumber, spec.approxWords >= 4);
+
+    let objInfo: { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string } | null = null;
+    let cpObjNode: SyntaxNode | null = null;
+
+    if (canEmbed) {
+      const compLex = comps[0];
+      const embedded = this.buildClauseNode(
+        { clauseType: 'Transitive', approxWords: Math.max(3, spec.approxWords - 2), constraints: { Tense: tense } },
+        rng,
+        depth + 1,
+        null
+      );
+      const cpChildren: SyntaxNode[] = [];
+      if (cfg.adpositionType === 'Postposition' && this.wordOrder === 'SOV') {
+        cpChildren.push(embedded);
+        if (compLex) cpChildren.push(this.newRoleNode('COMP', compLex.lemma, 'Comp', []));
+      } else {
+        if (compLex) cpChildren.push(this.newRoleNode('COMP', compLex.lemma, 'Comp', []));
+        cpChildren.push(embedded);
+      }
+      cpObjNode = new SyntaxNode('CP', 'CompCP', new FeatBundle([{ name: 'Role', value: 'CompCP' }]), cpChildren);
+    } else if (this.clauseTemplate === 'Transitive' && !isPassive) {
+      objInfo = buildBasicNp('Obj', cases.objCase, objNumber, spec.approxWords >= 5, subj.headLemma);
+    }
+
+    const verbLemma =
+      this.clauseTemplate === 'Copular'
+        ? (this.lexicon.resolveExact('be') ? 'be' : 'e')
+        : pickFrom(verbs, 'see');
     const verbLex = verbs.find((v) => v.lemma === verbLemma);
-    const subjClass = subjLex?.lexClass?.trim();
-    const objClass = objLex?.lexClass?.trim();
     const verbClass = verbLex?.lexClass?.trim();
 
-    const subjFeats: Feat[] = [{ name: 'Number', value: numSubj }];
-    if (subjClass) subjFeats.push({ name: 'Class', value: subjClass });
-
-    const objFeats: Feat[] = [{ name: 'Number', value: numObj }];
-    if (objClass) objFeats.push({ name: 'Class', value: objClass });
-
-    let subjNode: SyntaxNode = this.newRoleNode('N', subjLemma, 'Subj', subjFeats);
-    let objNode: SyntaxNode = this.newRoleNode('N', objLemma, 'Obj', objFeats);
-
-    // If approxWords >= 4 and adjectives exist, expand NP with an adjective modifier (with Class + Number agreement)
-    if (spec.approxWords >= 4 && adjs.length > 0) {
-      const modAdj = this.pickFrom(adjs, rng, 'small');
-      const modFeats: Feat[] = [{ name: 'Number', value: numSubj }];
-      if (subjClass) modFeats.push({ name: 'Class', value: subjClass });
-      subjNode = new SyntaxNode('NP', 'SubjNP', new FeatBundle([{ name: 'Role', value: 'SubjNP' }]), [
-        this.newRoleNode('ADJ', modAdj, 'Mod', modFeats),
-        subjNode,
-      ]);
+    const verbFeats: Feat[] = [
+      { name: 'Role', value: this.clauseTemplate === 'Copular' ? 'Copula' : 'Verb' },
+    ];
+    if (mood === 'Imp') {
+      verbFeats.push({ name: 'Mood', value: 'Imp' }, { name: 'Finiteness', value: 'Bare' }, { name: 'Person', value: '2' });
+    } else {
+      verbFeats.push({ name: 'Tense', value: tense }, { name: 'Person', value: subj.person }, { name: 'Number', value: subj.number });
     }
-    if (spec.approxWords >= 5 && adjs.length > 0 && this.clauseTemplate === 'Transitive') {
-      const modAdj2 = this.pickFrom(adjs, rng, 'small');
-      const modFeats2: Feat[] = [{ name: 'Number', value: numObj }];
-      if (objClass) modFeats2.push({ name: 'Class', value: objClass });
-      objNode = new SyntaxNode('NP', 'ObjNP', new FeatBundle([{ name: 'Role', value: 'ObjNP' }]), [
-        this.newRoleNode('ADJ', modAdj2, 'Mod', modFeats2),
-        objNode,
-      ]);
+    if (isPassive) {
+      verbFeats.push({ name: 'Voice', value: 'Passive' }, { name: 'Aspect', value: 'Part' });
     }
-
-    const verbFeats: Feat[] = [{ name: 'Tense', value: tense }];
     if (verbClass) verbFeats.push({ name: 'Class', value: verbClass });
-    if (subjClass) verbFeats.push({ name: 'SubjectClass', value: subjClass });
-    const verbNode = this.newRoleNode('V', verbLemma, 'Verb', verbFeats);
-
-    const predFeats: Feat[] = [{ name: 'Number', value: numSubj }];
-    if (subjClass) predFeats.push({ name: 'Class', value: subjClass });
-    const predNode = this.newRoleNode('ADJ', predLemma, 'Pred', predFeats);
-
-    if (this.clauseTemplate === 'Intransitive') {
-      return { S: subjNode, V: verbNode };
+    if (subj.headClass) verbFeats.push({ name: 'SubjectClass', value: subj.headClass });
+    if (cfg.polypersonalAgreement) {
+      verbFeats.push({ name: 'SubjAgr', value: formatAgrCode(mood === 'Imp' ? '2' : subj.person, subj.number) });
+      if (objInfo) {
+        verbFeats.push(
+          { name: 'ObjectPerson', value: objInfo.person },
+          { name: 'ObjectNumber', value: objInfo.number },
+          { name: 'ObjAgr', value: formatAgrCode(objInfo.person, objInfo.number) }
+        );
+        if (objInfo.headClass) verbFeats.push({ name: 'ObjectClass', value: objInfo.headClass });
+      }
     }
-    if (this.clauseTemplate === 'Copular') {
-      const copulaLex = this.lexicon.resolveExact('be') ? 'be' : 'e';
-      const copFeats: Feat[] = [{ name: 'Tense', value: tense }];
-      if (subjClass) copFeats.push({ name: 'SubjectClass', value: subjClass });
-      return {
-        S: subjNode,
-        V: this.newRoleNode('V', copulaLex, 'Copula', copFeats),
-        O: predNode,
-      };
+    const verbNode = new SyntaxNode('V', verbLemma, new FeatBundle(verbFeats));
+
+    const roles: Record<string, SyntaxNode> = { V: verbNode };
+    if (subj.node && mood !== 'Imp') roles.S = subj.node;
+
+    if (cpObjNode) {
+      roles.O = cpObjNode;
+    } else if (this.clauseTemplate === 'Copular') {
+      const predFeats: Feat[] = [{ name: 'Role', value: 'Pred' }, { name: 'Number', value: subj.number }];
+      if (subj.headClass) predFeats.push({ name: 'Class', value: subj.headClass });
+      roles.O = new SyntaxNode('ADJ', pickFrom(adjs, nouns[0]?.lemma ?? 'small'), new FeatBundle(predFeats));
+    } else if (objInfo) {
+      roles.O = objInfo.node;
     }
-    return { S: subjNode, V: verbNode, O: objNode };
+
+    let agentPp: SyntaxNode | null = null;
+    if (isPassive && spec.approxWords >= 5 && preps.length > 0 && nouns.length > 0) {
+      const agentPrep = preps.find((p) => p.lemma.toLowerCase() === 'by') ?? preps[0];
+      const agentNp = buildBasicNp('Obj', cases.obliqueCase, 'Sing', false, subj.headLemma);
+      const prepLeaf = this.newRoleNode(agentPrep.pos, agentPrep.lemma, 'Prep', []);
+      const ppChildren = cfg.adpositionType === 'Postposition' ? [agentNp.node, prepLeaf] : [prepLeaf, agentNp.node];
+      agentPp = new SyntaxNode('PP', 'AgentPP', new FeatBundle([{ name: 'Role', value: 'PP' }]), ppChildren);
+    }
+
+    const effectiveOrder: string[] = (() => {
+      const customClause = cfgMap.get('CLAUSE');
+      if (customClause) return customClause;
+      if (mood === 'YNQuestion' && cfg.questionStrategy === 'Inversion') {
+        const inv: Record<WordOrder, string[]> = {
+          SVO: ['V', 'S', 'O'],
+          SOV: ['V', 'S', 'O'],
+          VSO: ['V', 'S', 'O'],
+          VOS: ['V', 'O', 'S'],
+          OVS: ['V', 'O', 'S'],
+          OSV: ['V', 'S', 'O'],
+        };
+        return inv[this.wordOrder];
+      }
+      return this.expandWordOrder(this.wordOrder, Object.keys(roles));
+    })();
+
+    const clauseFeats: Feat[] = [];
+    if (depth > 0) clauseFeats.push({ name: 'Role', value: 'EmbeddedClause' });
+    if (mood !== 'Decl') clauseFeats.push({ name: 'Mood', value: mood });
+    if (isPassive) clauseFeats.push({ name: 'Voice', value: 'Passive' });
+    if (cfg.alignment !== 'NomAcc') clauseFeats.push({ name: 'Alignment', value: cfg.alignment });
+
+    const root = new SyntaxNode('CLAUSE', isPassive ? 'Passive' : this.clauseTemplate, new FeatBundle(clauseFeats));
+    for (const r of effectiveOrder) {
+      if (roles[r]) root.children.push(roles[r]);
+      else if (r === 'PP' && agentPp) {
+        root.children.push(agentPp);
+        agentPp = null;
+      } else if (r === 'CP' && cpObjNode && !root.children.includes(cpObjNode)) {
+        root.children.push(cpObjNode);
+      }
+    }
+    if (agentPp) root.children.push(agentPp);
+
+    if (mood === 'YNQuestion' && cfg.questionStrategy === 'Particle' && qParts.length > 0) {
+      const qLeaf = this.newRoleNode(qParts[0].pos, qParts[0].lemma, 'QPart', []);
+      if (this.wordOrder === 'VSO' || this.wordOrder === 'VOS') {
+        root.children.unshift(qLeaf);
+      } else {
+        root.children.push(qLeaf);
+      }
+    }
+
+    return root;
   }
 
   private expandWordOrder(order: WordOrder, available: string[]): string[] {
@@ -1249,7 +1520,7 @@ export class ConfigurableSyntaxGenerator {
     return canonicalMap[order].filter((role) => present.has(role));
   }
 
-  private newRoleNode(pos: string, lemma: string, role: string, extra: Feat[]): SyntaxNode {
+  protected newRoleNode(pos: string, lemma: string, role: string, extra: Feat[]): SyntaxNode {
     return new SyntaxNode(pos, lemma, new FeatBundle([{ name: 'Role', value: role }, ...extra]));
   }
 }
@@ -1816,7 +2087,12 @@ export interface ISyntaxGeneratorModule {
   id: string;
   name: string;
   description: string;
-  create: (lexicon: InMemoryLexicon, wordOrder: WordOrder, clauseTemplate: ClauseTemplate) => ConfigurableSyntaxGenerator;
+  create: (
+    lexicon: InMemoryLexicon,
+    wordOrder: WordOrder,
+    clauseTemplate: ClauseTemplate,
+    syntaxConfig?: SyntaxConfig
+  ) => ConfigurableSyntaxGenerator;
 }
 
 export interface IMorphologyRealizerModule {
@@ -1850,12 +2126,63 @@ class HeadFinalRichSyntaxGenerator extends ConfigurableSyntaxGenerator {
 class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
   private readonly lexRef: InMemoryLexicon;
 
-  constructor(lexicon: InMemoryLexicon, wordOrder: WordOrder = 'SVO', clauseTemplate: ClauseTemplate = 'Transitive') {
-    super(lexicon, wordOrder, clauseTemplate);
+  constructor(
+    lexicon: InMemoryLexicon,
+    wordOrder: WordOrder = 'SVO',
+    clauseTemplate: ClauseTemplate = 'Transitive',
+    syntaxConfig: SyntaxConfig = DEFAULT_SYNTAX_CONFIG
+  ) {
+    super(lexicon, wordOrder, clauseTemplate, syntaxConfig);
     this.lexRef = lexicon;
   }
 
   public override realize(spec: SentenceSpec, rng: RNG): SyntaxTree {
+    const lexemes = this.lexRef.getAll();
+    const conjs = lexemes.filter((l) => l.pos === 'CONJ');
+    const cfg = this.syntaxConfig;
+    const mood = resolveMoodFromSpec(spec);
+
+    const forceCoord = spec.constraints?.Coordinated === 'true';
+    const wantCoord =
+      cfg.maxClauseDepth >= 1 &&
+      conjs.length > 0 &&
+      mood === 'Decl' &&
+      (forceCoord || (cfg.allowEmbeddedClauses && spec.approxWords >= 7 && rng.nextDouble() < 0.25));
+
+    if (wantCoord) {
+      const c1 = this.buildPhraseClause(
+        { ...spec, approxWords: Math.max(4, spec.approxWords - 2) },
+        rng,
+        0,
+        null
+      );
+      const conj = conjs[rng.next(conjs.length)];
+      const c2 = this.buildPhraseClause(
+        { clauseType: this.clauseTemplate, approxWords: Math.max(3, spec.approxWords - 3), constraints: { Tense: spec.constraints?.Tense ?? 'Pres' } },
+        rng,
+        1,
+        null
+      );
+      return new SyntaxTree(
+        new SyntaxNode('CLAUSE', 'Coordinated', new FeatBundle([{ name: 'Role', value: 'CoordRoot' }]), [
+          c1,
+          new SyntaxNode('CONJ', conj.lemma, new FeatBundle([{ name: 'Role', value: 'Conj' }])),
+          c2,
+        ])
+      );
+    }
+
+    return new SyntaxTree(this.buildPhraseClause(spec, rng, 0, null));
+  }
+
+  private buildPhraseClause(
+    spec: SentenceSpec,
+    rng: RNG,
+    depth: number,
+    relHead: { headLemma: string; number: string; headClass?: string } | null
+  ): SyntaxNode {
+    const cfg = this.syntaxConfig;
+    const cfgMap = parseCustomCfgRules(cfg.customRules);
     const lexemes = this.lexRef.getAll();
     const nouns = lexemes.filter((l) => l.pos === 'N');
     const verbs = lexemes.filter((l) => l.pos === 'V');
@@ -1864,22 +2191,59 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
     const prons = lexemes.filter((l) => l.pos === 'PRON');
     const auxes = lexemes.filter((l) => l.pos === 'AUX');
     const negs = lexemes.filter((l) => l.pos === 'NEG');
-    const preps = lexemes.filter((l) => l.pos === 'PREP');
+    const preps = lexemes.filter((l) => l.pos === 'PREP' || l.pos === 'POSTP');
     const advs = lexemes.filter((l) => l.pos === 'ADV');
+    const comps = lexemes.filter((l) => l.pos === 'COMP');
+    const rels = lexemes.filter((l) => l.pos === 'REL');
+    const qParts = lexemes.filter((l) => l.pos === 'Q' || l.pos === 'PART');
 
     const pick = <T,>(list: T[]): T | undefined => (list.length > 0 ? list[rng.next(list.length)] : undefined);
 
+    const mood = depth === 0 ? resolveMoodFromSpec(spec) : 'Decl';
     const tense = spec.constraints?.Tense ?? 'Pres';
     const constrainedNumber = spec.constraints?.Number;
     const isNeg = spec.constraints?.Polarity === 'Neg' || (negs.length > 0 && rng.nextDouble() < 0.15);
 
+    const requestedTemplate =
+      spec.clauseType === 'Intransitive' || spec.clauseType === 'Copular' || spec.clauseType === 'Transitive'
+        ? spec.clauseType
+        : this.clauseTemplate;
+
+    const forcePassive = spec.constraints?.Voice?.toLowerCase() === 'passive';
+    const forbidPassive = spec.constraints?.Voice?.toLowerCase() === 'active';
+    const isPassive =
+      requestedTemplate === 'Transitive' &&
+      relHead === null &&
+      mood !== 'Imp' &&
+      (forcePassive || (!forbidPassive && cfg.allowPassive && depth === 0 && rng.nextDouble() < 0.22));
+
+    const maxDepth = Math.max(0, cfg.maxClauseDepth);
+    const forceEmbedded =
+      spec.constraints?.Embedded === 'true' || spec.constraints?.Embedded === 'Complement';
+    const canEmbed =
+      depth < maxDepth &&
+      requestedTemplate === 'Transitive' &&
+      !isPassive &&
+      relHead === null &&
+      mood === 'Decl' &&
+      (forceEmbedded ||
+        (cfg.allowEmbeddedClauses &&
+          comps.length > 0 &&
+          spec.constraints?.Embedded !== 'false' &&
+          rng.nextDouble() < 0.28));
+
+    const hasDirectObject = requestedTemplate === 'Transitive' && !isPassive && !canEmbed;
+    const cases = resolveAlignmentCases(cfg.alignment, hasDirectObject);
+
     const buildNp = (
       rolePrefix: 'Subj' | 'Obj',
-      gramCase: 'Nom' | 'Acc',
-      avoidLemma?: string
-    ): { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string } => {
+      gramCase: string,
+      avoidLemma?: string,
+      allowPronouns = true,
+      allowRelative = true
+    ): { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string; isPron: boolean } => {
       const eligibleProns = avoidLemma ? prons.filter((p) => p.lemma !== avoidLemma) : prons;
-      if (eligibleProns.length > 0 && rng.nextDouble() < 0.35) {
+      if (allowPronouns && eligibleProns.length > 0 && rng.nextDouble() < 0.35) {
         const pron = pick(eligibleProns)!;
         const lower = pron.lemma.toLowerCase();
         const person = lower === 'i' || lower === 'we' ? '1' : lower === 'you' ? '2' : '3';
@@ -1893,7 +2257,7 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
         ];
         if (pronClass) pronFeats.push({ name: 'Class', value: pronClass });
         const pronNode = new SyntaxNode('PRON', pron.lemma, new FeatBundle(pronFeats));
-        return { node: pronNode, person, number, headLemma: pron.lemma, headClass: pronClass };
+        return { node: pronNode, person, number, headLemma: pron.lemma, headClass: pronClass, isPron: true };
       }
 
       const pool = nouns.filter((n) => n.lemma !== avoidLemma);
@@ -1901,8 +2265,8 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
       const nounLemma = noun?.lemma ?? 'person';
       const headClass = noun?.lexClass?.trim();
       const number = constrainedNumber ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
-      const children: SyntaxNode[] = [];
 
+      let detNode: SyntaxNode | null = null;
       if (dets.length > 0) {
         const isMass = nounLemma.toLowerCase() === 'water';
         const compatibleDets =
@@ -1916,10 +2280,11 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
             { name: 'Number', value: number },
           ];
           if (headClass) detFeats.push({ name: 'Class', value: headClass });
-          children.push(new SyntaxNode('DET', det.lemma, new FeatBundle(detFeats)));
+          detNode = new SyntaxNode('DET', det.lemma, new FeatBundle(detFeats));
         }
       }
 
+      let adjNode: SyntaxNode | null = null;
       if (spec.approxWords >= 4 && adjs.length > 0 && rng.nextDouble() < 0.65) {
         const adj = pick(adjs)!;
         const adjFeats: Feat[] = [
@@ -1927,7 +2292,7 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
           { name: 'Number', value: number },
         ];
         if (headClass) adjFeats.push({ name: 'Class', value: headClass });
-        children.push(new SyntaxNode('ADJ', adj.lemma, new FeatBundle(adjFeats)));
+        adjNode = new SyntaxNode('ADJ', adj.lemma, new FeatBundle(adjFeats));
       }
 
       const nFeats: Feat[] = [
@@ -1937,7 +2302,62 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
         { name: 'Case', value: gramCase },
       ];
       if (headClass) nFeats.push({ name: 'Class', value: headClass });
-      children.push(new SyntaxNode('N', nounLemma, new FeatBundle(nFeats)));
+      const nounNode = new SyntaxNode('N', nounLemma, new FeatBundle(nFeats));
+
+      let relCp: SyntaxNode | null = null;
+      const forceRel = spec.constraints?.Relative === 'true' && rolePrefix === 'Subj';
+      const wantRel =
+        allowRelative &&
+        depth < maxDepth &&
+        relHead === null &&
+        rolePrefix === 'Subj' &&
+        (forceRel ||
+          (cfg.allowRelativeClauses &&
+            rels.length + comps.length > 0 &&
+            spec.constraints?.Relative !== 'false' &&
+            rng.nextDouble() < 0.25));
+
+      if (wantRel) {
+        const relWord = rels[0] ?? comps[0];
+        const innerClause = this.buildPhraseClause(
+          { clauseType: 'Transitive', approxWords: 3, constraints: { Tense: tense, Voice: 'Active', Relative: 'false', Embedded: 'false' } },
+          rng,
+          depth + 1,
+          { headLemma: nounLemma, number, headClass }
+        );
+        const relChildren: SyntaxNode[] = [];
+        if (cfg.adpositionType === 'Postposition' && this.wordOrder === 'SOV') {
+          relChildren.push(innerClause);
+          if (relWord) relChildren.push(new SyntaxNode(relWord.pos, relWord.lemma, new FeatBundle([{ name: 'Role', value: 'Rel' }])));
+        } else {
+          if (relWord) relChildren.push(new SyntaxNode(relWord.pos, relWord.lemma, new FeatBundle([{ name: 'Role', value: 'Rel' }])));
+          relChildren.push(innerClause);
+        }
+        relCp = new SyntaxNode('CP', 'RelCP', new FeatBundle([{ name: 'Role', value: 'RelCP' }]), relChildren);
+      }
+
+      const children: SyntaxNode[] = [];
+      const customNp = cfgMap.get('NP');
+      if (customNp) {
+        for (const sym of customNp) {
+          if (sym === 'DET' && detNode) children.push(detNode);
+          else if (sym === 'ADJ' && adjNode) children.push(adjNode);
+          else if (sym === 'N') children.push(nounNode);
+          else if ((sym === 'REL' || sym === 'CP') && relCp) children.push(relCp);
+        }
+        if (!children.includes(nounNode)) children.push(nounNode);
+        if (detNode && !children.includes(detNode)) children.unshift(detNode);
+        if (adjNode && !children.includes(adjNode)) children.push(adjNode);
+        if (relCp && !children.includes(relCp)) children.push(relCp);
+      } else {
+        if (detNode && cfg.determinerOrder === 'BeforeNoun') children.push(detNode);
+        if (relCp && cfg.adpositionType === 'Postposition' && this.wordOrder === 'SOV') children.push(relCp);
+        if (adjNode && cfg.adjectiveOrder === 'BeforeNoun') children.push(adjNode);
+        children.push(nounNode);
+        if (adjNode && cfg.adjectiveOrder === 'AfterNoun') children.push(adjNode);
+        if (detNode && cfg.determinerOrder === 'AfterNoun') children.push(detNode);
+        if (relCp && !(cfg.adpositionType === 'Postposition' && this.wordOrder === 'SOV')) children.push(relCp);
+      }
 
       const np = new SyntaxNode(
         'NP',
@@ -1945,71 +2365,206 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
         new FeatBundle([{ name: 'Role', value: `${rolePrefix}NP` }]),
         children
       );
-      return { node: np, person: '3', number, headLemma: nounLemma, headClass };
+      return { node: np, person: '3', number, headLemma: nounLemma, headClass, isPron: false };
     };
 
-    const subj = buildNp('Subj', 'Nom');
-    const obj = buildNp('Obj', 'Acc', subj.headLemma);
+    const subj = relHead
+      ? {
+          node: null as SyntaxNode | null,
+          person: '3',
+          number: relHead.number,
+          headLemma: relHead.headLemma,
+          headClass: relHead.headClass,
+          isPron: false,
+        }
+      : buildNp('Subj', cases.subjCase, undefined, spec.constraints?.Relative !== 'true', true);
 
-    const verbPool = this.clauseTemplate === 'Copular'
-      ? verbs.filter((v) => v.lemma === 'be')
-      : verbs.filter((v) => v.lemma !== 'be');
+    let obj: { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string; isPron: boolean } | null = null;
+    let cpObj: SyntaxNode | null = null;
+    let agentPp: SyntaxNode | null = null;
+
+    if (canEmbed) {
+      const compLex = comps[0];
+      const embeddedClause = this.buildPhraseClause(
+        {
+          clauseType: 'Transitive',
+          approxWords: Math.max(3, spec.approxWords - 2),
+          constraints: { Tense: tense, Voice: 'Active', Embedded: 'false' },
+        },
+        rng,
+        depth + 1,
+        null
+      );
+      const cpChildren: SyntaxNode[] = [];
+      if (cfg.adpositionType === 'Postposition' && this.wordOrder === 'SOV') {
+        cpChildren.push(embeddedClause);
+        if (compLex) cpChildren.push(new SyntaxNode('COMP', compLex.lemma, new FeatBundle([{ name: 'Role', value: 'Comp' }])));
+      } else {
+        if (compLex) cpChildren.push(new SyntaxNode('COMP', compLex.lemma, new FeatBundle([{ name: 'Role', value: 'Comp' }])));
+        cpChildren.push(embeddedClause);
+      }
+      cpObj = new SyntaxNode('CP', 'CompCP', new FeatBundle([{ name: 'Role', value: 'CompCP' }]), cpChildren);
+    } else if (isPassive) {
+      if (spec.approxWords >= 5 && preps.length > 0 && nouns.length > 0) {
+        const agentPrep = preps.find((p) => p.lemma.toLowerCase() === 'by') ?? pick(preps)!;
+        const agentNp = buildNp('Obj', cases.obliqueCase, subj.headLemma, true, false);
+        const prepLeaf = new SyntaxNode(agentPrep.pos, agentPrep.lemma, new FeatBundle([{ name: 'Role', value: 'Prep' }]));
+        const ppChildren = cfg.adpositionType === 'Postposition' ? [agentNp.node, prepLeaf] : [prepLeaf, agentNp.node];
+        agentPp = new SyntaxNode('PP', 'AgentPP', new FeatBundle([{ name: 'Role', value: 'PP' }]), ppChildren);
+      }
+    } else if (requestedTemplate === 'Transitive') {
+      obj = buildNp('Obj', cases.objCase, subj.headLemma, true, false);
+    }
+
+    const verbPool =
+      requestedTemplate === 'Copular'
+        ? verbs.filter((v) => v.lemma === 'be')
+        : verbs.filter((v) => v.lemma !== 'be');
     const chosenVerbLex =
-      this.clauseTemplate === 'Copular'
+      requestedTemplate === 'Copular'
         ? this.lexRef.resolveExact('be')
         : pick(verbPool.length > 0 ? verbPool : verbs);
-    const chosenVerb = chosenVerbLex?.lemma ?? (this.clauseTemplate === 'Copular' ? 'be' : 'see');
+    const chosenVerb = chosenVerbLex?.lemma ?? (requestedTemplate === 'Copular' ? 'be' : 'see');
     const verbClass = chosenVerbLex?.lexClass?.trim();
 
-    const vpChildren: SyntaxNode[] = [];
-    const wantFutureAux = tense === 'Fut' && auxes.some((a) => a.lemma === 'will');
+    const beLex = this.lexRef.resolveExact('be');
+    const wantFutureAux = tense === 'Fut' && auxes.some((a) => a.lemma === 'will') && mood !== 'Imp';
     const doAux = auxes.find((a) => a.lemma === 'do');
     const advNode =
       advs.length > 0 && spec.approxWords >= 5 && rng.nextDouble() < 0.45
         ? new SyntaxNode('ADV', pick(advs)!.lemma, new FeatBundle([{ name: 'Role', value: 'AdvMod' }]))
         : null;
 
-    if (wantFutureAux) {
-      vpChildren.push(
-        new SyntaxNode('AUX', 'will', new FeatBundle([{ name: 'Role', value: 'Aux' }, { name: 'Tense', value: 'Pres' }]))
-      );
+    const effSubjPerson = mood === 'Imp' ? '2' : subj.person;
+    const effSubjNumber = mood === 'Imp' ? 'Sing' : subj.number;
+
+    const appendPolypersonal = (feats: Feat[]) => {
+      if (!cfg.polypersonalAgreement) return;
+      feats.push({ name: 'SubjAgr', value: formatAgrCode(effSubjPerson, effSubjNumber) });
+      if (obj) {
+        feats.push(
+          { name: 'ObjectPerson', value: obj.person },
+          { name: 'ObjectNumber', value: obj.number },
+          { name: 'ObjAgr', value: formatAgrCode(obj.person, obj.number) }
+        );
+        if (obj.headClass) feats.push({ name: 'ObjectClass', value: obj.headClass });
+      }
+    };
+
+    let frontedAuxOrVerb: SyntaxNode | null = null;
+    const vpChildren: SyntaxNode[] = [];
+    const wantInversion = mood === 'YNQuestion' && cfg.questionStrategy === 'Inversion';
+
+    if (isPassive && beLex) {
+      if (wantFutureAux) {
+        const willNode = new SyntaxNode('AUX', 'will', new FeatBundle([{ name: 'Role', value: 'Aux' }, { name: 'Tense', value: 'Pres' }]));
+        if (wantInversion) frontedAuxOrVerb = willNode;
+        else vpChildren.push(willNode);
+        if (isNeg && negs.length > 0) {
+          vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
+        }
+        vpChildren.push(new SyntaxNode('V', beLex.lemma, new FeatBundle([{ name: 'Role', value: 'PassiveAux' }, { name: 'Finiteness', value: 'Bare' }])));
+      } else {
+        const beFeats: Feat[] = [
+          { name: 'Role', value: 'PassiveAux' },
+          { name: 'Tense', value: tense },
+          { name: 'Person', value: effSubjPerson },
+          { name: 'Number', value: effSubjNumber },
+        ];
+        if (tense === 'Pres' && effSubjPerson === '3' && effSubjNumber === 'Sing') {
+          beFeats.push({ name: 'Agreement', value: '3sg' });
+        }
+        const beNode = new SyntaxNode('V', beLex.lemma, new FeatBundle(beFeats));
+        if (wantInversion) frontedAuxOrVerb = beNode;
+        else vpChildren.push(beNode);
+        if (isNeg && negs.length > 0) {
+          vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
+        }
+      }
+      if (advNode) vpChildren.push(advNode);
+      const partFeats: Feat[] = [
+        { name: 'Role', value: 'Verb' },
+        { name: 'Voice', value: 'Passive' },
+        { name: 'Aspect', value: 'Part' },
+        { name: 'Finiteness', value: 'Part' },
+      ];
+      if (verbClass) partFeats.push({ name: 'Class', value: verbClass });
+      if (subj.headClass) partFeats.push({ name: 'SubjectClass', value: subj.headClass });
+      vpChildren.push(new SyntaxNode('V', chosenVerb, new FeatBundle(partFeats)));
+    } else if (mood === 'Imp') {
+      if (isNeg && negs.length > 0 && chosenVerb !== 'be' && doAux) {
+        vpChildren.push(new SyntaxNode('AUX', doAux.lemma, new FeatBundle([{ name: 'Role', value: 'Aux' }, { name: 'Mood', value: 'Imp' }, { name: 'Finiteness', value: 'Bare' }])));
+        vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
+      }
+      if (advNode) vpChildren.push(advNode);
+      const impFeats: Feat[] = [
+        { name: 'Role', value: requestedTemplate === 'Copular' ? 'Copula' : 'Verb' },
+        { name: 'Mood', value: 'Imp' },
+        { name: 'Finiteness', value: 'Bare' },
+        { name: 'Person', value: '2' },
+      ];
+      if (verbClass) impFeats.push({ name: 'Class', value: verbClass });
+      appendPolypersonal(impFeats);
+      vpChildren.push(new SyntaxNode('V', chosenVerb, new FeatBundle(impFeats)));
+      if (isNeg && negs.length > 0 && chosenVerb === 'be') {
+        vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
+      }
+    } else if (wantFutureAux) {
+      const willNode = new SyntaxNode('AUX', 'will', new FeatBundle([{ name: 'Role', value: 'Aux' }, { name: 'Tense', value: 'Pres' }]));
+      if (wantInversion) frontedAuxOrVerb = willNode;
+      else vpChildren.push(willNode);
       if (isNeg && negs.length > 0) {
         vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
       }
       if (advNode) vpChildren.push(advNode);
       const vBareFeats: Feat[] = [{ name: 'Role', value: 'Verb' }, { name: 'Finiteness', value: 'Bare' }];
       if (verbClass) vBareFeats.push({ name: 'Class', value: verbClass });
+      appendPolypersonal(vBareFeats);
       vpChildren.push(new SyntaxNode('V', chosenVerb, new FeatBundle(vBareFeats)));
-    } else if (isNeg && negs.length > 0 && chosenVerb !== 'be' && doAux) {
+    } else if ((isNeg && negs.length > 0 || wantInversion) && chosenVerb !== 'be' && doAux) {
       const auxFeats: Feat[] = [
         { name: 'Role', value: 'Aux' },
         { name: 'Tense', value: tense },
-        { name: 'Person', value: subj.person },
-        { name: 'Number', value: subj.number },
+        { name: 'Person', value: effSubjPerson },
+        { name: 'Number', value: effSubjNumber },
       ];
-      if (tense === 'Pres' && subj.person === '3' && subj.number === 'Sing') {
+      if (tense === 'Pres' && effSubjPerson === '3' && effSubjNumber === 'Sing') {
         auxFeats.push({ name: 'Agreement', value: '3sg' });
       }
-      vpChildren.push(new SyntaxNode('AUX', doAux.lemma, new FeatBundle(auxFeats)));
-      vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
+      const doNode = new SyntaxNode('AUX', doAux.lemma, new FeatBundle(auxFeats));
+      if (wantInversion) frontedAuxOrVerb = doNode;
+      else vpChildren.push(doNode);
+      if (isNeg && negs.length > 0) {
+        vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
+      }
       if (advNode) vpChildren.push(advNode);
       const vBareFeats: Feat[] = [{ name: 'Role', value: 'Verb' }, { name: 'Finiteness', value: 'Bare' }];
       if (verbClass) vBareFeats.push({ name: 'Class', value: verbClass });
+      appendPolypersonal(vBareFeats);
       vpChildren.push(new SyntaxNode('V', chosenVerb, new FeatBundle(vBareFeats)));
     } else {
       if (advNode && chosenVerb !== 'be') vpChildren.push(advNode);
       const verbFeats: Feat[] = [
-        { name: 'Role', value: this.clauseTemplate === 'Copular' ? 'Copula' : 'Verb' },
+        { name: 'Role', value: requestedTemplate === 'Copular' ? 'Copula' : 'Verb' },
         { name: 'Tense', value: tense },
-        { name: 'Person', value: subj.person },
-        { name: 'Number', value: subj.number },
+        { name: 'Person', value: effSubjPerson },
+        { name: 'Number', value: effSubjNumber },
       ];
-      if (tense === 'Pres' && subj.person === '3' && subj.number === 'Sing') {
+      if (tense === 'Pres' && effSubjPerson === '3' && effSubjNumber === 'Sing') {
         verbFeats.push({ name: 'Agreement', value: '3sg' });
+      }
+      if (isPassive) {
+        verbFeats.push({ name: 'Voice', value: 'Passive' }, { name: 'Aspect', value: 'Part' });
       }
       if (verbClass) verbFeats.push({ name: 'Class', value: verbClass });
       if (subj.headClass) verbFeats.push({ name: 'SubjectClass', value: subj.headClass });
-      vpChildren.push(new SyntaxNode('V', chosenVerb, new FeatBundle(verbFeats)));
+      appendPolypersonal(verbFeats);
+      const finiteV = new SyntaxNode('V', chosenVerb, new FeatBundle(verbFeats));
+      if (wantInversion && chosenVerb === 'be') {
+        frontedAuxOrVerb = finiteV;
+      } else {
+        vpChildren.push(finiteV);
+      }
       if (isNeg && negs.length > 0 && chosenVerb === 'be') {
         vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
       }
@@ -2017,27 +2572,37 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
     }
 
     const vNode =
-      vpChildren.length === 1
-        ? vpChildren[0]
-        : new SyntaxNode('VP', 'VP', new FeatBundle([{ name: 'Role', value: 'VP' }]), vpChildren);
+      vpChildren.length === 0
+        ? null
+        : vpChildren.length === 1
+          ? vpChildren[0]
+          : new SyntaxNode('VP', 'VP', new FeatBundle([{ name: 'Role', value: 'VP' }]), vpChildren);
 
     const predFeats: Feat[] = [
       { name: 'Role', value: 'Pred' },
-      { name: 'Number', value: subj.number },
+      { name: 'Number', value: effSubjNumber },
     ];
     if (subj.headClass) predFeats.push({ name: 'Class', value: subj.headClass });
 
-    const roles: Record<string, SyntaxNode> =
-      this.clauseTemplate === 'Intransitive'
-        ? { S: subj.node, V: vNode }
-        : this.clauseTemplate === 'Copular'
-          ? {
-              S: subj.node,
-              V: vNode,
-              O: new SyntaxNode('ADJ', pick(adjs)?.lemma ?? 'small', new FeatBundle(predFeats)),
-            }
-          : { S: subj.node, V: vNode, O: obj.node };
+    const dropSubj =
+      mood === 'Imp' ||
+      (cfg.proDrop && subj.isPron && spec.constraints?.ProDrop !== 'false');
+    const dropObj =
+      Boolean(obj && obj.isPron && cfg.proDrop && cfg.polypersonalAgreement && spec.constraints?.ProDrop !== 'false');
 
+    const roles: Record<string, SyntaxNode> = {};
+    if (!dropSubj && subj.node) roles.S = subj.node;
+    if (vNode) roles.V = vNode;
+
+    if (cpObj) {
+      roles.O = cpObj;
+    } else if (requestedTemplate === 'Copular') {
+      roles.O = new SyntaxNode('ADJ', pick(adjs)?.lemma ?? 'small', new FeatBundle(predFeats));
+    } else if (obj && !dropObj) {
+      roles.O = obj.node;
+    }
+
+    const customClause = cfgMap.get('CLAUSE');
     const canonical: Record<WordOrder, string[]> = {
       SVO: ['S', 'V', 'O'],
       SOV: ['S', 'O', 'V'],
@@ -2047,23 +2612,67 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
       OSV: ['O', 'S', 'V'],
     };
 
-    const root = new SyntaxNode('CLAUSE', this.clauseTemplate);
-    for (const r of canonical[this.wordOrder]) {
-      if (roles[r]) root.children.push(roles[r]);
+    const clauseOrder = customClause
+      ? customClause
+      : wantInversion && !frontedAuxOrVerb
+        ? ['V', 'S', 'O']
+        : canonical[this.wordOrder];
+
+    const clauseFeats: Feat[] = [];
+    if (depth > 0) clauseFeats.push({ name: 'Role', value: 'EmbeddedClause' });
+    if (mood !== 'Decl') clauseFeats.push({ name: 'Mood', value: mood });
+    if (isPassive) clauseFeats.push({ name: 'Voice', value: 'Passive' });
+    if (cfg.alignment !== 'NomAcc') clauseFeats.push({ name: 'Alignment', value: cfg.alignment });
+
+    const root = new SyntaxNode(
+      'CLAUSE',
+      isPassive ? 'Passive' : requestedTemplate,
+      new FeatBundle(clauseFeats)
+    );
+    if (frontedAuxOrVerb) {
+      root.children.push(frontedAuxOrVerb);
     }
 
-    if (spec.approxWords >= 6 && preps.length > 0 && nouns.length > 0) {
+    let appendedPp = false;
+    let extraPp: SyntaxNode | null = agentPp;
+    if (!extraPp && !canEmbed && spec.approxWords >= 6 && preps.length > 0 && nouns.length > 0) {
       const prep = pick(preps)!;
-      const pobj = buildNp('Obj', 'Acc');
-      root.children.push(
-        new SyntaxNode('PP', 'PP', new FeatBundle([{ name: 'Role', value: 'PP' }]), [
-          new SyntaxNode('PREP', prep.lemma, new FeatBundle([{ name: 'Role', value: 'Prep' }])),
-          pobj.node,
-        ])
-      );
+      const pobj = buildNp('Obj', cases.obliqueCase, subj.headLemma, true, false);
+      const prepLeaf = new SyntaxNode(prep.pos, prep.lemma, new FeatBundle([{ name: 'Role', value: 'Prep' }]));
+      const customPp = cfgMap.get('PP');
+      const ppChildren = customPp
+        ? customPp.flatMap((sym) =>
+            sym === 'NP' ? [pobj.node] : sym === 'PREP' || sym === 'POSTP' ? [prepLeaf] : []
+          )
+        : cfg.adpositionType === 'Postposition'
+          ? [pobj.node, prepLeaf]
+          : [prepLeaf, pobj.node];
+      extraPp = new SyntaxNode('PP', 'PP', new FeatBundle([{ name: 'Role', value: 'PP' }]), ppChildren);
     }
 
-    return new SyntaxTree(root);
+    for (const r of clauseOrder) {
+      if (roles[r]) root.children.push(roles[r]);
+      else if (r === 'PP' && extraPp && !appendedPp) {
+        root.children.push(extraPp);
+        appendedPp = true;
+      } else if (r === 'CP' && cpObj && !root.children.includes(cpObj)) {
+        root.children.push(cpObj);
+      }
+    }
+    if (extraPp && !appendedPp) {
+      root.children.push(extraPp);
+    }
+
+    if (mood === 'YNQuestion' && cfg.questionStrategy === 'Particle' && qParts.length > 0) {
+      const qLeaf = new SyntaxNode(qParts[0].pos, qParts[0].lemma, new FeatBundle([{ name: 'Role', value: 'QPart' }]));
+      if (this.wordOrder === 'VSO' || this.wordOrder === 'VOS') {
+        root.children.unshift(qLeaf);
+      } else {
+        root.children.push(qLeaf);
+      }
+    }
+
+    return root;
   }
 }
 
@@ -2120,6 +2729,10 @@ class MorphophonemicOrthography extends Orthography {
       feats.has('Person', '3') &&
       feats.has('Number', 'Sing');
     const isPastV = (ctx.pos === 'V' || ctx.pos === 'AUX') && feats.has('Tense', 'Past');
+    const isPartV =
+      ctx.pos === 'V' &&
+      (feats.has('Aspect', 'Part') || feats.has('Voice', 'Passive')) &&
+      !feats.has('Finiteness', 'Bare');
 
     if (isPluralN || is3sgPres) {
       if (/(s|x|z|ch|sh)$/i.test(baseSpelling)) return `${baseSpelling}es`;
@@ -2127,7 +2740,7 @@ class MorphophonemicOrthography extends Orthography {
       return `${baseSpelling}s`;
     }
 
-    if (isPastV) {
+    if (isPastV || isPartV) {
       if (baseSpelling.endsWith('e')) return `${baseSpelling}d`;
       if (/[^aeiou]y$/i.test(baseSpelling)) return `${baseSpelling.slice(0, -1)}ied`;
       return `${baseSpelling}ed`;
@@ -2188,20 +2801,20 @@ export const BUILTIN_SYNTAX_MODULES: readonly ISyntaxGeneratorModule[] = [
   {
     id: 'configurable-syntax',
     name: 'Configurable Syntax (Default)',
-    description: 'Standard SVO/SOV/VSO clause planner with NP adjective expansion.',
-    create: (lex, wo, ct) => new ConfigurableSyntaxGenerator(lex, wo, ct),
+    description: 'Standard SVO/SOV/VSO clause planner with NP modifier order, case alignment, and mood.',
+    create: (lex, wo, ct, cfg) => new ConfigurableSyntaxGenerator(lex, wo, ct, cfg),
   },
   {
     id: 'rich-np-syntax',
     name: 'Expanded Modifier Syntax (Phase 4)',
     description: 'Always expands subject/object NPs with adjective modifiers regardless of word target.',
-    create: (lex, wo, ct) => new HeadFinalRichSyntaxGenerator(lex, wo, ct),
+    create: (lex, wo, ct, cfg) => new HeadFinalRichSyntaxGenerator(lex, wo, ct, cfg),
   },
   {
     id: 'phrase-structure-syntax',
-    name: 'Living-Language Phrase Structure (DET, PRON, AUX, PP)',
-    description: 'Hierarchical clauses supporting determiners, pronouns with Case/Person/Number, auxiliaries, negation, and PPs.',
-    create: (lex, wo, ct) => new PhraseStructureSyntaxGenerator(lex, wo, ct),
+    name: 'Living-Language Phrase Structure (DET, PRON, AUX, PP, CP)',
+    description: 'Recursive clauses supporting determiners, pronouns, alignment, passive voice, questions, auxiliaries, and PPs.',
+    create: (lex, wo, ct, cfg) => new PhraseStructureSyntaxGenerator(lex, wo, ct, cfg),
   },
 ];
 
@@ -2342,6 +2955,7 @@ export class LangEngine {
     tokens: GraphemeToken[];
     surface: string;
     issues: string[];
+    tree: SyntaxTree;
   } {
     const sTree = this.syntax.realize(spec, rng);
     const linearized = sTree.linearize();
@@ -2349,6 +2963,8 @@ export class LangEngine {
       const { tokens, isIrregular, spelling } = this.morphology.inflectNodeDetailed(node);
       const derived = this.phonology.derive(tokens);
       return {
+        node,
+        tokens,
         derived,
         context: {
           surface: derived.finalSurface,
@@ -2365,13 +2981,73 @@ export class LangEngine {
     const orthResult = this.orthography.renderWordsWithTokens(wordInfos.map((w) => w.context));
     const issues = wordInfos.flatMap((w) => w.derived.phonotacticIssues);
 
+    let written = orthResult.text;
+    const isIpaWrapped = written.startsWith('/') && written.endsWith('/');
+    if (!isIpaWrapped && written.trim()) {
+      if (sTree.root.features.has('Mood', 'YNQuestion') && !written.endsWith('?')) {
+        written += '?';
+      } else if (sTree.root.features.has('Mood', 'Imp') && !written.endsWith('!')) {
+        written += '!';
+      }
+    }
+
     return {
-      written: orthResult.text,
+      written,
       tokens: orthResult.tokens,
       surface: surfaceWithSpaces,
       issues,
+      tree: sTree,
     };
   }
+}
+
+export function formatInterlinearGloss(engine: LangEngine, tree: SyntaxTree): string {
+  const leaves = tree.linearize().filter((n) => Boolean(n.lemmaId));
+  if (leaves.length === 0) return '(empty clause)';
+
+  const columns = leaves.map((node) => {
+    const { tokens } = engine.morphology.inflectNodeDetailed(node);
+    const derived = engine.phonology.derive(tokens);
+    const orthWord = engine.orthography.renderWordsWithTokens([
+      {
+        surface: derived.finalSurface,
+        lemma: node.lemmaId,
+        pos: node.pos,
+        features: node.features,
+        spelling: engine.morphology.lexicon.resolveExact(node.lemmaId)?.spelling,
+        isIrregular: tokens.some((t) => t.morpheme.id === 'STEM_IRREG'),
+      },
+    ]).text;
+
+    const morphSurface = tokens.map((t) => t.underlyingPhones.join('') || '∅').join('-');
+    const morphGloss = tokens
+      .map((t) => {
+        if (t.morpheme.id === 'STEM' || t.morpheme.id === 'STEM_IRREG') return node.lemmaId;
+        return t.morpheme.gloss.replace(/^AFX_/, '').toUpperCase();
+      })
+      .join('-');
+    const featSummary = node.features.items
+      .filter((f) => f.name !== 'Role' && f.name !== 'Finiteness')
+      .map((f) => f.value)
+      .slice(0, 3)
+      .join('.');
+    const posLine = featSummary ? `${node.pos}[${featSummary}]` : node.pos;
+
+    const width = Math.max(orthWord.length, morphSurface.length, morphGloss.length, posLine.length) + 2;
+    return {
+      orth: orthWord.padEnd(width),
+      surf: morphSurface.padEnd(width),
+      gloss: morphGloss.padEnd(width),
+      pos: posLine.padEnd(width),
+    };
+  });
+
+  return [
+    `Orth : ${columns.map((c) => c.orth).join('').trimEnd()}`,
+    `Morph: ${columns.map((c) => c.surf).join('').trimEnd()}`,
+    `Gloss: ${columns.map((c) => c.gloss).join('').trimEnd()}`,
+    `Cat  : ${columns.map((c) => c.pos).join('').trimEnd()}`,
+  ].join('\n');
 }
 
 export function validateProject(state: LanguageProjectState): DiagnosticIssue[] {
@@ -2545,6 +3221,7 @@ export function createDefaultProjectState(): LanguageProjectState {
     ],
     WordOrder: 'SVO',
     ClauseTemplate: 'Transitive',
+    SyntaxConfig: { ...DEFAULT_SYNTAX_CONFIG, customRules: [] },
     OrthographyRules: [
       { Phone: 'ʃ', Grapheme: 'sh', PrevContext: null, NextContext: null, Enabled: true },
       { Phone: 't', Grapheme: 'c', PrevContext: null, NextContext: 'i', Enabled: true },
@@ -2604,6 +3281,7 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
         'tʃ', 'dʒ', 'ɾ',
         'st', 'sk', 'sp', 'nt', 'nd', 'ns', 'nz', 'mp', 'ŋk', 'lt', 'ld', 'ɫt', 'ɫd', 'lk', 'lp',
         'rt', 'rd', 'rk', 'rp', 'rs', 'rz', 'ɹt', 'ɹd', 'ɹk', 'ɹp', 'ɹs', 'ɹz', 'ks', 'ts', 'dz', 'ps',
+        'gz', 'bz', 'vz', 'mz', 'ɹks', 'ɹts', 'ɹdz', 'kt', 'gd', 'bd', 'zd', 'pt', 'ft',
       ],
       maxOnsetCluster: 3,
       maxCodaCluster: 4,
@@ -2682,6 +3360,10 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
     Lexemes: [
       { Lemma: 'the', Pos: 'DET', UR: 'ð ə', Spelling: 'the' },
       { Lemma: 'a', Pos: 'DET', UR: 'ə', Spelling: 'a' },
+      { Lemma: 'that', Pos: 'COMP', UR: 'ð æ t', Spelling: 'that' },
+      { Lemma: 'who', Pos: 'REL', UR: 'h uː', Spelling: 'who' },
+      { Lemma: 'and', Pos: 'CONJ', UR: 'æ n d', Spelling: 'and' },
+      { Lemma: 'by', Pos: 'PREP', UR: 'b aɪ', Spelling: 'by' },
       { Lemma: 'I', Pos: 'PRON', UR: 'ˈaɪ', Spelling: 'I', Irregulars: { 'Case=Acc': 'ˈm iː' } },
       { Lemma: 'she', Pos: 'PRON', UR: 'ˈʃ iː', Spelling: 'she', Irregulars: { 'Case=Acc': 'ˈh ɝː' } },
       { Lemma: 'they', Pos: 'PRON', UR: 'ˈð eɪ', Spelling: 'they', Irregulars: { 'Case=Acc': 'ˈð ɛ m' } },
@@ -2715,8 +3397,8 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
       { Lemma: 'knight', Pos: 'N', UR: 'ˈn aɪ t', Spelling: 'knight' },
       { Lemma: 'walk', Pos: 'V', UR: 'ˈw ɔː k', Spelling: 'walk' },
       { Lemma: 'chase', Pos: 'V', UR: 'ˈtʃ eɪ s', Spelling: 'chase' },
-      { Lemma: 'see', Pos: 'V', UR: 'ˈs iː', Spelling: 'see', Irregulars: { 'Tense=Past': 'ˈs ɔː' } },
-      { Lemma: 'go', Pos: 'V', UR: 'ˈg oʊ', Spelling: 'go', Irregulars: { 'Tense=Past': 'ˈw ɛ n t', 'Person=3,Number=Sing,Tense=Pres': 'ˈg oʊ z' } },
+      { Lemma: 'see', Pos: 'V', UR: 'ˈs iː', Spelling: 'see', Irregulars: { 'Tense=Past': 'ˈs ɔː', 'Aspect=Part': 'ˈs iː n' } },
+      { Lemma: 'go', Pos: 'V', UR: 'ˈg oʊ', Spelling: 'go', Irregulars: { 'Tense=Past': 'ˈw ɛ n t', 'Person=3,Number=Sing,Tense=Pres': 'ˈg oʊ z', 'Aspect=Part': 'ˈg ɔː n' } },
       { Lemma: 'small', Pos: 'ADJ', UR: 'ˈs m ɔː l', Spelling: 'small' },
       { Lemma: 'tall', Pos: 'ADJ', UR: 'ˈt ɔː l', Spelling: 'tall' },
     ],
@@ -2727,12 +3409,23 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
       { Name: 'Past /ɪd/', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-ɪ d', IsPrefix: false, Condition: '[place=alveolar, manner=stop]', Enabled: true },
       { Name: 'Past /t/', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-t', IsPrefix: false, Condition: '[-voice]', Enabled: true },
       { Name: 'Past /d/', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-d', IsPrefix: false, Condition: '', Enabled: true },
+      { Name: 'Participle /ɪd/', Pos: 'V', FeatureName: 'Aspect', FeatureValue: 'Part', Affix: '-ɪ d', IsPrefix: false, Condition: '[place=alveolar, manner=stop]', Enabled: true },
+      { Name: 'Participle /t/', Pos: 'V', FeatureName: 'Aspect', FeatureValue: 'Part', Affix: '-t', IsPrefix: false, Condition: '[-voice]', Enabled: true },
+      { Name: 'Participle /d/', Pos: 'V', FeatureName: 'Aspect', FeatureValue: 'Part', Affix: '-d', IsPrefix: false, Condition: '', Enabled: true },
       { Name: '3sg /ɪz/', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-ɪ z', IsPrefix: false, Condition: '[+sibilant]', Enabled: true },
       { Name: '3sg /s/', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-s', IsPrefix: false, Condition: '[-voice]', Enabled: true },
       { Name: '3sg /z/', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-z', IsPrefix: false, Condition: '', Enabled: true },
     ],
     WordOrder: 'SVO',
     ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      allowEmbeddedClauses: true,
+      allowRelativeClauses: true,
+      allowPassive: true,
+      maxClauseDepth: 1,
+      customRules: [],
+    },
     OrthographyRules: [
       { Phone: 'tʃ', Grapheme: 'ch', PrevContext: null, NextContext: null, Enabled: true },
       { Phone: 'dʒ', Grapheme: 'j', PrevContext: null, NextContext: null, Enabled: true },
@@ -2781,6 +3474,8 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
       { Input: 'pʰiːpəl', Output: 'people' },
       { Input: 'wɛnt', Output: 'went' },
       { Input: 'sɔː', Output: 'saw' },
+      { Input: 'siːn', Output: 'seen' },
+      { Input: 'gɔːn', Output: 'gone' },
       { Input: 'wʌz', Output: 'was' },
       { Input: 'wɝː', Output: 'were' },
       { Input: 'ɪz', Output: 'is' },
@@ -2791,6 +3486,10 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
       { Input: 'goʊz', Output: 'goes' },
       { Input: 'ðə', Output: 'the' },
       { Input: 'ə', Output: 'a' },
+      { Input: 'ðæt', Output: 'that' },
+      { Input: 'huː', Output: 'who' },
+      { Input: 'ænd', Output: 'and' },
+      { Input: 'baɪ', Output: 'by' },
       { Input: 'wɔːɾɚz', Output: 'waters' },
     ],
     Capitalization: 'SentenceInitial',
@@ -2849,6 +3548,7 @@ export function normalizeLoadedProjectState(raw: Partial<LanguageProjectState>):
     WritingSystem: raw.WritingSystem
       ? { ...defaults.WritingSystem, ...raw.WritingSystem }
       : defaults.WritingSystem,
+    SyntaxConfig: normalizeSyntaxConfig(raw.SyntaxConfig),
     Pipeline: raw.Pipeline
       ? { ...defaults.Pipeline, ...raw.Pipeline }
       : defaults.Pipeline,
@@ -2858,6 +3558,7 @@ export function normalizeLoadedProjectState(raw: Partial<LanguageProjectState>):
 export function buildEngineFromState(state: LanguageProjectState): LangEngine {
   const tactics = new Phonotactics(state.Phonotactics);
   const pipeline = state.Pipeline ?? DEFAULT_PIPELINE_SELECTION;
+  const syntaxConfig = normalizeSyntaxConfig(state.SyntaxConfig);
   const activePluginRules = BUILTIN_PLUGIN_PHONO_RULES.filter((r) =>
     pipeline.enabledPhonoPluginRules.includes(r.id)
   );
@@ -2911,7 +3612,7 @@ export function buildEngineFromState(state: LanguageProjectState): LangEngine {
   const syntaxMod =
     BUILTIN_SYNTAX_MODULES.find((m) => m.id === pipeline.syntaxGeneratorId) ??
     BUILTIN_SYNTAX_MODULES[0];
-  const syntax = syntaxMod.create(lexicon, state.WordOrder, state.ClauseTemplate);
+  const syntax = syntaxMod.create(lexicon, state.WordOrder, state.ClauseTemplate, syntaxConfig);
 
   const orthMod =
     BUILTIN_ORTHOGRAPHY_MODULES.find((m) => m.id === pipeline.orthographyRendererId) ??

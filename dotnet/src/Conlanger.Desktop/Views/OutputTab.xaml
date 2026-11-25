@@ -43,6 +43,10 @@
                     <TextBox Text="{Binding ConstraintFeatName, UpdateSourceTrigger=PropertyChanged}" Width="68" ToolTip="Feature Name" Margin="0,0,4,4" />
                     <TextBlock Text="=" VerticalAlignment="Center" Margin="0,0,4,4" />
                     <TextBox Text="{Binding ConstraintFeatVal, UpdateSourceTrigger=PropertyChanged}" Width="64" ToolTip="Feature Value" Margin="0,0,10,4" />
+                    <TextBlock Text="Mood:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <ComboBox ItemsSource="{Binding SyntaxMoodOptions}" SelectedItem="{Binding OutputMoodFilter}" Width="105" Margin="0,0,10,4" />
+                    <TextBlock Text="Voice:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <ComboBox ItemsSource="{Binding SyntaxVoiceOptions}" SelectedItem="{Binding OutputVoiceFilter}" Width="86" Margin="0,0,10,4" />
                     <Button Content="Generate Corpus" Command="{Binding GenerateBatchCommand}" Background="#0F172A" Foreground="White" Margin="0,0,6,4" />
                     <Button Content="Export TXT..." Click="OnExportTxtClick" Margin="0,0,6,4" />
                     <Button Content="Export CSV..." Click="OnExportCsvClick" Margin="0,0,0,4" />

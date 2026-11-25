@@ -277,4 +277,126 @@ public sealed class LanguageEngineTests
         Assert.Contains("fame", psSentence.Written);
         Assert.DoesNotContain("petit ", psSentence.Written);
     }
+
+    [Fact]
+    public void SyntaxEngine_SupportsErgAbsTripartiteAlignmentAndPolypersonalProDrop()
+    {
+        var ergProject = ProjectFactory.CreateStarterProject();
+        ergProject.Phonemes =
+        [
+            .. new[] { "m", "n", "k", "t", "s", "p", "v" }.Select(c => ProjectFactory.CreatePhoneme(c, "C")),
+            .. new[] { "a", "e", "i", "o", "u" }.Select(v => ProjectFactory.CreatePhoneme(v, "V"))
+        ];
+        ergProject.Lexemes =
+        [
+            new() { Lemma = "dog", Pos = "N", UR = "k a n" },
+            new() { Lemma = "run", Pos = "V", UR = "k u r" }
+        ];
+        ergProject.Affixes =
+        [
+            new() { Name = "Erg", Pos = "N", FeatureName = "Case", FeatureValue = "Erg", Affix = "-n", Enabled = true },
+            new() { Name = "Abs", Pos = "N", FeatureName = "Case", FeatureValue = "Abs", Affix = "-a", Enabled = true },
+            new() { Name = "Intrans", Pos = "N", FeatureName = "Case", FeatureValue = "Intrans", Affix = "-o", Enabled = true }
+        ];
+        ergProject.OrthographyRules = [];
+        ergProject.Capitalization = CapitalizationMode.None;
+        ergProject.SyntaxConfig.Alignment = AlignmentSystem.ErgAbs;
+
+        var engine = new LangEngine();
+        ergProject.ClauseTemplate = ClauseTemplate.Transitive;
+        var transRes = engine.GenerateSentence(ergProject, seed: 1, approxWords: 3, new Dictionary<string, string> { ["Number"] = "Sing" });
+        Assert.Contains("kann", transRes.Written);
+        Assert.Contains("kana", transRes.Written);
+
+        ergProject.ClauseTemplate = ClauseTemplate.Intransitive;
+        var intransRes = engine.GenerateSentence(ergProject, seed: 1, approxWords: 3, new Dictionary<string, string> { ["Number"] = "Sing" });
+        Assert.Contains("kana", intransRes.Written);
+
+        ergProject.SyntaxConfig.Alignment = AlignmentSystem.Tripartite;
+        var triRes = engine.GenerateSentence(ergProject, seed: 1, approxWords: 3, new Dictionary<string, string> { ["Number"] = "Sing" });
+        Assert.Contains("kano", triRes.Written);
+
+        // Polypersonal agreement + Pro-Drop
+        var poly = ProjectFactory.CreateStarterProject();
+        poly.Lexemes =
+        [
+            new() { Lemma = "I", Pos = "PRON", UR = "m i" },
+            new() { Lemma = "they", Pos = "PRON", UR = "t e" },
+            new() { Lemma = "see", Pos = "V", UR = "v i d" }
+        ];
+        poly.Affixes =
+        [
+            new() { Name = "1sgSubj", Pos = "V", FeatureName = "SubjAgr", FeatureValue = "1sg", Affix = "ni-", IsPrefix = true, Enabled = true },
+            new() { Name = "3plObj", Pos = "V", FeatureName = "ObjAgr", FeatureValue = "3pl", Affix = "-wa", IsPrefix = false, Enabled = true }
+        ];
+        poly.OrthographyRules = [];
+        poly.Capitalization = CapitalizationMode.None;
+        poly.Pipeline.SyntaxGeneratorId = "phrase-structure-syntax";
+        poly.SyntaxConfig.ProDrop = true;
+        poly.SyntaxConfig.PolypersonalAgreement = true;
+
+        var polyEngine = new LangEngine();
+        var polyTree = polyEngine.ResolveSyntax(poly).Generate(new SentenceSpec("Transitive", 3), poly, new Random(2));
+        Assert.DoesNotContain(polyTree.Leaves(), n => n.Category == "PRON");
+        var vLeaf = polyTree.Leaves().First(n => n.Category == "V");
+        Assert.Contains(vLeaf.Features ?? [], f => f.Name == "SubjAgr");
+        Assert.Contains(vLeaf.Features ?? [], f => f.Name == "ObjAgr");
+    }
+
+    [Fact]
+    public void EnglishPreset_SupportsYesNoQuestionsImperativesPassivesAndRecursiveClauses()
+    {
+        var eng = ProjectFactory.CreateEnglishPresetProject();
+        var engine = new LangEngine();
+
+        var qRes = engine.GenerateSentence(eng, seed: 2, approxWords: 4, new Dictionary<string, string> { ["Mood"] = "YNQuestion", ["Tense"] = "Past", ["Voice"] = "Active" });
+        Assert.EndsWith("?", qRes.Written);
+        Assert.True(qRes.Written.StartsWith("Did", StringComparison.Ordinal) || qRes.Written.StartsWith("Was", StringComparison.Ordinal) || qRes.Written.StartsWith("Were", StringComparison.Ordinal));
+
+        var impRes = engine.GenerateSentence(eng, seed: 3, approxWords: 4, new Dictionary<string, string> { ["Mood"] = "Imp" });
+        Assert.EndsWith("!", impRes.Written);
+
+        var passRes = engine.GenerateSentence(eng, seed: 4, approxWords: 6, new Dictionary<string, string> { ["Voice"] = "Passive", ["Tense"] = "Past" });
+        Assert.Contains("Voice=Passive", ConfigurableSyntaxGenerator.FormatSyntaxTree(passRes.Tree.Root));
+        Assert.Contains("by", passRes.Written.ToLowerInvariant());
+
+        var compRes = engine.GenerateSentence(eng, seed: 5, approxWords: 6, new Dictionary<string, string> { ["Embedded"] = "Complement", ["Relative"] = "false" });
+        Assert.Contains("that", compRes.Written.ToLowerInvariant());
+        Assert.Contains("CP:CompCP", ConfigurableSyntaxGenerator.FormatSyntaxTree(compRes.Tree.Root));
+
+        var relRes = engine.GenerateSentence(eng, seed: 6, approxWords: 5, new Dictionary<string, string> { ["Relative"] = "true", ["Embedded"] = "false", ["Voice"] = "Active" });
+        Assert.Contains("CP:RelCP", ConfigurableSyntaxGenerator.FormatSyntaxTree(relRes.Tree.Root));
+    }
+
+    [Fact]
+    public void SyntaxEngine_SupportsHeadFinalPostpositionsQuestionParticleAndCustomCfg()
+    {
+        var jpn = ProjectFactory.CreateStarterProject();
+        jpn.WordOrder = WordOrder.SOV;
+        jpn.Pipeline.SyntaxGeneratorId = "phrase-structure-syntax";
+        jpn.Lexemes =
+        [
+            new() { Lemma = "dog", Pos = "N", UR = "i n u", Spelling = "inu" },
+            new() { Lemma = "park", Pos = "N", UR = "k o e n", Spelling = "koen" },
+            new() { Lemma = "walk", Pos = "V", UR = "a r u k u", Spelling = "aruku" },
+            new() { Lemma = "small", Pos = "ADJ", UR = "k o", Spelling = "ko" },
+            new() { Lemma = "the", Pos = "DET", UR = "k o n o", Spelling = "kono" },
+            new() { Lemma = "in", Pos = "POSTP", UR = "n i", Spelling = "ni" },
+            new() { Lemma = "ka", Pos = "Q", UR = "k a", Spelling = "ka" }
+        ];
+        jpn.OrthographyRules = [];
+        jpn.Capitalization = CapitalizationMode.None;
+        jpn.SyntaxConfig.AdpositionType = AdpositionOrder.Postposition;
+        jpn.SyntaxConfig.QuestionStrategy = QuestionStrategy.Particle;
+        jpn.SyntaxConfig.CustomRules = ["NP -> DET N ADJ", "PP -> NP POSTP"];
+
+        var engine = new LangEngine();
+        var res = engine.GenerateSentence(jpn, seed: 1, approxWords: 6, new Dictionary<string, string> { ["Mood"] = "YNQuestion" });
+        Assert.EndsWith("ka?", res.Written);
+        var igt = LangEngine.FormatInterlinearGloss(engine, res.Tree, jpn);
+        Assert.Contains("Orth :", igt);
+        Assert.Contains("Morph:", igt);
+        Assert.Contains("Gloss:", igt);
+        Assert.Contains("Cat  :", igt);
+    }
 }

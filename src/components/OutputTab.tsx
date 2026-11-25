@@ -12,6 +12,8 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
   const [sampleCount, setSampleCount] = useState(5);
   const [approxWords, setApproxWords] = useState(6);
   const [seed, setSeed] = useState('');
+  const [moodFilter, setMoodFilter] = useState<'Decl' | 'YNQuestion' | 'Imp'>('Decl');
+  const [voiceFilter, setVoiceFilter] = useState<'Auto' | 'Active' | 'Passive'>('Auto');
   const [featureName, setFeatureName] = useState('Tense');
   const [featureValue, setFeatureValue] = useState('Past');
   const [samples, setSamples] = useState<string[]>([]);
@@ -20,6 +22,12 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
   const generate = () => {
     const engine = buildEngineFromState(state);
     const constraints: Record<string, string> = {};
+    if (moodFilter !== 'Decl') {
+      constraints.Mood = moodFilter;
+    }
+    if (voiceFilter !== 'Auto') {
+      constraints.Voice = voiceFilter;
+    }
     if (featureName.trim() && featureValue.trim()) {
       constraints[featureName.trim()] = featureValue.trim();
     }
@@ -32,7 +40,7 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
     for (let i = 0; i < count; i++) {
       const rng = new RNG(baseSeed + i);
       const { written } = engine.generateSentence(rng, {
-        clauseType: 'decl',
+        clauseType: state.ClauseTemplate,
         approxWords: Math.max(1, approxWords),
         constraints,
       });
@@ -66,7 +74,7 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
             min={1}
             value={sampleCount}
             onChange={(e) => setSampleCount(Math.max(1, Number(e.target.value) || 1))}
-            className="w-16 px-2 py-1 bg-white border border-slate-300 rounded"
+            className="w-16 px-2 py-1 font-mono tabular-nums bg-white border border-slate-300 rounded"
           />
         </label>
 
@@ -77,7 +85,7 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
             min={1}
             value={approxWords}
             onChange={(e) => setApproxWords(Math.max(1, Number(e.target.value) || 1))}
-            className="w-16 px-2 py-1 bg-white border border-slate-300 rounded"
+            className="w-16 px-2 py-1 font-mono tabular-nums bg-white border border-slate-300 rounded"
           />
         </label>
 
@@ -88,8 +96,34 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
             value={seed}
             onChange={(e) => setSeed(e.target.value)}
             placeholder="auto"
-            className="w-24 px-2 py-1 bg-white border border-slate-300 rounded"
+            className="w-20 px-2 py-1 font-mono tabular-nums bg-white border border-slate-300 rounded"
           />
+        </label>
+
+        <label className="flex items-center gap-1.5">
+          <span className="text-slate-700">Mood</span>
+          <select
+            value={moodFilter}
+            onChange={(e) => setMoodFilter(e.target.value as 'Decl' | 'YNQuestion' | 'Imp')}
+            className="px-2 py-1 bg-white border border-slate-300 rounded"
+          >
+            <option value="Decl">Decl</option>
+            <option value="YNQuestion">YNQuestion</option>
+            <option value="Imp">Imp</option>
+          </select>
+        </label>
+
+        <label className="flex items-center gap-1.5">
+          <span className="text-slate-700">Voice</span>
+          <select
+            value={voiceFilter}
+            onChange={(e) => setVoiceFilter(e.target.value as 'Auto' | 'Active' | 'Passive')}
+            className="px-2 py-1 bg-white border border-slate-300 rounded"
+          >
+            <option value="Auto">Auto</option>
+            <option value="Active">Active</option>
+            <option value="Passive">Passive</option>
+          </select>
         </label>
 
         <label className="flex items-center gap-1.5">
@@ -98,20 +132,20 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
             type="text"
             value={featureName}
             onChange={(e) => setFeatureName(e.target.value)}
-            className="w-24 px-2 py-1 bg-white border border-slate-300 rounded"
+            className="w-20 px-2 py-1 bg-white border border-slate-300 rounded"
           />
           <input
             type="text"
             value={featureValue}
             onChange={(e) => setFeatureValue(e.target.value)}
-            className="w-24 px-2 py-1 bg-white border border-slate-300 rounded"
+            className="w-20 px-2 py-1 bg-white border border-slate-300 rounded"
           />
         </label>
 
         <button
           type="button"
           onClick={generate}
-          className="px-3 py-1 bg-slate-800 text-white rounded hover:bg-slate-700"
+          className="px-3.5 py-1 bg-slate-800 text-white rounded hover:bg-slate-700 whitespace-nowrap shrink-0"
         >
           Generate
         </button>
@@ -119,7 +153,7 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
           type="button"
           onClick={() => exportFile('txt')}
           disabled={samples.length === 0}
-          className="px-3 py-1 bg-slate-200 hover:bg-slate-300 border border-slate-300 rounded disabled:opacity-40"
+          className="px-3 py-1 bg-slate-200 hover:bg-slate-300 border border-slate-300 rounded disabled:opacity-40 whitespace-nowrap shrink-0"
         >
           Export TXT
         </button>
@@ -127,7 +161,7 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
           type="button"
           onClick={() => exportFile('csv')}
           disabled={samples.length === 0}
-          className="px-3 py-1 bg-slate-200 hover:bg-slate-300 border border-slate-300 rounded disabled:opacity-40"
+          className="px-3 py-1 bg-slate-200 hover:bg-slate-300 border border-slate-300 rounded disabled:opacity-40 whitespace-nowrap shrink-0"
         >
           Export CSV
         </button>

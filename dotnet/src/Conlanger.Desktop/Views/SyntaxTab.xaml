@@ -13,40 +13,120 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <GroupBox Grid.Row="0" Header="Clause Architecture &amp; Sampling Controls (Respects Swapped Phase 4 Syntax Generator)">
-            <WrapPanel Orientation="Horizontal">
-                <StackPanel Margin="0,0,18,6">
-                    <TextBlock Text="Word Order" Foreground="#475569" Margin="0,0,0,4" />
-                    <ComboBox ItemsSource="{Binding WordOrders}" SelectedItem="{Binding SelectedWordOrder}" Width="130" />
-                </StackPanel>
-                <StackPanel Margin="0,0,18,6">
-                    <TextBlock Text="Clause Template" Foreground="#475569" Margin="0,0,0,4" />
-                    <ComboBox ItemsSource="{Binding ClauseTemplates}" SelectedItem="{Binding SelectedClauseTemplate}" Width="150" />
-                </StackPanel>
-                <StackPanel Margin="0,0,18,6">
-                    <TextBlock Text="Approx. Words (NP Modifiers)" Foreground="#475569" Margin="0,0,0,4" />
-                    <TextBox Text="{Binding SyntaxApproxWords, UpdateSourceTrigger=PropertyChanged}" Width="130" />
-                </StackPanel>
-                <StackPanel Margin="0,0,18,6">
-                    <TextBlock Text="Preview Seed" Foreground="#475569" Margin="0,0,0,4" />
-                    <TextBox Text="{Binding SyntaxPreviewSeed, UpdateSourceTrigger=PropertyChanged}" Width="100" />
-                </StackPanel>
-                <Button Content="Sample New Seed" Command="{Binding SampleSyntaxSeedCommand}" VerticalAlignment="Bottom" Margin="0,0,0,6" />
-            </WrapPanel>
+        <GroupBox Grid.Row="0" Header="Clause Architecture, Typology &amp; Custom CFG Rules (Active Pipeline Generator)" Margin="0,0,0,10">
+            <StackPanel>
+                <WrapPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <StackPanel Margin="0,0,14,6">
+                        <TextBlock Text="Word Order" Foreground="#475569" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding WordOrders}" SelectedItem="{Binding SelectedWordOrder}" Width="110" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,14,6">
+                        <TextBlock Text="Clause Template" Foreground="#475569" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding ClauseTemplates}" SelectedItem="{Binding SelectedClauseTemplate}" Width="125" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,14,6">
+                        <TextBlock Text="Case Alignment" Foreground="#475569" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding AlignmentSystems}" SelectedItem="{Binding SelectedAlignment}" Width="120" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,14,6">
+                        <TextBlock Text="Adjective Order" Foreground="#475569" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding ModifierOrders}" SelectedItem="{Binding SelectedAdjectiveOrder}" Width="120" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,14,6">
+                        <TextBlock Text="Determiner Order" Foreground="#475569" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding ModifierOrders}" SelectedItem="{Binding SelectedDeterminerOrder}" Width="120" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,14,6">
+                        <TextBlock Text="Adposition" Foreground="#475569" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding AdpositionOrders}" SelectedItem="{Binding SelectedAdpositionType}" Width="120" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,14,6">
+                        <TextBlock Text="Y/N Questions" Foreground="#475569" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding QuestionStrategies}" SelectedItem="{Binding SelectedQuestionStrategy}" Width="110" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,14,6">
+                        <TextBlock Text="Max Depth (0-3)" Foreground="#475569" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding MaxClauseDepth, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                    </StackPanel>
+                </WrapPanel>
+
+                <WrapPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <CheckBox Content="Pro-Drop" IsChecked="{Binding ProDrop}" Margin="0,0,16,4" VerticalAlignment="Center" />
+                    <CheckBox Content="Polypersonal Agreement" IsChecked="{Binding PolypersonalAgreement}" Margin="0,0,16,4" VerticalAlignment="Center" />
+                    <CheckBox Content="Complement &amp; Coord Clauses" IsChecked="{Binding AllowEmbeddedClauses}" Margin="0,0,16,4" VerticalAlignment="Center" />
+                    <CheckBox Content="Relative Clauses" IsChecked="{Binding AllowRelativeClauses}" Margin="0,0,16,4" VerticalAlignment="Center" />
+                    <CheckBox Content="Passive Voice" IsChecked="{Binding AllowPassive}" Margin="0,0,16,4" VerticalAlignment="Center" />
+                </WrapPanel>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.2*" />
+                        <ColumnDefinition Width="1.6*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                        <TextBlock Text="Custom CFG Overrides (one per line, e.g. NP -> DET N ADJ)" Foreground="#475569" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding CustomSyntaxRulesText, UpdateSourceTrigger=LostFocus}" AcceptsReturn="True" Height="56" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12" Padding="6" />
+                    </StackPanel>
+
+                    <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <StackPanel Margin="0,0,12,4">
+                            <TextBlock Text="Approx. Words" Foreground="#475569" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding SyntaxApproxWords, UpdateSourceTrigger=PropertyChanged}" Width="82" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,12,4">
+                            <TextBlock Text="Preview Mood" Foreground="#475569" Margin="0,0,0,4" />
+                            <ComboBox ItemsSource="{Binding SyntaxMoodOptions}" SelectedItem="{Binding SyntaxMoodPreview}" Width="115" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,12,4">
+                            <TextBlock Text="Voice" Foreground="#475569" Margin="0,0,0,4" />
+                            <ComboBox ItemsSource="{Binding SyntaxVoiceOptions}" SelectedItem="{Binding SyntaxVoicePreview}" Width="95" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,12,4">
+                            <TextBlock Text="Tense" Foreground="#475569" Margin="0,0,0,4" />
+                            <ComboBox ItemsSource="{Binding SyntaxTenseOptions}" SelectedItem="{Binding SyntaxTensePreview}" Width="82" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,12,4">
+                            <TextBlock Text="Seed" Foreground="#475569" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding SyntaxPreviewSeed, UpdateSourceTrigger=PropertyChanged}" Width="72" />
+                        </StackPanel>
+                        <Button Content="Sample New Seed" Command="{Binding SampleSyntaxSeedCommand}" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                    </WrapPanel>
+                </Grid>
+            </StackPanel>
         </GroupBox>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*" />
-                <ColumnDefinition Width="1.2*" />
+                <ColumnDefinition Width="1.25*" />
             </Grid.ColumnDefinitions>
 
-            <GroupBox Grid.Column="0" Header="Linearized Clause Leaves (Lemma / Category)" Margin="0,0,10,0">
-                <TextBox Text="{Binding SyntaxLinearPreview, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontSize="17" Padding="10" Background="#F8FAFC" BorderThickness="0" />
-            </GroupBox>
+            <Grid Grid.Column="0" Margin="0,0,10,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <GroupBox Grid.Row="0" Header="Orthographic &amp; Phonological Output" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBox Text="{Binding SyntaxWrittenPreview, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontSize="17" FontWeight="SemiBold" Padding="8" Background="#F8FAFC" BorderThickness="0" />
+                        <TextBox Text="{Binding SyntaxSurfacePreview, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12.5" Foreground="#475569" Padding="8,4,8,6" Background="#F8FAFC" BorderThickness="0" />
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Grid.Row="1" Header="Linearized Leaves (Lemma / Category)" Margin="0,0,0,8">
+                    <TextBox Text="{Binding SyntaxLinearPreview, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontSize="13.5" Padding="8" Background="#F8FAFC" BorderThickness="0" />
+                </GroupBox>
+
+                <GroupBox Grid.Row="2" Header="Interlinear Glossed Text (Leipzig IGT)">
+                    <TextBox Text="{Binding SyntaxIgtPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12.5" Padding="8" Background="#F8FAFC" BorderThickness="0" />
+                </GroupBox>
+            </Grid>
 
             <GroupBox Grid.Column="1" Header="Syntax Tree Hierarchy">
-                <TextBox Text="{Binding SyntaxTreeSummary, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13" Padding="10" Background="#F8FAFC" BorderThickness="0" />
+                <TextBox Text="{Binding SyntaxTreeSummary, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13" Padding="10" Background="#F8FAFC" BorderThickness="0" />
             </GroupBox>
         </Grid>
     </Grid>

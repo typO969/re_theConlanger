@@ -117,6 +117,26 @@ export type WordOrder = 'SVO' | 'SOV' | 'VSO' | 'VOS' | 'OVS' | 'OSV';
 export type ClauseTemplate = 'Intransitive' | 'Transitive' | 'Copular';
 export type CapitalizationMode = 'None' | 'SentenceInitial' | 'AllWords';
 export type StressPattern = 'None' | 'Initial' | 'Penultimate' | 'Final' | 'Lexical';
+export type AlignmentSystem = 'NomAcc' | 'ErgAbs' | 'Tripartite';
+export type ModifierOrder = 'BeforeNoun' | 'AfterNoun';
+export type AdpositionOrder = 'Preposition' | 'Postposition';
+export type QuestionStrategy = 'Inversion' | 'Particle';
+export type SentenceMood = 'Decl' | 'YNQuestion' | 'Imp';
+
+export interface SyntaxConfig {
+  alignment: AlignmentSystem;
+  adjectiveOrder: ModifierOrder;
+  determinerOrder: ModifierOrder;
+  adpositionType: AdpositionOrder;
+  questionStrategy: QuestionStrategy;
+  proDrop: boolean;
+  polypersonalAgreement: boolean;
+  allowEmbeddedClauses: boolean;
+  allowRelativeClauses: boolean;
+  allowPassive: boolean;
+  maxClauseDepth: number;
+  customRules: string[];
+}
 
 export interface PipelineSelection {
   syntaxGeneratorId: string;
@@ -270,6 +290,7 @@ export interface LanguageProjectState {
   Affixes: AffixState[];
   WordOrder: WordOrder;
   ClauseTemplate: ClauseTemplate;
+  SyntaxConfig?: SyntaxConfig;
   OrthographyRules: OrthRuleState[];
   OrthographyExceptions: OrthExceptionState[];
   Capitalization: CapitalizationMode;

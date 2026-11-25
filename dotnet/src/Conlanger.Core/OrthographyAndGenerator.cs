@@ -112,6 +112,9 @@ public sealed class MorphophonemicOrthography : OrthographyEngine
             && HasFeat(ctx.Features, "Number", "Sing");
         bool isPastV = (string.Equals(ctx.Pos, "V", StringComparison.OrdinalIgnoreCase) || string.Equals(ctx.Pos, "AUX", StringComparison.OrdinalIgnoreCase))
             && HasFeat(ctx.Features, "Tense", "Past");
+        bool isPartV = string.Equals(ctx.Pos, "V", StringComparison.OrdinalIgnoreCase)
+            && (HasFeat(ctx.Features, "Aspect", "Part") || HasFeat(ctx.Features, "Voice", "Passive"))
+            && !HasFeat(ctx.Features, "Finiteness", "Bare");
 
         if (isPluralN || is3sgPres)
         {
@@ -122,7 +125,7 @@ public sealed class MorphophonemicOrthography : OrthographyEngine
             return $"{baseSpelling}s";
         }
 
-        if (isPastV)
+        if (isPastV || isPartV)
         {
             if (baseSpelling.EndsWith("e", StringComparison.OrdinalIgnoreCase))
                 return $"{baseSpelling}d";
@@ -383,7 +386,76 @@ public sealed class LangEngine
         }
 
         var orth = orthography.RenderWords(wordContexts, project);
-        return new SentenceGenerationResult(orth.Text, orth.Tokens, surfaceWords, allIssues, tree);
+        var written = orth.Text;
+        bool isIpaWrapped = written.StartsWith("/", StringComparison.Ordinal) && written.EndsWith("/", StringComparison.Ordinal);
+        if (!isIpaWrapped && !string.IsNullOrWhiteSpace(written))
+        {
+            string? mood = tree.Root.Features?.FirstOrDefault(f => string.Equals(f.Name, "Mood", StringComparison.OrdinalIgnoreCase))?.Value;
+            if (string.Equals(mood, "YNQuestion", StringComparison.OrdinalIgnoreCase) && !written.EndsWith("?", StringComparison.Ordinal))
+                written += "?";
+            else if (string.Equals(mood, "Imp", StringComparison.OrdinalIgnoreCase) && !written.EndsWith("!", StringComparison.Ordinal))
+                written += "!";
+        }
+        return new SentenceGenerationResult(written, orth.Tokens, surfaceWords, allIssues, tree);
+    }
+
+    public static string FormatInterlinearGloss(LangEngine engine, SyntaxTree tree, LanguageProject project)
+    {
+        var leaves = tree.Leaves().Where(n => !string.IsNullOrWhiteSpace(n.Lemma)).ToList();
+        if (leaves.Count == 0) return "(empty clause)";
+
+        var morphology = engine.ResolveMorphology(project);
+        var orthography = engine.ResolveOrthography(project);
+        var pluginRules = engine.ResolvePluginRules(project);
+        var morphEngine = morphology as MorphologyEngine;
+
+        var cols = new List<(string Orth, string Morph, string Gloss, string Cat)>(leaves.Count);
+        foreach (var node in leaves)
+        {
+            var lemma = node.Lemma!;
+            var lex = project.Lexemes.FirstOrDefault(l => string.Equals(l.Lemma, lemma, StringComparison.Ordinal))
+                ?? project.Lexemes.FirstOrDefault(l => string.Equals(l.Lemma, lemma, StringComparison.OrdinalIgnoreCase));
+
+            List<(string Id, string Gloss, IReadOnlyList<string> Phones)> morphemeParts;
+            bool isIrregular;
+            if (morphEngine is not null)
+            {
+                var detailed = morphEngine.InflectSingleMorphemes(lemma, node.Category, node.Features, project);
+                morphemeParts = detailed.Morphemes.ToList();
+                isIrregular = detailed.IsIrregular;
+            }
+            else
+            {
+                var word = morphology.RealizeDetailed(new SyntaxTree(new SyntaxNode(node.Category, lemma, node.Features)), project).FirstOrDefault();
+                var phones = word?.Phones ?? Array.Empty<string>();
+                isIrregular = word?.IsIrregular ?? false;
+                morphemeParts = new() { (isIrregular ? "STEM_IRREG" : "STEM", lemma, phones) };
+            }
+
+            var flatPhones = morphemeParts.SelectMany(m => m.Phones).ToList();
+            var derived = PhonologyEngine.Derive(flatPhones, project, pluginRules);
+            var ctx = new RealizedWordContext(derived.SurfacePhones, lemma, node.Category, node.Features, lex?.Spelling, isIrregular);
+            var orthWord = orthography.RenderWords(new[] { ctx }, project).Text;
+
+            var morphSurface = string.Join("-", morphemeParts.Select(m => m.Phones.Count > 0 ? string.Concat(m.Phones) : "∅"));
+            var morphGloss = string.Join("-", morphemeParts.Select(m =>
+                m.Id is "STEM" or "STEM_IRREG" ? lemma : m.Gloss.Replace("AFX_", "", StringComparison.Ordinal).ToUpperInvariant()));
+            var featSummary = node.Features is null
+                ? ""
+                : string.Join(".", node.Features.Where(f => f.Name != "Role" && f.Name != "Finiteness").Take(3).Select(f => f.Value));
+            var posLine = string.IsNullOrEmpty(featSummary) ? node.Category : $"{node.Category}[{featSummary}]";
+
+            int width = Math.Max(Math.Max(orthWord.Length, morphSurface.Length), Math.Max(morphGloss.Length, posLine.Length)) + 2;
+            cols.Add((orthWord.PadRight(width), morphSurface.PadRight(width), morphGloss.PadRight(width), posLine.PadRight(width)));
+        }
+
+        return string.Join(Environment.NewLine, new[]
+        {
+            $"Orth : {string.Concat(cols.Select(c => c.Orth)).TrimEnd()}",
+            $"Morph: {string.Concat(cols.Select(c => c.Morph)).TrimEnd()}",
+            $"Gloss: {string.Concat(cols.Select(c => c.Gloss)).TrimEnd()}",
+            $"Cat  : {string.Concat(cols.Select(c => c.Cat)).TrimEnd()}"
+        });
     }
 }
 
