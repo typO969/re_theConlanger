@@ -932,9 +932,9 @@ public sealed class MainViewModel : ViewModelBase
     private void RefreshMorphPreview()
     {
         var morph = _engine.ResolveMorphology(_project);
-        var feats = string.IsNullOrWhiteSpace(MorphPreviewFeatName)
+        IReadOnlyList<Feat> feats = string.IsNullOrWhiteSpace(MorphPreviewFeatName)
             ? Array.Empty<Feat>()
-            : [new Feat(MorphPreviewFeatName.Trim(), MorphPreviewFeatVal.Trim())];
+            : new[] { new Feat(MorphPreviewFeatName.Trim(), MorphPreviewFeatVal.Trim()) };
         MorphPreviewOutput = morph.RealizeForPreview(MorphPreviewLemma, MorphPreviewPos, feats, _project);
     }
 
@@ -1133,6 +1133,10 @@ public sealed class MainViewModel : ViewModelBase
         StatusMessage = $"Generated {words.Count} candidate word(s)";
     }
 
+    private IReadOnlyList<string> RealizeSingleWord(IMorphologyRealizer morph, string lemma, string pos, IReadOnlyList<Feat> features) =>
+        morph.RealizeWords(new SyntaxTree(new SyntaxNode(pos, lemma, features)), _project).FirstOrDefault()
+        ?? Array.Empty<string>();
+
     private void RefreshInspectors()
     {
         var lex = _project.Lexemes.FirstOrDefault(l => string.Equals(l.Lemma, SelectedInspectorLexeme, StringComparison.OrdinalIgnoreCase))
@@ -1142,9 +1146,9 @@ public sealed class MainViewModel : ViewModelBase
         var orth = _engine.ResolveOrthography(_project);
         var pluginRules = _engine.ResolvePluginRules(_project);
 
-        var presPhones = morph.InflectSingle(lex.Lemma, lex.Pos, Array.Empty<Feat>(), _project);
-        var pastPhones = morph.InflectSingle(lex.Lemma, lex.Pos, [new Feat("Tense", "Past")], _project);
-        var plurPhones = morph.InflectSingle(lex.Lemma, lex.Pos, [new Feat("Number", "Pl")], _project);
+        var presPhones = RealizeSingleWord(morph, lex.Lemma, lex.Pos, Array.Empty<Feat>());
+        var pastPhones = RealizeSingleWord(morph, lex.Lemma, lex.Pos, new[] { new Feat("Tense", "Past") });
+        var plurPhones = RealizeSingleWord(morph, lex.Lemma, lex.Pos, new[] { new Feat("Number", "Pl") });
 
         var lines = new List<string>
         {
@@ -1161,7 +1165,7 @@ public sealed class MainViewModel : ViewModelBase
 
         foreach (var afx in _project.Affixes.Where(a => a.Enabled && string.Equals(a.Pos, lex.Pos, StringComparison.OrdinalIgnoreCase)))
         {
-            var inflected = morph.InflectSingle(lex.Lemma, lex.Pos, [new Feat(afx.FeatureName, afx.FeatureValue)], _project);
+            var inflected = RealizeSingleWord(morph, lex.Lemma, lex.Pos, new[] { new Feat(afx.FeatureName, afx.FeatureValue) });
             var derivedForm = PhonologyEngine.Derive(inflected, _project, pluginRules);
             var writtenForm = orth.Render(new[] { derivedForm.SurfacePhones }, _project).Text;
             lines.Add($"{afx.Name} [{afx.FeatureName}={afx.FeatureValue}]: {string.Join(" ", inflected)} -> {writtenForm}");

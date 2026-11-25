@@ -88,8 +88,8 @@ public sealed class LanguageEngineTests
 
         var engine = new LangEngine();
         var morph = engine.ResolveMorphology(project);
-        var pluralPerson = morph.InflectSingle("person", "N", [new Feat("Number", "Pl")], project);
-        Assert.Equal(new[] { "m", "a", "m", "a", "t", "a", "i" }, pluralPerson);
+        var pluralPerson = morph.RealizeWords(new SyntaxTree(new SyntaxNode("N", "person", [new Feat("Number", "Pl")])), project).Single();
+        Assert.Equal(new[] { "p", "e", "p", "e", "r", "s", "o", "n", "i" }, pluralPerson);
 
         var sentence = engine.GenerateSentence(project, seed: 42, approxWords: 2, new Dictionary<string, string> { ["Number"] = "Pl" });
         Assert.StartsWith("/", sentence.Written);
