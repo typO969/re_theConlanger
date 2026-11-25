@@ -90,6 +90,18 @@ public sealed class PhonologyRuleSpec
     public bool Enabled { get; set; } = true;
 }
 
+public sealed class DiachronicRuleSpec
+{
+    public string Name { get; set; } = "";
+    public string Era { get; set; } = "";
+    public string Target { get; set; } = "";
+    public string Replacement { get; set; } = "";
+    public string? PrevPhone { get; set; }
+    public string? NextPhone { get; set; }
+    public string? Condition { get; set; }
+    public bool Enabled { get; set; } = true;
+}
+
 public sealed class LexemeEntry
 {
     public string Lemma { get; set; } = "";
@@ -98,6 +110,27 @@ public sealed class LexemeEntry
     public string? LexClass { get; set; }
     public string? Spelling { get; set; }
     public Dictionary<string, string>? Irregulars { get; set; }
+    public List<string>? SemanticTags { get; set; }
+    public string? ProtoUR { get; set; }
+
+    [JsonIgnore]
+    public string SemanticTagsSummary
+    {
+        get => SemanticTags is null || SemanticTags.Count == 0 ? "" : string.Join(", ", SemanticTags);
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                SemanticTags = null;
+                return;
+            }
+            var parsed = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            SemanticTags = parsed.Count > 0 ? parsed : null;
+        }
+    }
 
     [JsonIgnore]
     public string IrregularsSummary
@@ -288,6 +321,7 @@ public sealed class LanguageProject
     public GeneratorOptions GeneratorOptions { get; set; } = new();
     public StressPattern StressPattern { get; set; } = StressPattern.None;
     public List<PhonologyRuleSpec> PhonologyRules { get; set; } = new();
+    public List<DiachronicRuleSpec> DiachronicRules { get; set; } = new();
     public List<LexemeEntry> Lexemes { get; set; } = new();
     public List<AffixEntry> Affixes { get; set; } = new();
     public WordOrder WordOrder { get; set; } = WordOrder.SVO;

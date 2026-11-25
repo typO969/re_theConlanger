@@ -769,6 +769,36 @@ public static class PhonologyEngine
                 prevOk = MatchesPhoneOrClass(i > 0 ? phones[i - 1] : null, prevT, project, stressedSet, i - 1);
             }
 
+        bool carryStress = false;
+        var result = new List<string>(phones.Count);
+        var subPhones = isDeletion ? Array.Empty<string>() : replacement.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < phones.Count; i++)
+        {
+            var cur = phones[i];
+            bool targetHit = MatchesPhoneOrClass(cur, target, project, stressedSet, i);
+
+            string ApplyStress(string seg)
+            {
+                if (!carryStress) return seg;
+                carryStress = false;
+                return HasStressMark(seg) ? seg : $"ˈ{seg}";
+            }
+
+            bool prevOk;
+            if (prevT is "$" or ".")
+            {
+                prevOk = sylBounds.Starts.Contains(i);
+            }
+            else if (!string.IsNullOrEmpty(prevT) && IsToneContextSelector(prevT))
+            {
+                int tbuIdx = FindAdjacentTbuIndex(phones, i - 1, -1, project);
+                prevOk = MatchesPhoneOrClass(tbuIdx >= 0 ? phones[tbuIdx] : null, prevT, project, stressedSet, tbuIdx);
+            }
+            else
+            {
+                prevOk = MatchesPhoneOrClass(i > 0 ? phones[i - 1] : null, prevT, project, stressedSet, i - 1);
+            }
+
             bool nextOk;
             if (nextT is "$" or ".")
             {
@@ -790,29 +820,36 @@ public static class PhonologyEngine
             {
                 if (isAlphaPlace)
                 {
-                    result.Add(ResolveAlphaPlaceReplacement(cur, phones, i, prevT, nextT, project));
+                    result.Add(ApplyStress(ResolveAlphaPlaceReplacement(cur, phones, i, prevT, nextT, project)));
                 }
                 else if (isAlphaBack || isAlphaRound)
                 {
-                    result.Add(ResolveAlphaHarmonyReplacement(cur, phones, i, prevT, nextT, isAlphaBack, isAlphaRound, project));
+                    result.Add(ApplyStress(ResolveAlphaHarmonyReplacement(cur, phones, i, prevT, nextT, isAlphaBack, isAlphaRound, project)));
                 }
                 else if (toneMatch.Success)
                 {
-                    result.Add(ApplyToneToPhone(cur, toneMatch.Groups[1].Value));
+                    result.Add(ApplyStress(ApplyToneToPhone(cur, toneMatch.Groups[1].Value)));
+                }
+                else if (subPhones.Length == 0)
+                {
+                    if (HasStressMark(cur) && !target.StartsWith('ˈ'))
+                        carryStress = true;
                 }
                 else if (subPhones.Length > 0 && HasStressMark(cur) && !target.StartsWith('ˈ') && !HasStressMark(subPhones[0]))
                 {
+                    carryStress = false;
                     result.Add($"ˈ{subPhones[0]}");
                     for (int s = 1; s < subPhones.Length; s++) result.Add(subPhones[s]);
                 }
                 else
                 {
-                    result.AddRange(subPhones);
+                    result.Add(ApplyStress(subPhones[0]));
+                    for (int s = 1; s < subPhones.Length; s++) result.Add(subPhones[s]);
                 }
             }
             else
             {
-                result.Add(cur);
+                result.Add(ApplyStress(cur));
             }
         }
         return result;
@@ -857,5 +894,208 @@ public static class PhonologyEngine
             steps.Add(new DerivationStep("Phonotactics", string.Join("; ", issues)));
 
         return new PhonologyDerivationResult(cur, syllables, stressIdx, steps, issues);
+    }
+}
+
+public sealed record DiachronicPresetSpec(string Id, string Name, string Description, IReadOnlyList<PhonologyRuleSpec> Rules);
+
+public sealed record DiachronicStepTrace(string Era, string RuleName, string SurfaceForm);
+
+public sealed record DiachronicCognateDiff(
+    string ProtoLemma,
+    string ProtoUr,
+    string DaughterUr,
+    string DaughterSurface,
+    string DiffStatus
+);
+
+public sealed record DiachronicAffixDiff(string AffixName, string ProtoForm, string DaughterForm);
+
+public sealed record DiachronicSimulationResult(
+    string DaughterProjectName,
+    IReadOnlyList<DiachronicStepTrace> StepTraces,
+    IReadOnlyList<DiachronicCognateDiff> CognateDiffs,
+    IReadOnlyList<DiachronicAffixDiff> AffixDiffs,
+    IReadOnlyList<string> EmergentPhones,
+    IReadOnlyList<string> LostPhones
+);
+
+public static class DiachronicEngine
+{
+    public static IReadOnlyList<DiachronicPresetSpec> GetPresets() => new[]
+    {
+        new DiachronicPresetSpec(
+            "great-vowel-shift",
+            "Great Vowel Shift (English)",
+            "Historic raising and diphthongization of long middle English vowels (e.g., iː -> aɪ, uː -> aʊ, eː -> iː).",
+            new[]
+            {
+                new PhonologyRuleSpec { Name = "Long i raising/diphthongization", Target = "iː", Replacement = "aɪ", Enabled = true },
+                new PhonologyRuleSpec { Name = "Long u raising/diphthongization", Target = "uː", Replacement = "aʊ", Enabled = true },
+                new PhonologyRuleSpec { Name = "Long e raising", Target = "eː", Replacement = "iː", Enabled = true },
+                new PhonologyRuleSpec { Name = "Long o raising", Target = "oː", Replacement = "uː", Enabled = true }
+            }
+        ),
+        new DiachronicPresetSpec(
+            "grimms-law",
+            "Grimm's Law (Proto-Indo-European to Germanic)",
+            "Consonant shift affecting PIE stops (e.g., voiceless stops to fricatives, voiced stops to voiceless stops).",
+            new[]
+            {
+                new PhonologyRuleSpec { Name = "PIE voiceless stops to fricatives", Target = "p", Replacement = "f", Enabled = true },
+                new PhonologyRuleSpec { Name = "PIE voiceless t to θ", Target = "t", Replacement = "θ", Enabled = true },
+                new PhonologyRuleSpec { Name = "PIE voiced aspirated to voiced", Target = "bʰ", Replacement = "b", Enabled = true }
+            }
+        ),
+        new DiachronicPresetSpec(
+            "romance-lenition",
+            "Western Romance Lenition",
+            "Intervocalic voicing and spirantization of stops (e.g., t -> d between vowels).",
+            new[]
+            {
+                new PhonologyRuleSpec { Name = "Intervocalic t voicing", Target = "t", Replacement = "d", PrevPhone = "V", NextPhone = "V", Enabled = true },
+                new PhonologyRuleSpec { Name = "Intervocalic p voicing", Target = "p", Replacement = "b", PrevPhone = "V", NextPhone = "V", Enabled = true },
+                new PhonologyRuleSpec { Name = "Intervocalic k voicing", Target = "k", Replacement = "g", PrevPhone = "V", NextPhone = "V", Enabled = true }
+            }
+        ),
+        new DiachronicPresetSpec(
+            "japanese-h-lenition",
+            "Japanese Consonant Shift (*p -> ɸ -> h)",
+            "Bilabial stop lenition into glottal fricative before non-high vowels.",
+            new[]
+            {
+                new PhonologyRuleSpec { Name = "p to bilabial fricative", Target = "p", Replacement = "ɸ", Enabled = true },
+                new PhonologyRuleSpec { Name = "ɸ to h", Target = "ɸ", Replacement = "h", Enabled = true }
+            }
+        )
+    };
+
+    public static IReadOnlyList<DiachronicStepTrace> TraceProtoForm(
+        string protoUr,
+        IEnumerable<PhonologyRuleSpec> rules,
+        LanguageProject project)
+    {
+        var traces = new List<DiachronicStepTrace>();
+        var cur = Morphology.SplitPhones(protoUr);
+        traces.Add(new DiachronicStepTrace("Proto-Form", "UR", string.Join(" ", cur)));
+
+        int stepNum = 1;
+        foreach (var rule in rules.Where(r => r.Enabled))
+        {
+            cur = PhonologyEngine.ApplyRule(cur, rule, project);
+            traces.Add(new DiachronicStepTrace($"Era {stepNum++}", rule.Name, string.Join(" ", cur)));
+        }
+        return traces;
+    }
+
+    public static DiachronicSimulationResult SimulateEvolution(
+        LanguageProject protoProject,
+        IEnumerable<PhonologyRuleSpec> rules,
+        string daughterName)
+    {
+        var ruleList = rules.ToList();
+        var sampleLexeme = protoProject.Lexemes.FirstOrDefault(l => !string.IsNullOrEmpty(l.ProtoUR))
+            ?? protoProject.Lexemes.FirstOrDefault();
+        var sampleUr = sampleLexeme?.ProtoUR ?? sampleLexeme?.UR ?? "ˈp a t e";
+
+        var traces = TraceProtoForm(sampleUr, ruleList, protoProject);
+
+        var cognateDiffs = new List<DiachronicCognateDiff>();
+        foreach (var lex in protoProject.Lexemes.Take(15))
+        {
+            var pUr = !string.IsNullOrEmpty(lex.ProtoUR) ? lex.ProtoUR : lex.UR;
+            var pPhones = Morphology.SplitPhones(pUr);
+            var dPhones = pPhones;
+            foreach (var r in ruleList.Where(x => x.Enabled))
+            {
+                dPhones = PhonologyEngine.ApplyRule(dPhones, r, protoProject);
+            }
+            var dSurf = string.Join("", dPhones);
+            string status = string.Join(" ", pPhones) == string.Join(" ", dPhones) ? "Unchanged" : "Evolved";
+            cognateDiffs.Add(new DiachronicCognateDiff(lex.Lemma, pUr, string.Join(" ", dPhones), dSurf, status));
+        }
+
+        var affixDiffs = new List<DiachronicAffixDiff>();
+        foreach (var afx in protoProject.Affixes)
+        {
+            var aPhones = Morphology.SplitPhones(afx.Affix);
+            var dAffPhones = aPhones;
+            foreach (var r in ruleList.Where(x => x.Enabled))
+            {
+                dAffPhones = PhonologyEngine.ApplyRule(dAffPhones, r, protoProject);
+            }
+            affixDiffs.Add(new DiachronicAffixDiff(afx.Name, afx.Affix, string.Join("", dAffPhones)));
+        }
+
+        var originalPhones = new HashSet<string>(protoProject.Phonemes.Select(p => p.Symbol));
+        var evolvedPhones = new HashSet<string>();
+        foreach (var lex in protoProject.Lexemes)
+        {
+            var pPhones = Morphology.SplitPhones(!string.IsNullOrEmpty(lex.ProtoUR) ? lex.ProtoUR : lex.UR);
+            var dPhones = pPhones;
+            foreach (var r in ruleList.Where(x => x.Enabled)) dPhones = PhonologyEngine.ApplyRule(dPhones, r, protoProject);
+            foreach (var ph in dPhones) evolvedPhones.Add(StripSuprasegmentals(ph));
+        }
+
+        var emergent = evolvedPhones.Where(p => !originalPhones.Contains(p)).ToList();
+        var lost = protoProject.Phonemes.Select(p => StripSuprasegmentals(p.Symbol)).Where(p => !evolvedPhones.Contains(p)).ToList();
+
+        return new DiachronicSimulationResult(
+            string.IsNullOrWhiteSpace(daughterName) ? $"{protoProject.Name} (Daughter)" : daughterName,
+            traces,
+            cognateDiffs,
+            affixDiffs,
+            emergent,
+            lost
+        );
+    }
+
+    public static LanguageProject ApplyEvolutionToProject(
+        LanguageProject protoProject,
+        IEnumerable<PhonologyRuleSpec> rules,
+        string daughterName,
+        bool preserveHistoricalSpelling)
+    {
+        var ruleList = rules.ToList();
+        var daughter = JsonSerializer.Deserialize<LanguageProject>(ProjectFactory.ToJson(protoProject), ProjectFactory.JsonOptions)!;
+        daughter.Name = string.IsNullOrWhiteSpace(daughterName) ? $"{protoProject.Name} Daughter" : daughterName;
+        daughter.DiachronicRules = ruleList.Select(r => new PhonologyRuleSpec
+        {
+            Name = r.Name,
+            Era = r.Era,
+            Target = r.Target,
+            Replacement = r.Replacement,
+            PrevPhone = r.PrevPhone,
+            NextPhone = r.NextPhone,
+            Condition = r.Condition,
+            Enabled = r.Enabled
+        }).ToList();
+
+        foreach (var lex in daughter.Lexemes)
+        {
+            if (string.IsNullOrEmpty(lex.ProtoUR))
+                lex.ProtoUR = lex.UR;
+
+            var pPhones = Morphology.SplitPhones(lex.ProtoUR);
+            var dPhones = pPhones;
+            foreach (var r in ruleList.Where(x => x.Enabled))
+            {
+                dPhones = PhonologyEngine.ApplyRule(dPhones, r, daughter);
+            }
+            lex.UR = string.Join(" ", dPhones);
+            if (!preserveHistoricalSpelling && !string.IsNullOrEmpty(lex.Spelling))
+            {
+                // re-render orthography if not preserving historical spelling
+                var orth = new Orthography(daughter.OrthographyRules, daughter.OrthographyExceptions, daughter.Capitalization);
+                lex.Spelling = orth.render(string.Join("", dPhones));
+            }
+        }
+
+        if (preserveHistoricalSpelling)
+        {
+            daughter.Pipeline.OrthographyRendererId = "morphophonemic-orthography";
+        }
+
+        return daughter;
     }
 }

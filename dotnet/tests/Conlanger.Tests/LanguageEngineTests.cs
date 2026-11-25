@@ -399,4 +399,31 @@ public sealed class LanguageEngineTests
         Assert.Contains("Gloss:", igt);
         Assert.Contains("Cat  :", igt);
     }
+
+    [Fact]
+    public void DiachronicEngine_PresetsAndEvolutionTrace()
+    {
+        var presets = DiachronicEngine.GetPresets();
+        Assert.True(presets.Count >= 4);
+
+        var eng = ProjectFactory.CreateEnglishPresetProject();
+        var gvsRules = presets.First(p => p.Id == "great-vowel-shift").Rules;
+        var traces = DiachronicEngine.TraceProtoForm("ˈk n iː x t", gvsRules, eng);
+        Assert.True(traces.Count >= 2);
+
+        var sim = DiachronicEngine.SimulateEvolution(eng, gvsRules, "Modern English");
+        Assert.NotNull(sim);
+        Assert.NotEmpty(sim.CognateDiffs);
+    }
+
+    [Fact]
+    public void DiscourseEngine_GeneratesCoherentParagraph()
+    {
+        var eng = ProjectFactory.CreateEnglishPresetProject();
+        var discourse = DiscourseEngine.GenerateDiscourse(eng, seed: 42, sentenceCount: 3, approxWords: 5);
+        Assert.False(string.IsNullOrWhiteSpace(discourse.ParagraphText));
+        Assert.Equal(3, discourse.Sentences.Count);
+        Assert.NotEmpty(discourse.TrackedEntities);
+    }
 }
+

@@ -16,6 +16,8 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
   const [newLexClass, setNewLexClass] = useState('');
   const [newSpelling, setNewSpelling] = useState('');
   const [newIrregulars, setNewIrregulars] = useState('');
+  const [newSemanticTags, setNewSemanticTags] = useState('');
+  const [newProtoUr, setNewProtoUr] = useState('');
 
   const [newAffixName, setNewAffixName] = useState('');
   const [newAffixPos, setNewAffixPos] = useState('N');
@@ -69,6 +71,11 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
     const lexClass = newLexClass.trim();
     const spelling = newSpelling.trim();
     const irregulars = parseIrregularsText(newIrregulars);
+    const semanticTags = newSemanticTags
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const protoUr = newProtoUr.trim().split(/\s+/).filter(Boolean).join(' ');
     onUpdate(
       (prev) => ({
         ...prev,
@@ -81,6 +88,8 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
             ...(lexClass ? { LexClass: lexClass } : {}),
             ...(spelling ? { Spelling: spelling } : {}),
             ...(irregulars ? { Irregulars: irregulars } : {}),
+            ...(semanticTags.length > 0 ? { SemanticTags: semanticTags } : {}),
+            ...(protoUr ? { ProtoUR: protoUr } : {}),
           },
         ],
       }),
@@ -92,6 +101,8 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
     setNewLexClass('');
     setNewSpelling('');
     setNewIrregulars('');
+    setNewSemanticTags('');
+    setNewProtoUr('');
   };
 
   const removeLexeme = (lemma: string) => {
@@ -173,7 +184,9 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
                 <th className="px-3 py-1.5 font-semibold w-16">POS</th>
                 <th className="px-3 py-1.5 font-semibold">Class</th>
                 <th className="px-3 py-1.5 font-semibold">UR</th>
+                <th className="px-3 py-1.5 font-semibold">Proto UR</th>
                 <th className="px-3 py-1.5 font-semibold">Spelling</th>
+                <th className="px-3 py-1.5 font-semibold">Semantic Tags</th>
                 <th className="px-3 py-1.5 font-semibold">Irregulars</th>
                 <th className="px-3 py-1.5 w-20"></th>
               </tr>
@@ -185,7 +198,11 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
                   <td className="px-3 py-1.5 font-mono text-xs">{lex.Pos}</td>
                   <td className="px-3 py-1.5 font-mono text-xs text-indigo-700">{lex.LexClass ?? ''}</td>
                   <td className="px-3 py-1.5 font-mono text-xs">{lex.UR}</td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-slate-500">{lex.ProtoUR ?? ''}</td>
                   <td className="px-3 py-1.5 text-xs text-slate-700">{lex.Spelling ?? ''}</td>
+                  <td className="px-3 py-1.5 font-mono text-[11px] text-emerald-700">
+                    {lex.SemanticTags?.join(', ') ?? ''}
+                  </td>
                   <td className="px-3 py-1.5 font-mono text-[11px] text-slate-600">
                     {formatIrregulars(lex.Irregulars)}
                   </td>
@@ -210,7 +227,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
             value={newLemma}
             onChange={(e) => setNewLemma(e.target.value)}
             placeholder="Lemma"
-            className="w-28 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
+            className="w-24 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
           />
           <input
             type="text"
@@ -223,29 +240,43 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
             type="text"
             value={newLexClass}
             onChange={(e) => setNewLexClass(e.target.value)}
-            placeholder="Class (Fem/Class1)"
-            className="w-28 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
+            placeholder="Class"
+            className="w-20 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
           />
           <input
             type="text"
             value={newPhonemes}
             onChange={(e) => setNewPhonemes(e.target.value)}
             placeholder="UR (e.g. ˈk æ t)"
-            className="w-40 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
+            className="w-32 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
+          />
+          <input
+            type="text"
+            value={newProtoUr}
+            onChange={(e) => setNewProtoUr(e.target.value)}
+            placeholder="Proto UR (opt)"
+            className="w-28 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
           />
           <input
             type="text"
             value={newSpelling}
             onChange={(e) => setNewSpelling(e.target.value)}
             placeholder="Spelling (opt)"
-            className="w-28 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
+            className="w-24 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
+          />
+          <input
+            type="text"
+            value={newSemanticTags}
+            onChange={(e) => setNewSemanticTags(e.target.value)}
+            placeholder="Tags (animate, subj:animate)"
+            className="w-44 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
           />
           <input
             type="text"
             value={newIrregulars}
             onChange={(e) => setNewIrregulars(e.target.value)}
             placeholder="Irregulars (Number=Pl: ˈm aɪ s)"
-            className="w-52 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
+            className="w-44 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
           />
           <button
             type="button"

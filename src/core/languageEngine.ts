@@ -5,7 +5,15 @@ import {
   CapitalizationMode,
   ClauseTemplate,
   DerivationStep,
+  DiachronicAffixDiff,
+  DiachronicCognateDiff,
+  DiachronicRule,
+  DiachronicSimulationResult,
+  DiachronicStepTrace,
   DiagnosticIssue,
+  DiscourseOptions,
+  DiscourseResult,
+  DiscourseSentenceItem,
   Feat,
   FeatBundle,
   GraphemeToken,
@@ -214,9 +222,19 @@ const DEFAULT_IPA_FEATURES: Record<string, Partial<PhonologicalFeatures>> = {
   ə: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'central', roundness: 'unrounded', custom: 'reduced' },
   ɚ: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'central', roundness: 'unrounded', custom: 'rhotic reduced' },
   'ɝː': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'central', roundness: 'unrounded', custom: 'rhotic stressed' },
+  bʰ: { voicing: 'voiced', manner: 'stop', place: 'bilabial', custom: 'aspirated' },
+  dʰ: { voicing: 'voiced', manner: 'stop', place: 'alveolar', custom: 'aspirated' },
+  gʰ: { voicing: 'voiced', manner: 'stop', place: 'velar', custom: 'aspirated' },
+  ts: { voicing: 'voiceless', manner: 'affricate', place: 'alveolar', custom: 'sibilant' },
+  dz: { voicing: 'voiced', manner: 'affricate', place: 'alveolar', custom: 'sibilant' },
+  ɸ: { voicing: 'voiceless', manner: 'fricative', place: 'bilabial' },
+  β: { voicing: 'voiced', manner: 'fricative', place: 'bilabial' },
+  ç: { voicing: 'voiceless', manner: 'fricative', place: 'palatal' },
   'aɪ': { voicing: 'voiced', manner: 'vowel', height: 'low', backness: 'front', roundness: 'unrounded', custom: 'diphthong' },
   'aʊ': { voicing: 'voiced', manner: 'vowel', height: 'low', backness: 'back', roundness: 'rounded', custom: 'diphthong' },
   'ɔɪ': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'rounded', custom: 'diphthong' },
+  'eː': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'front', roundness: 'unrounded', custom: 'tense long' },
+  'oː': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'rounded', custom: 'tense long' },
 };
 
 export function createPhoneme(symbol: string, type: 'C' | 'V', overrides?: Partial<Phoneme>): Phoneme {
@@ -870,39 +888,53 @@ export function applyRuleSpec(
   const output: string[] = [];
   const repPhones =
     replacement === '∅' || replacement === '' ? [] : replacement.split(/\s+/).filter(Boolean);
+  let carryStress = false;
 
   for (let i = 0; i < phones.length; i++) {
     const phone = phones[i];
     const targetHit = matchesPhoneOrClass(phone, target, inventory, stressedSet, i);
+    const applyStress = (seg: string) => {
+      if (!carryStress) return seg;
+      carryStress = false;
+      return hasStressMark(seg) ? seg : `ˈ${seg}`;
+    };
+
     if (
       targetHit &&
       contextMatch(phones, i, prevTarget, nextTarget, 1, inventory, stressedSet, sylBounds) &&
       matchesCondition(phone, spec.condition, inventory, stressedSet, i)
     ) {
       if (isAlphaPlace) {
-        output.push(resolveAlphaPlaceReplacement(phone, phones, i, prevTarget, nextTarget, inventory));
+        output.push(applyStress(resolveAlphaPlaceReplacement(phone, phones, i, prevTarget, nextTarget, inventory)));
       } else if (isAlphaBack || isAlphaRound) {
         output.push(
-          resolveAlphaHarmonyReplacement(
-            phone,
-            phones,
-            i,
-            prevTarget,
-            nextTarget,
-            isAlphaBack,
-            isAlphaRound,
-            inventory
+          applyStress(
+            resolveAlphaHarmonyReplacement(
+              phone,
+              phones,
+              i,
+              prevTarget,
+              nextTarget,
+              isAlphaBack,
+              isAlphaRound,
+              inventory
+            )
           )
         );
       } else if (toneMatch) {
-        output.push(applyToneToPhone(phone, toneMatch[1]));
+        output.push(applyStress(applyToneToPhone(phone, toneMatch[1])));
+      } else if (repPhones.length === 0) {
+        if (hasStressMark(phone) && !target.startsWith('ˈ')) {
+          carryStress = true;
+        }
       } else if (repPhones.length > 0 && hasStressMark(phone) && !target.startsWith('ˈ') && !hasStressMark(repPhones[0])) {
+        carryStress = false;
         output.push(`ˈ${repPhones[0]}`, ...repPhones.slice(1));
       } else {
-        output.push(...repPhones);
+        output.push(applyStress(repPhones[0]), ...repPhones.slice(1));
       }
     } else {
-      output.push(phone);
+      output.push(applyStress(phone));
     }
   }
   return output;
@@ -1211,6 +1243,58 @@ export function formatAgrCode(person: string, number: string): string {
   return `${person}${number.toLowerCase() === 'pl' ? 'pl' : 'sg'}`;
 }
 
+export function getLexemePrefixedTags(lex: Pick<Lexeme, 'semanticTags'> | undefined, prefix: string): string[] {
+  if (!lex?.semanticTags) return [];
+  const lowerPrefix = `${prefix.toLowerCase()}:`;
+  return lex.semanticTags
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t.startsWith(lowerPrefix))
+    .map((t) => t.slice(lowerPrefix.length))
+    .filter(Boolean);
+}
+
+export function lexemeHasTag(lex: Pick<Lexeme, 'semanticTags'> | undefined, tag: string): boolean {
+  if (!lex?.semanticTags) return false;
+  const target = tag.trim().toLowerCase();
+  return lex.semanticTags.some((t) => t.trim().toLowerCase() === target);
+}
+
+export function lexemeMatchesAllTags(lex: Pick<Lexeme, 'semanticTags'> | undefined, required: readonly string[]): boolean {
+  if (required.length === 0) return true;
+  return required.every((r) => lexemeHasTag(lex, r));
+}
+
+export function lexemeMatchesAnyTag(lex: Pick<Lexeme, 'semanticTags'> | undefined, candidates: readonly string[]): boolean {
+  if (candidates.length === 0) return true;
+  return candidates.some((c) => lexemeHasTag(lex, c));
+}
+
+export function filterCompatibleVerbsForSubject(
+  verbs: readonly Lexeme[],
+  subjLex: Lexeme | undefined,
+  semanticFilterEnabled: boolean
+): Lexeme[] {
+  if (!semanticFilterEnabled || !subjLex?.semanticTags?.length) return [...verbs];
+  const matched = verbs.filter((v) => {
+    const reqs = getLexemePrefixedTags(v, 'subj');
+    return reqs.length === 0 || lexemeMatchesAllTags(subjLex, reqs);
+  });
+  return matched.length > 0 ? matched : [...verbs];
+}
+
+export function filterNounsBySelection(
+  pool: readonly Lexeme[],
+  requiredTags: readonly string[],
+  disjunctive: boolean,
+  semanticFilterEnabled: boolean
+): Lexeme[] {
+  if (!semanticFilterEnabled || requiredTags.length === 0) return [...pool];
+  const matched = pool.filter((item) =>
+    disjunctive ? lexemeMatchesAnyTag(item, requiredTags) : lexemeMatchesAllTags(item, requiredTags)
+  );
+  return matched.length > 0 ? matched : [...pool];
+}
+
 export class ConfigurableSyntaxGenerator {
   protected readonly lexicon: InMemoryLexicon;
   public wordOrder: WordOrder;
@@ -1250,6 +1334,9 @@ export class ConfigurableSyntaxGenerator {
     const comps = lexemes.filter((l) => l.pos === 'COMP');
     const preps = lexemes.filter((l) => l.pos === 'PREP' || l.pos === 'POSTP');
 
+    const hasSemantics = lexemes.some((l) => (l.semanticTags?.length ?? 0) > 0);
+    const semanticFilter = hasSemantics && spec.constraints?.SemanticFilter !== 'false';
+
     const pickFrom = (items: Lexeme[], fallback: string): string =>
       items.length === 0 ? fallback : items[rng.next(items.length)].lemma;
 
@@ -1283,15 +1370,27 @@ export class ConfigurableSyntaxGenerator {
     const subjNumber = relHead ? relHead.number : (spec.constraints?.Number ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing'));
     const objNumber = spec.constraints?.Number ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
 
+    const subjVerbCandidates = verbs.filter((v) => v.lemma !== 'be');
+    const anySubjReqs = [...new Set(subjVerbCandidates.flatMap((v) => getLexemePrefixedTags(v, 'subj')))];
+
     const buildBasicNp = (
       rolePrefix: 'Subj' | 'Obj',
       gramCase: string,
       number: string,
       allowAdj: boolean,
-      avoidLemma?: string
-    ): { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string } => {
-      const pool = avoidLemma ? nouns.filter((n) => n.lemma !== avoidLemma) : nouns;
-      const nounLex = (pool.length > 0 ? pool : nouns)[rng.next(Math.max(1, (pool.length > 0 ? pool : nouns).length))];
+      avoidLemma?: string,
+      requiredSemTags: readonly string[] = [],
+      forceLemma?: string
+    ): { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string; lex?: Lexeme } => {
+      let pool = avoidLemma ? nouns.filter((n) => n.lemma !== avoidLemma) : nouns;
+      if (forceLemma && rolePrefix === 'Subj') {
+        const forced = nouns.find((n) => n.lemma.toLowerCase() === forceLemma.toLowerCase());
+        if (forced) pool = [forced];
+      } else if (semanticFilter && requiredSemTags.length > 0) {
+        pool = filterNounsBySelection(pool.length > 0 ? pool : nouns, requiredSemTags, rolePrefix === 'Subj', semanticFilter);
+      }
+      const finalPool = pool.length > 0 ? pool : nouns;
+      const nounLex = finalPool[rng.next(Math.max(1, finalPool.length))];
       const nounLemma = nounLex?.lemma ?? 'person';
       const headClass = nounLex?.lexClass?.trim();
 
@@ -1342,7 +1441,7 @@ export class ConfigurableSyntaxGenerator {
       }
 
       if (!adjLeaf && !relCp) {
-        return { node: nLeaf, person: '3', number, headLemma: nounLemma, headClass };
+        return { node: nLeaf, person: '3', number, headLemma: nounLemma, headClass, lex: nounLex };
       }
 
       const npCfg = cfgMap.get('NP');
@@ -1374,20 +1473,36 @@ export class ConfigurableSyntaxGenerator {
         number,
         headLemma: nounLemma,
         headClass,
+        lex: nounLex,
       };
     };
 
-    const subj = relHead
-      ? { node: null as SyntaxNode | null, person: '3', number: relHead.number, headLemma: relHead.headLemma, headClass: relHead.headClass }
-      : buildBasicNp('Subj', cases.subjCase, subjNumber, spec.approxWords >= 4);
+    const subjReqTags =
+      this.clauseTemplate === 'Copular'
+        ? []
+        : isPassive
+          ? ['concrete']
+          : anySubjReqs;
 
-    let objInfo: { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string } | null = null;
+    const subj = relHead
+      ? { node: null as SyntaxNode | null, person: '3', number: relHead.number, headLemma: relHead.headLemma, headClass: relHead.headClass, lex: this.lexicon.resolveExact(relHead.headLemma) }
+      : buildBasicNp('Subj', cases.subjCase, subjNumber, spec.approxWords >= 4, undefined, subjReqTags, depth === 0 ? spec.constraints?.ForceSubjLemma : undefined);
+
+    const compatVerbs = this.clauseTemplate === 'Copular' ? verbs : filterCompatibleVerbsForSubject(verbs, isPassive ? undefined : subj.lex, semanticFilter);
+    const chosenVerbLemma =
+      this.clauseTemplate === 'Copular'
+        ? (this.lexicon.resolveExact('be') ? 'be' : 'e')
+        : pickFrom(compatVerbs, 'see');
+    const chosenVerbLex = compatVerbs.find((v) => v.lemma === chosenVerbLemma);
+    const objReqTags = getLexemePrefixedTags(chosenVerbLex, 'obj');
+
+    let objInfo: { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string; lex?: Lexeme } | null = null;
     let cpObjNode: SyntaxNode | null = null;
 
     if (canEmbed) {
       const compLex = comps[0];
       const embedded = this.buildClauseNode(
-        { clauseType: 'Transitive', approxWords: Math.max(3, spec.approxWords - 2), constraints: { Tense: tense } },
+        { clauseType: 'Transitive', approxWords: Math.max(3, spec.approxWords - 2), constraints: { Tense: tense, SemanticFilter: spec.constraints?.SemanticFilter ?? 'true' } },
         rng,
         depth + 1,
         null
@@ -1402,14 +1517,11 @@ export class ConfigurableSyntaxGenerator {
       }
       cpObjNode = new SyntaxNode('CP', 'CompCP', new FeatBundle([{ name: 'Role', value: 'CompCP' }]), cpChildren);
     } else if (this.clauseTemplate === 'Transitive' && !isPassive) {
-      objInfo = buildBasicNp('Obj', cases.objCase, objNumber, spec.approxWords >= 5, subj.headLemma);
+      objInfo = buildBasicNp('Obj', cases.objCase, objNumber, spec.approxWords >= 5, subj.headLemma, objReqTags);
     }
 
-    const verbLemma =
-      this.clauseTemplate === 'Copular'
-        ? (this.lexicon.resolveExact('be') ? 'be' : 'e')
-        : pickFrom(verbs, 'see');
-    const verbLex = verbs.find((v) => v.lemma === verbLemma);
+    const verbLemma = chosenVerbLemma;
+    const verbLex = chosenVerbLex;
     const verbClass = verbLex?.lexClass?.trim();
 
     const verbFeats: Feat[] = [
@@ -1773,8 +1885,8 @@ export class Morphology {
 
   private static readonly MULTI_CHAR_SEGMENTS = new Set([
     'iː', 'eɪ', 'oʊ', 'ɔː', 'uː', 'ɑː', 'ɝː', 'aɪ', 'aʊ', 'ɔɪ',
-    'yː', 'øː',
-    'tʃ', 'dʒ', 'pʰ', 'tʰ', 'kʰ',
+    'yː', 'øː', 'eː', 'oː',
+    'tʃ', 'dʒ', 'ts', 'dz', 'pʰ', 'tʰ', 'kʰ', 'bʰ', 'dʰ', 'gʰ',
   ]);
 
   public static splitPhones(source: string): string[] {
@@ -2197,6 +2309,17 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
     const rels = lexemes.filter((l) => l.pos === 'REL');
     const qParts = lexemes.filter((l) => l.pos === 'Q' || l.pos === 'PART');
 
+    const hasSemantics = lexemes.some((l) => (l.semanticTags?.length ?? 0) > 0);
+    const semanticFilter = hasSemantics && spec.constraints?.SemanticFilter !== 'false';
+    const trackDefiniteness = spec.constraints?.TrackDefiniteness === 'true';
+    const introducedSet = new Set(
+      (spec.constraints?.IntroducedLemmas ?? '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+    );
+    const forceSubjLemma = depth === 0 ? spec.constraints?.ForceSubjLemma : undefined;
+
     const pick = <T,>(list: T[]): T | undefined => (list.length > 0 ? list[rng.next(list.length)] : undefined);
 
     const mood = depth === 0 ? resolveMoodFromSpec(spec) : 'Decl';
@@ -2235,16 +2358,76 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
     const hasDirectObject = requestedTemplate === 'Transitive' && !isPassive && !canEmbed;
     const cases = resolveAlignmentCases(cfg.alignment, hasDirectObject);
 
+    const pickDetForNoun = (
+      rolePrefix: 'Subj' | 'Obj',
+      nounLex: Lexeme | undefined,
+      nounLemma: string,
+      number: string
+    ): Lexeme | undefined => {
+      if (dets.length === 0) return undefined;
+      const isMass = nounLemma.toLowerCase() === 'water' || lexemeHasTag(nounLex, 'mass');
+      let compatibleDets =
+        number === 'Pl' || isMass
+          ? dets.filter((d) => d.lemma.toLowerCase() !== 'a' && d.lemma.toLowerCase() !== 'an')
+          : dets;
+
+      const explicitDet = rolePrefix === 'Subj' ? spec.constraints?.SubjDet : spec.constraints?.ObjDet;
+      if (explicitDet === 'def') {
+        const defs = compatibleDets.filter((d) => lexemeHasTag(d, 'det:def') || d.lemma.toLowerCase() === 'the');
+        if (defs.length > 0) compatibleDets = defs;
+      } else if (explicitDet === 'indef') {
+        const indefs = compatibleDets.filter(
+          (d) => lexemeHasTag(d, 'det:indef') || d.lemma.toLowerCase() === 'a' || d.lemma.toLowerCase() === 'an'
+        );
+        if (indefs.length > 0) compatibleDets = indefs;
+      } else if (trackDefiniteness) {
+        const alreadyIntroduced = introducedSet.has(nounLemma.toLowerCase());
+        const targetDetPool = alreadyIntroduced
+          ? compatibleDets.filter((d) => lexemeHasTag(d, 'det:def') || d.lemma.toLowerCase() === 'the')
+          : compatibleDets.filter(
+              (d) => lexemeHasTag(d, 'det:indef') || d.lemma.toLowerCase() === 'a' || d.lemma.toLowerCase() === 'an'
+            );
+        if (targetDetPool.length > 0) compatibleDets = targetDetPool;
+      }
+
+      return pick(compatibleDets.length > 0 ? compatibleDets : dets);
+    };
+
     const buildNp = (
       rolePrefix: 'Subj' | 'Obj',
       gramCase: string,
       avoidLemma?: string,
       allowPronouns = true,
-      allowRelative = true
-    ): { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string; isPron: boolean } => {
+      allowRelative = true,
+      requiredSemTags: readonly string[] = [],
+      disjunctiveSem = false,
+      forceLemma?: string
+    ): { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string; isPron: boolean; lex?: Lexeme } => {
       const eligibleProns = avoidLemma ? prons.filter((p) => p.lemma !== avoidLemma) : prons;
-      if (allowPronouns && eligibleProns.length > 0 && rng.nextDouble() < 0.35) {
-        const pron = pick(eligibleProns)!;
+      const forcedPron =
+        forceLemma && allowPronouns
+          ? eligibleProns.find((p) => p.lemma.toLowerCase() === forceLemma.toLowerCase())
+          : undefined;
+      const semEligibleProns =
+        semanticFilter && requiredSemTags.length > 0
+          ? eligibleProns.filter((p) =>
+              disjunctiveSem ? lexemeMatchesAnyTag(p, requiredSemTags) : lexemeMatchesAllTags(p, requiredSemTags)
+            )
+          : eligibleProns;
+      const forcedNoun =
+        forceLemma && !forcedPron
+          ? nouns.find((n) => n.lemma.toLowerCase() === forceLemma.toLowerCase())
+          : undefined;
+
+      if (
+        forcedPron ||
+        (!forcedNoun &&
+          allowPronouns &&
+          semEligibleProns.length > 0 &&
+          !trackDefiniteness &&
+          rng.nextDouble() < 0.35)
+      ) {
+        const pron = forcedPron ?? pick(semEligibleProns)!;
         const lower = pron.lemma.toLowerCase();
         const person = lower === 'i' || lower === 'we' ? '1' : lower === 'you' ? '2' : '3';
         const number = constrainedNumber ?? (lower === 'they' || lower === 'we' || lower === 'you' ? 'Pl' : 'Sing');
@@ -2257,31 +2440,29 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
         ];
         if (pronClass) pronFeats.push({ name: 'Class', value: pronClass });
         const pronNode = new SyntaxNode('PRON', pron.lemma, new FeatBundle(pronFeats));
-        return { node: pronNode, person, number, headLemma: pron.lemma, headClass: pronClass, isPron: true };
+        return { node: pronNode, person, number, headLemma: pron.lemma, headClass: pronClass, isPron: true, lex: pron };
       }
 
-      const pool = nouns.filter((n) => n.lemma !== avoidLemma);
+      let pool = avoidLemma ? nouns.filter((n) => n.lemma !== avoidLemma) : nouns;
+      if (forcedNoun) {
+        pool = [forcedNoun];
+      } else if (semanticFilter && requiredSemTags.length > 0) {
+        pool = filterNounsBySelection(pool.length > 0 ? pool : nouns, requiredSemTags, disjunctiveSem, semanticFilter);
+      }
       const noun = pick(pool.length > 0 ? pool : nouns);
       const nounLemma = noun?.lemma ?? 'person';
       const headClass = noun?.lexClass?.trim();
       const number = constrainedNumber ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
 
       let detNode: SyntaxNode | null = null;
-      if (dets.length > 0) {
-        const isMass = nounLemma.toLowerCase() === 'water';
-        const compatibleDets =
-          number === 'Pl' || isMass
-            ? dets.filter((d) => d.lemma.toLowerCase() !== 'a' && d.lemma.toLowerCase() !== 'an')
-            : dets;
-        const det = pick(compatibleDets.length > 0 ? compatibleDets : dets);
-        if (det) {
-          const detFeats: Feat[] = [
-            { name: 'Role', value: 'Det' },
-            { name: 'Number', value: number },
-          ];
-          if (headClass) detFeats.push({ name: 'Class', value: headClass });
-          detNode = new SyntaxNode('DET', det.lemma, new FeatBundle(detFeats));
-        }
+      const det = pickDetForNoun(rolePrefix, noun, nounLemma, number);
+      if (det) {
+        const detFeats: Feat[] = [
+          { name: 'Role', value: 'Det' },
+          { name: 'Number', value: number },
+        ];
+        if (headClass) detFeats.push({ name: 'Class', value: headClass });
+        detNode = new SyntaxNode('DET', det.lemma, new FeatBundle(detFeats));
       }
 
       let adjNode: SyntaxNode | null = null;
@@ -2320,7 +2501,18 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
       if (wantRel) {
         const relWord = rels[0] ?? comps[0];
         const innerClause = this.buildPhraseClause(
-          { clauseType: 'Transitive', approxWords: 3, constraints: { Tense: tense, Voice: 'Active', Relative: 'false', Embedded: 'false' } },
+          {
+            clauseType: 'Transitive',
+            approxWords: 3,
+            constraints: {
+              Tense: tense,
+              Voice: 'Active',
+              Relative: 'false',
+              Embedded: 'false',
+              SemanticFilter: spec.constraints?.SemanticFilter ?? 'true',
+              ...(trackDefiniteness ? { TrackDefiniteness: 'true', IntroducedLemmas: spec.constraints?.IntroducedLemmas ?? '' } : {}),
+            },
+          },
           rng,
           depth + 1,
           { headLemma: nounLemma, number, headClass }
@@ -2365,8 +2557,17 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
         new FeatBundle([{ name: 'Role', value: `${rolePrefix}NP` }]),
         children
       );
-      return { node: np, person: '3', number, headLemma: nounLemma, headClass, isPron: false };
+      return { node: np, person: '3', number, headLemma: nounLemma, headClass, isPron: false, lex: noun };
     };
+
+    const subjVerbCandidates = verbs.filter((v) => v.lemma !== 'be');
+    const anySubjReqs = [...new Set(subjVerbCandidates.flatMap((v) => getLexemePrefixedTags(v, 'subj')))];
+    const subjReqTags =
+      requestedTemplate === 'Copular'
+        ? []
+        : isPassive
+          ? ['concrete']
+          : anySubjReqs;
 
     const subj = relHead
       ? {
@@ -2376,10 +2577,36 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
           headLemma: relHead.headLemma,
           headClass: relHead.headClass,
           isPron: false,
+          lex: this.lexRef.resolveExact(relHead.headLemma),
         }
-      : buildNp('Subj', cases.subjCase, undefined, spec.constraints?.Relative !== 'true', true);
+      : buildNp(
+          'Subj',
+          cases.subjCase,
+          undefined,
+          spec.constraints?.Relative !== 'true',
+          true,
+          subjReqTags,
+          true,
+          forceSubjLemma
+        );
 
-    let obj: { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string; isPron: boolean } | null = null;
+    const rawVerbPool =
+      requestedTemplate === 'Copular'
+        ? verbs.filter((v) => v.lemma === 'be')
+        : verbs.filter((v) => v.lemma !== 'be');
+    const verbPool =
+      requestedTemplate === 'Copular'
+        ? rawVerbPool
+        : filterCompatibleVerbsForSubject(rawVerbPool, isPassive ? undefined : subj.lex, semanticFilter);
+    const chosenVerbLex =
+      requestedTemplate === 'Copular'
+        ? this.lexRef.resolveExact('be')
+        : pick(verbPool.length > 0 ? verbPool : verbs);
+    const chosenVerb = chosenVerbLex?.lemma ?? (requestedTemplate === 'Copular' ? 'be' : 'see');
+    const verbClass = chosenVerbLex?.lexClass?.trim();
+    const objReqTags = getLexemePrefixedTags(chosenVerbLex, 'obj');
+
+    let obj: { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string; isPron: boolean; lex?: Lexeme } | null = null;
     let cpObj: SyntaxNode | null = null;
     let agentPp: SyntaxNode | null = null;
 
@@ -2389,7 +2616,13 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
         {
           clauseType: 'Transitive',
           approxWords: Math.max(3, spec.approxWords - 2),
-          constraints: { Tense: tense, Voice: 'Active', Embedded: 'false' },
+          constraints: {
+            Tense: tense,
+            Voice: 'Active',
+            Embedded: 'false',
+            SemanticFilter: spec.constraints?.SemanticFilter ?? 'true',
+            ...(trackDefiniteness ? { TrackDefiniteness: 'true', IntroducedLemmas: spec.constraints?.IntroducedLemmas ?? '' } : {}),
+          },
         },
         rng,
         depth + 1,
@@ -2407,25 +2640,15 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
     } else if (isPassive) {
       if (spec.approxWords >= 5 && preps.length > 0 && nouns.length > 0) {
         const agentPrep = preps.find((p) => p.lemma.toLowerCase() === 'by') ?? pick(preps)!;
-        const agentNp = buildNp('Obj', cases.obliqueCase, subj.headLemma, true, false);
+        const agentReqs = getLexemePrefixedTags(agentPrep, 'pp');
+        const agentNp = buildNp('Obj', cases.obliqueCase, subj.headLemma, true, false, agentReqs, true);
         const prepLeaf = new SyntaxNode(agentPrep.pos, agentPrep.lemma, new FeatBundle([{ name: 'Role', value: 'Prep' }]));
         const ppChildren = cfg.adpositionType === 'Postposition' ? [agentNp.node, prepLeaf] : [prepLeaf, agentNp.node];
         agentPp = new SyntaxNode('PP', 'AgentPP', new FeatBundle([{ name: 'Role', value: 'PP' }]), ppChildren);
       }
     } else if (requestedTemplate === 'Transitive') {
-      obj = buildNp('Obj', cases.objCase, subj.headLemma, true, false);
+      obj = buildNp('Obj', cases.objCase, subj.headLemma, objReqTags.length === 0, false, objReqTags, true);
     }
-
-    const verbPool =
-      requestedTemplate === 'Copular'
-        ? verbs.filter((v) => v.lemma === 'be')
-        : verbs.filter((v) => v.lemma !== 'be');
-    const chosenVerbLex =
-      requestedTemplate === 'Copular'
-        ? this.lexRef.resolveExact('be')
-        : pick(verbPool.length > 0 ? verbPool : verbs);
-    const chosenVerb = chosenVerbLex?.lemma ?? (requestedTemplate === 'Copular' ? 'be' : 'see');
-    const verbClass = chosenVerbLex?.lexClass?.trim();
 
     const beLex = this.lexRef.resolveExact('be');
     const wantFutureAux = tense === 'Fut' && auxes.some((a) => a.lemma === 'will') && mood !== 'Imp';
@@ -2636,8 +2859,10 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
     let appendedPp = false;
     let extraPp: SyntaxNode | null = agentPp;
     if (!extraPp && !canEmbed && spec.approxWords >= 6 && preps.length > 0 && nouns.length > 0) {
-      const prep = pick(preps)!;
-      const pobj = buildNp('Obj', cases.obliqueCase, subj.headLemma, true, false);
+      const ppCandidates = preps.filter((p) => p.lemma.toLowerCase() !== 'by');
+      const prep = pick(ppCandidates.length > 0 ? ppCandidates : preps)!;
+      const ppReqs = getLexemePrefixedTags(prep, 'pp');
+      const pobj = buildNp('Obj', cases.obliqueCase, subj.headLemma, ppReqs.length === 0, false, ppReqs, true);
       const prepLeaf = new SyntaxNode(prep.pos, prep.lemma, new FeatBundle([{ name: 'Role', value: 'Prep' }]));
       const customPp = cfgMap.get('PP');
       const ppChildren = customPp
@@ -2999,6 +3224,391 @@ export class LangEngine {
       tree: sTree,
     };
   }
+
+  public generateDiscourse(rng: RNG, options: DiscourseOptions = {}): DiscourseResult {
+    const count = Math.max(1, Math.min(10, options.sentenceCount ?? 4));
+    const approxWords = Math.max(2, options.approxWords ?? 6);
+    const trackDefiniteness = options.trackDefiniteness ?? true;
+    const useAnaphoricPronouns = options.useAnaphoricPronouns ?? true;
+    const useConnectives = options.useConnectives ?? true;
+    const enforceSemantics = options.enforceSelectionalRestrictions ?? true;
+
+    const allLexemes = this.morphology.lexicon.getAll();
+    const prons = allLexemes.filter((l) => l.pos === 'PRON');
+    const thirdPersonProns = prons.filter((p) => {
+      const low = p.lemma.toLowerCase();
+      return low !== 'i' && low !== 'we' && low !== 'you';
+    });
+
+    const introduced = new Map<string, { number: string; animate: boolean }>();
+    let lastTopic: { lemma: string; number: string; animate: boolean } | null = null;
+    const sentences: DiscourseSentenceItem[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const constraints: Record<string, string> = { ...(options.constraints ?? {}) };
+      if (!constraints.SemanticFilter) {
+        constraints.SemanticFilter = enforceSemantics ? 'true' : 'false';
+      }
+      if (trackDefiniteness) {
+        constraints.TrackDefiniteness = 'true';
+        constraints.IntroducedLemmas = Array.from(introduced.keys()).join(',');
+      }
+      if (!constraints.Mood) {
+        constraints.Mood = 'Decl';
+      }
+
+      if (i > 0 && lastTopic && rng.nextDouble() < 0.72) {
+        const isPl = lastTopic.number.toLowerCase() === 'pl';
+        const matchingPron = isPl
+          ? thirdPersonProns.find((p) => ['they', 'them'].includes(p.lemma.toLowerCase()))
+          : thirdPersonProns.find((p) => ['she', 'he', 'they'].includes(p.lemma.toLowerCase()));
+
+        if (useAnaphoricPronouns && lastTopic.animate && matchingPron && rng.nextDouble() < 0.58) {
+          constraints.ForceSubjLemma = matchingPron.lemma;
+          constraints.Number = lastTopic.number;
+        } else {
+          constraints.ForceSubjLemma = lastTopic.lemma;
+          constraints.Number = lastTopic.number;
+          if (trackDefiniteness) constraints.SubjDet = 'def';
+        }
+      }
+
+      if (useConnectives && i > 0 && approxWords >= 6 && rng.nextDouble() < 0.3 && !constraints.Coordinated) {
+        constraints.Coordinated = 'true';
+      }
+
+      const generated = this.generateSentence(rng, {
+        clauseType: this.syntax.clauseTemplate,
+        approxWords,
+        constraints,
+      });
+
+      const leaves = generated.tree.linearize();
+      const entitiesMentioned: string[] = [];
+      let nextTopic: { lemma: string; number: string; animate: boolean } | null = null;
+
+      for (const leaf of leaves) {
+        if (leaf.pos === 'N' && leaf.lemmaId) {
+          const low = leaf.lemmaId.toLowerCase();
+          const num = leaf.features.items.find((f) => f.name === 'Number')?.value ?? 'Sing';
+          const lex = this.morphology.lexicon.resolveExact(leaf.lemmaId);
+          const animate = lexemeHasTag(lex, 'animate') || lexemeHasTag(lex, 'human') || lexemeHasTag(lex, 'animal');
+          if (!introduced.has(low)) {
+            introduced.set(low, { number: num, animate });
+          }
+          entitiesMentioned.push(leaf.lemmaId);
+          const role = leaf.features.items.find((f) => f.name === 'Role')?.value;
+          if (role === 'Subj' && !nextTopic) {
+            nextTopic = { lemma: leaf.lemmaId, number: num, animate };
+          }
+        }
+      }
+
+      if (nextTopic) {
+        lastTopic = nextTopic;
+      }
+
+      let finalWritten = generated.written.trim();
+      if (finalWritten && !/[.!?]$/.test(finalWritten)) {
+        finalWritten += '.';
+      }
+
+      sentences.push({
+        index: i + 1,
+        written: finalWritten,
+        surface: generated.surface,
+        entitiesMentioned,
+        issues: generated.issues,
+      });
+    }
+
+    return {
+      paragraph: sentences.map((s) => s.written).join(' '),
+      sentences,
+      trackedEntities: Array.from(introduced.keys()),
+    };
+  }
+}
+
+export interface DiachronicPresetSpec {
+  id: string;
+  name: string;
+  description: string;
+  sampleProtoForms: string[];
+  rules: DiachronicRule[];
+}
+
+export const DIACHRONIC_PRESETS: readonly DiachronicPresetSpec[] = [
+  {
+    id: 'great-vowel-shift',
+    name: 'Great Vowel Shift & Silent Clusters (Middle -> Modern English)',
+    description: 'High vowel diphthongization (iː->aɪ, uː->aʊ), long vowel raising (eː->iː, oː->uː), and initial kn-/gh simplification.',
+    sampleProtoForms: ['ˈk n iː x t', 'ˈm uː s', 'ˈg oː s', 'ˈn aː m ə', 'ˈs eː'],
+    rules: [
+      { Name: 'High Front Diphthongization (*iː -> aɪ)', Era: 'GVS Stage 1', Target: 'iː', Replacement: 'aɪ', Enabled: true },
+      { Name: 'High Back Diphthongization (*uː -> aʊ)', Era: 'GVS Stage 1', Target: 'uː', Replacement: 'aʊ', Enabled: true },
+      { Name: 'Mid Front Raising (*eː -> iː)', Era: 'GVS Stage 2', Target: 'eː', Replacement: 'iː', Enabled: true },
+      { Name: 'Mid Back Raising (*oː -> uː)', Era: 'GVS Stage 2', Target: 'oː', Replacement: 'uː', Enabled: true },
+      { Name: 'Low Front Raising (*aː -> eɪ)', Era: 'GVS Stage 2', Target: 'aː', Replacement: 'eɪ', Enabled: true },
+      { Name: 'Pre-Nasal /k/ Cluster Reduction (*kn -> n)', Era: 'Early ModE', Target: 'k', Replacement: '∅', PrevPhone: '#', NextPhone: 'n', Enabled: true },
+      { Name: 'Post-Vowel Velar Fricative Loss (*x -> ∅)', Era: 'Early ModE', Target: 'x', Replacement: '∅', NextPhone: 't', Enabled: true },
+    ],
+  },
+  {
+    id: 'grimms-law',
+    name: "Grimm's Law (PIE -> Proto-Germanic Chain Shift)",
+    description: 'Classic chain shift: voiceless stops spirantize, voiced stops devoice, voiced aspirates deaspirate.',
+    sampleProtoForms: ['p a t e r', 'k o r d', 'bʰ r aː t e r', 'dʰ u gʰ a t e r'],
+    rules: [
+      { Name: 'Bilabial Spirantization (*p -> f)', Era: "Grimm's I", Target: 'p', Replacement: 'f', Enabled: true },
+      { Name: 'Alveolar Spirantization (*t -> θ)', Era: "Grimm's I", Target: 't', Replacement: 'θ', Enabled: true },
+      { Name: 'Velar Spirantization (*k -> x)', Era: "Grimm's I", Target: 'k', Replacement: 'x', Enabled: true },
+      { Name: 'Bilabial Devoicing (*b -> p)', Era: "Grimm's II", Target: 'b', Replacement: 'p', Enabled: true },
+      { Name: 'Alveolar Devoicing (*d -> t)', Era: "Grimm's II", Target: 'd', Replacement: 't', Enabled: true },
+      { Name: 'Velar Devoicing (*g -> k)', Era: "Grimm's II", Target: 'g', Replacement: 'k', Enabled: true },
+      { Name: 'Aspirate Deaspiration (*bʰ -> b)', Era: "Grimm's III", Target: 'bʰ', Replacement: 'b', Enabled: true },
+      { Name: 'Aspirate Deaspiration (*dʰ -> d)', Era: "Grimm's III", Target: 'dʰ', Replacement: 'd', Enabled: true },
+      { Name: 'Aspirate Deaspiration (*gʰ -> g)', Era: "Grimm's III", Target: 'gʰ', Replacement: 'g', Enabled: true },
+    ],
+  },
+  {
+    id: 'romance-lenition',
+    name: 'Western Romance Lenition & Palatalization (Latin -> Romance)',
+    description: 'Intervocalic voiced stop loss/spirantization followed by intervocalic voiceless stop voicing + palatalization before front vowels.',
+    sampleProtoForms: ['w i t a', 'k e n t u m', 'k a p u t', 'f i d e m'],
+    rules: [
+      { Name: 'Intervocalic *d Loss (V_V)', Era: 'Vulgar Latin', Target: 'd', Replacement: '∅', PrevPhone: 'V', NextPhone: 'V', Enabled: true },
+      { Name: 'Intervocalic *b Spirantization (V_V)', Era: 'Vulgar Latin', Target: 'b', Replacement: 'v', PrevPhone: 'V', NextPhone: 'V', Enabled: true },
+      { Name: 'Intervocalic *p Voicing (V_V)', Era: 'Western Romance', Target: 'p', Replacement: 'b', PrevPhone: 'V', NextPhone: 'V', Enabled: true },
+      { Name: 'Intervocalic *t Voicing (V_V)', Era: 'Western Romance', Target: 't', Replacement: 'd', PrevPhone: 'V', NextPhone: 'V', Enabled: true },
+      { Name: 'Intervocalic *k Voicing (V_V)', Era: 'Western Romance', Target: 'k', Replacement: 'g', PrevPhone: 'V', NextPhone: 'V', Enabled: true },
+      { Name: 'Velar Palatalization before /i/ (*k -> tʃ)', Era: 'Romance Palatalization', Target: 'k', Replacement: 'tʃ', NextPhone: 'i', Enabled: true },
+      { Name: 'Velar Palatalization before /e/ (*k -> tʃ)', Era: 'Romance Palatalization', Target: 'k', Replacement: 'tʃ', NextPhone: 'e', Enabled: true },
+    ],
+  },
+  {
+    id: 'japanese-h-lenition',
+    name: 'Old -> Modern Japanese Consonantal Shift (/p/ -> /ɸ/ -> /h/)',
+    description: 'Labial stop lenition across eras plus alveolar palatalization/affrication before high vowels.',
+    sampleProtoForms: ['p a n a', 'p i t o', 'p u t a', 't u k i'],
+    rules: [
+      { Name: 'Labial Spirantization (*p -> ɸ)', Era: 'Nara -> Heian', Target: 'p', Replacement: 'ɸ', NextPhone: 'V', Enabled: true },
+      { Name: 'Pre-High-Front Palatalization (*t -> tʃ / __i)', Era: 'Late Middle Japanese', Target: 't', Replacement: 'tʃ', NextPhone: 'i', Enabled: true },
+      { Name: 'Pre-High-Back Affrication (*t -> ts / __u)', Era: 'Late Middle Japanese', Target: 't', Replacement: 'ts', NextPhone: 'u', Enabled: true },
+      { Name: 'Delabialization (*ɸ -> h)', Era: 'Early Modern Japanese', Target: 'ɸ', Replacement: 'h', Enabled: true },
+    ],
+  },
+];
+
+function computeDiachronicStressSet(
+  phones: readonly string[],
+  inventory: readonly Phoneme[],
+  stressPattern: StressPattern,
+  syllabifier: Syllabifier
+): Set<number> {
+  const stressed = new Set<number>();
+  const hasExplicit = phones.some(hasStressMark);
+  if ((stressPattern === 'None' && !hasExplicit) || phones.length === 0) return stressed;
+  const syls = syllabifier.split(phones);
+  const eff = hasExplicit && stressPattern === 'None' ? 'Lexical' : stressPattern;
+  const idx = resolveStressSyllableIndex(syls.length, eff, syls);
+  if (idx < 0) return stressed;
+  let offset = 0;
+  for (let i = 0; i < syls.length; i++) {
+    const len = syls[i].onset.length + syls[i].nucleus.length + syls[i].coda.length;
+    if (i === idx) {
+      for (let k = offset; k < offset + len; k++) stressed.add(k);
+      break;
+    }
+    offset += len;
+  }
+  void inventory;
+  return stressed;
+}
+
+export function traceProtoForm(
+  protoUr: string,
+  rules: readonly DiachronicRule[],
+  state: LanguageProjectState
+): { daughterPhones: string[]; steps: DiachronicStepTrace[] } {
+  const initial = Morphology.splitPhones(protoUr);
+  const tactics = new Phonotactics(state.Phonotactics);
+  const syllabifier = new Syllabifier(state.Phonemes.filter((p) => p.type === 'V'), tactics);
+  const steps: DiachronicStepTrace[] = [];
+
+  let current = [...initial];
+  for (const rule of rules) {
+    if (!rule.Enabled) continue;
+    const stressed = computeDiachronicStressSet(current, state.Phonemes, state.StressPattern, syllabifier);
+    const next = applyRuleSpec(
+      {
+        name: rule.Name,
+        target: rule.Target,
+        replacement: rule.Replacement,
+        prevPhone: rule.PrevPhone ?? null,
+        nextPhone: rule.NextPhone ?? null,
+        condition: rule.Condition ?? '',
+        enabled: true,
+      },
+      current,
+      state.Phonemes,
+      stressed,
+      syllabifier
+    );
+    const changed = next.join(' ') !== current.join(' ');
+    steps.push({
+      ruleName: rule.Name,
+      era: rule.Era ?? '',
+      phones: next,
+      changed,
+    });
+    current = next;
+  }
+
+  return { daughterPhones: current, steps };
+}
+
+export function simulateDiachronicEvolution(state: LanguageProjectState): DiachronicSimulationResult {
+  const rules = state.DiachronicRules ?? [];
+  const engine = buildEngineFromState(state);
+
+  const protoPhoneSet = new Set<string>();
+  const daughterPhoneSet = new Set<string>();
+  const cognates: DiachronicCognateDiff[] = [];
+
+  for (const lex of state.Lexemes) {
+    const sourceUr = lex.ProtoUR?.trim() ? lex.ProtoUR : lex.UR;
+    const initialPhones = Morphology.splitPhones(sourceUr);
+    for (const ph of initialPhones) protoPhoneSet.add(stripSuprasegmentals(ph));
+
+    const { daughterPhones, steps } = traceProtoForm(sourceUr, rules, state);
+    for (const ph of daughterPhones) daughterPhoneSet.add(stripSuprasegmentals(ph));
+
+    const daughterUr = daughterPhones.join(' ');
+    const daughterWritten = engine.orthography.renderWordsWithTokens([
+      {
+        surface: daughterPhones.join(''),
+        lemma: lex.Lemma,
+        pos: lex.Pos,
+        spelling: lex.Spelling,
+      },
+    ]).text;
+
+    cognates.push({
+      lemma: lex.Lemma,
+      pos: lex.Pos,
+      protoUr: initialPhones.join(' '),
+      daughterPhones,
+      daughterUr,
+      daughterWritten,
+      changed: initialPhones.join(' ') !== daughterUr,
+      steps,
+    });
+  }
+
+  const affixDiffs: DiachronicAffixDiff[] = state.Affixes.map((afx) => {
+    const kind = Morphology.getEffectiveAffixType({ affixType: afx.AffixType, isPrefix: afx.IsPrefix });
+    if (!afx.Enabled || kind === 'Template') {
+      return {
+        name: afx.Name,
+        pos: afx.Pos,
+        protoAffix: afx.Affix,
+        daughterAffix: afx.Affix,
+        changed: false,
+      };
+    }
+    const prefixHyphen = afx.Affix.trim().startsWith('-') ? '-' : '';
+    const suffixHyphen = afx.Affix.trim().endsWith('-') ? '-' : '';
+    const cleaned = afx.Affix.replace(/-/g, '').trim();
+    if (!cleaned || afx.Affix.includes('...') || afx.Affix.includes('+')) {
+      return {
+        name: afx.Name,
+        pos: afx.Pos,
+        protoAffix: afx.Affix,
+        daughterAffix: afx.Affix,
+        changed: false,
+      };
+    }
+    const { daughterPhones } = traceProtoForm(cleaned, rules, state);
+    const rebuilt = `${prefixHyphen}${daughterPhones.join(' ')}${suffixHyphen}`;
+    return {
+      name: afx.Name,
+      pos: afx.Pos,
+      protoAffix: afx.Affix,
+      daughterAffix: rebuilt,
+      changed: afx.Affix !== rebuilt,
+    };
+  });
+
+  const existingInv = new Set(state.Phonemes.map((p) => stripSuprasegmentals(p.symbol)));
+  const emergentPhones = Array.from(daughterPhoneSet).filter((p) => p && !existingInv.has(p));
+  const lostPhones = Array.from(protoPhoneSet).filter((p) => p && !daughterPhoneSet.has(p));
+  const changedCount = cognates.filter((c) => c.changed).length;
+
+  return {
+    cognates,
+    affixDiffs,
+    emergentPhones,
+    lostPhones,
+    changedCount,
+  };
+}
+
+export function applyDiachronicEvolutionToProject(
+  state: LanguageProjectState,
+  options: { preserveHistoricalSpelling?: boolean; daughterName?: string } = {}
+): LanguageProjectState {
+  const preserveSpelling = options.preserveHistoricalSpelling ?? true;
+  const rules = state.DiachronicRules ?? [];
+  const sim = simulateDiachronicEvolution(state);
+  const engine = buildEngineFromState(state);
+
+  const evolvedLexemes = state.Lexemes.map((lex) => {
+    const cognate = sim.cognates.find((c) => c.lemma === lex.Lemma);
+    if (!cognate) return lex;
+    const preShiftSpelling =
+      lex.Spelling ??
+      (preserveSpelling
+        ? engine.orthography.renderWordsWithTokens([
+            { surface: Morphology.splitPhones(cognate.protoUr).join(''), lemma: lex.Lemma, pos: lex.Pos },
+          ]).text.toLowerCase()
+        : undefined);
+
+    return {
+      ...lex,
+      ProtoUR: lex.ProtoUR?.trim() || cognate.protoUr,
+      UR: cognate.daughterUr || cognate.protoUr,
+      ...(preShiftSpelling ? { Spelling: preShiftSpelling } : {}),
+    };
+  });
+
+  const evolvedAffixes = state.Affixes.map((afx, idx) => {
+    const diff = sim.affixDiffs[idx];
+    if (!diff || !diff.changed) return afx;
+    return { ...afx, Affix: diff.daughterAffix };
+  });
+
+  const nextPhonemes = [...state.Phonemes];
+  const existingSet = new Set(nextPhonemes.map((p) => stripSuprasegmentals(p.symbol)));
+  for (const em of sim.emergentPhones) {
+    if (!existingSet.has(em)) {
+      const guessVowel = isVowelSymbol(em, state.Phonemes);
+      nextPhonemes.push(createPhoneme(em, guessVowel ? 'V' : 'C'));
+      existingSet.add(em);
+    }
+  }
+
+  return normalizeLoadedProjectState({
+    ...state,
+    Name: options.daughterName?.trim() || `${state.Name} (Evolved)`,
+    Phonemes: nextPhonemes,
+    Lexemes: evolvedLexemes,
+    Affixes: evolvedAffixes,
+    DiachronicRules: rules.map((r) => ({ ...r, Enabled: false })),
+    Pipeline: preserveSpelling
+      ? { ...state.Pipeline, orthographyRendererId: 'morphophonemic-orthography' }
+      : state.Pipeline,
+  });
 }
 
 export function formatInterlinearGloss(engine: LangEngine, tree: SyntaxTree): string {
@@ -3357,16 +3967,22 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
         Enabled: true,
       },
     ],
+    DiachronicRules: [
+      { Name: 'High Front Diphthongization (*iː -> aɪ)', Era: 'Great Vowel Shift', Target: 'iː', Replacement: 'aɪ', Enabled: true },
+      { Name: 'High Back Diphthongization (*uː -> aʊ)', Era: 'Great Vowel Shift', Target: 'uː', Replacement: 'aʊ', Enabled: true },
+      { Name: 'Pre-Nasal /k/ Loss (*kn -> n)', Era: 'Early ModE', Target: 'k', Replacement: '∅', PrevPhone: '#', NextPhone: 'n', Enabled: true },
+      { Name: 'Velar Fricative Loss (*xt -> t)', Era: 'Early ModE', Target: 'x', Replacement: '∅', NextPhone: 't', Enabled: true },
+    ],
     Lexemes: [
-      { Lemma: 'the', Pos: 'DET', UR: 'ð ə', Spelling: 'the' },
-      { Lemma: 'a', Pos: 'DET', UR: 'ə', Spelling: 'a' },
+      { Lemma: 'the', Pos: 'DET', UR: 'ð ə', Spelling: 'the', SemanticTags: ['det:def'] },
+      { Lemma: 'a', Pos: 'DET', UR: 'ə', Spelling: 'a', SemanticTags: ['det:indef'] },
       { Lemma: 'that', Pos: 'COMP', UR: 'ð æ t', Spelling: 'that' },
       { Lemma: 'who', Pos: 'REL', UR: 'h uː', Spelling: 'who' },
       { Lemma: 'and', Pos: 'CONJ', UR: 'æ n d', Spelling: 'and' },
-      { Lemma: 'by', Pos: 'PREP', UR: 'b aɪ', Spelling: 'by' },
-      { Lemma: 'I', Pos: 'PRON', UR: 'ˈaɪ', Spelling: 'I', Irregulars: { 'Case=Acc': 'ˈm iː' } },
-      { Lemma: 'she', Pos: 'PRON', UR: 'ˈʃ iː', Spelling: 'she', Irregulars: { 'Case=Acc': 'ˈh ɝː' } },
-      { Lemma: 'they', Pos: 'PRON', UR: 'ˈð eɪ', Spelling: 'they', Irregulars: { 'Case=Acc': 'ˈð ɛ m' } },
+      { Lemma: 'by', Pos: 'PREP', UR: 'b aɪ', Spelling: 'by', SemanticTags: ['pp:animate'] },
+      { Lemma: 'I', Pos: 'PRON', UR: 'ˈaɪ', Spelling: 'I', Irregulars: { 'Case=Acc': 'ˈm iː' }, SemanticTags: ['animate', 'human'] },
+      { Lemma: 'she', Pos: 'PRON', UR: 'ˈʃ iː', Spelling: 'she', Irregulars: { 'Case=Acc': 'ˈh ɝː' }, SemanticTags: ['animate', 'human'] },
+      { Lemma: 'they', Pos: 'PRON', UR: 'ˈð eɪ', Spelling: 'they', Irregulars: { 'Case=Acc': 'ˈð ɛ m' }, SemanticTags: ['animate', 'human'] },
       {
         Lemma: 'be',
         Pos: 'V',
@@ -3383,22 +3999,22 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
       { Lemma: 'do', Pos: 'AUX', UR: 'ˈd uː', Spelling: 'do', Irregulars: { 'Person=3,Number=Sing,Tense=Pres': 'ˈd ʌ z', 'Tense=Past': 'ˈd ɪ d' } },
       { Lemma: 'will', Pos: 'AUX', UR: 'ˈw ɪ l', Spelling: 'will' },
       { Lemma: 'not', Pos: 'NEG', UR: 'ˈn ɑː t', Spelling: 'not' },
-      { Lemma: 'in', Pos: 'PREP', UR: 'ɪ n', Spelling: 'in' },
-      { Lemma: 'near', Pos: 'PREP', UR: 'ˈn ɪ ɹ', Spelling: 'near' },
+      { Lemma: 'in', Pos: 'PREP', UR: 'ɪ n', Spelling: 'in', SemanticTags: ['pp:place', 'pp:liquid'] },
+      { Lemma: 'near', Pos: 'PREP', UR: 'ˈn ɪ ɹ', Spelling: 'near', SemanticTags: ['pp:place', 'pp:concrete'] },
       { Lemma: 'quickly', Pos: 'ADV', UR: 'ˈk w ɪ k l iː', Spelling: 'quickly' },
-      { Lemma: 'person', Pos: 'N', UR: 'ˈp ɝː s ə n', Spelling: 'person', Irregulars: { 'Number=Pl': 'ˈp iː p ə l' } },
-      { Lemma: 'mouse', Pos: 'N', UR: 'ˈm aʊ s', Spelling: 'mouse', Irregulars: { 'Number=Pl': 'ˈm aɪ s' } },
-      { Lemma: 'fish', Pos: 'N', UR: 'ˈf ɪ ʃ', Spelling: 'fish', Irregulars: { 'Number=Pl': 'ˈf ɪ ʃ' } },
-      { Lemma: 'cat', Pos: 'N', UR: 'ˈk æ t', Spelling: 'cat' },
-      { Lemma: 'dog', Pos: 'N', UR: 'ˈd ɔː g', Spelling: 'dog' },
-      { Lemma: 'fox', Pos: 'N', UR: 'ˈf ɑː k s', Spelling: 'fox' },
-      { Lemma: 'water', Pos: 'N', UR: 'ˈw ɔː t ɚ', Spelling: 'water', Irregulars: { 'Number=Pl': 'ˈw ɔː t ɚ z' } },
-      { Lemma: 'park', Pos: 'N', UR: 'ˈp ɑː ɹ k', Spelling: 'park' },
-      { Lemma: 'knight', Pos: 'N', UR: 'ˈn aɪ t', Spelling: 'knight' },
-      { Lemma: 'walk', Pos: 'V', UR: 'ˈw ɔː k', Spelling: 'walk' },
-      { Lemma: 'chase', Pos: 'V', UR: 'ˈtʃ eɪ s', Spelling: 'chase' },
-      { Lemma: 'see', Pos: 'V', UR: 'ˈs iː', Spelling: 'see', Irregulars: { 'Tense=Past': 'ˈs ɔː', 'Aspect=Part': 'ˈs iː n' } },
-      { Lemma: 'go', Pos: 'V', UR: 'ˈg oʊ', Spelling: 'go', Irregulars: { 'Tense=Past': 'ˈw ɛ n t', 'Person=3,Number=Sing,Tense=Pres': 'ˈg oʊ z', 'Aspect=Part': 'ˈg ɔː n' } },
+      { Lemma: 'person', Pos: 'N', UR: 'ˈp ɝː s ə n', Spelling: 'person', Irregulars: { 'Number=Pl': 'ˈp iː p ə l' }, SemanticTags: ['animate', 'human', 'concrete'] },
+      { Lemma: 'mouse', Pos: 'N', UR: 'ˈm aʊ s', Spelling: 'mouse', ProtoUR: 'ˈm uː s', Irregulars: { 'Number=Pl': 'ˈm aɪ s' }, SemanticTags: ['animate', 'animal', 'concrete'] },
+      { Lemma: 'fish', Pos: 'N', UR: 'ˈf ɪ ʃ', Spelling: 'fish', Irregulars: { 'Number=Pl': 'ˈf ɪ ʃ' }, SemanticTags: ['animate', 'animal', 'edible', 'concrete'] },
+      { Lemma: 'cat', Pos: 'N', UR: 'ˈk æ t', Spelling: 'cat', SemanticTags: ['animate', 'animal', 'concrete'] },
+      { Lemma: 'dog', Pos: 'N', UR: 'ˈd ɔː g', Spelling: 'dog', SemanticTags: ['animate', 'animal', 'concrete'] },
+      { Lemma: 'fox', Pos: 'N', UR: 'ˈf ɑː k s', Spelling: 'fox', SemanticTags: ['animate', 'animal', 'concrete'] },
+      { Lemma: 'water', Pos: 'N', UR: 'ˈw ɔː t ɚ', Spelling: 'water', Irregulars: { 'Number=Pl': 'ˈw ɔː t ɚ z' }, SemanticTags: ['inanimate', 'liquid', 'mass', 'concrete'] },
+      { Lemma: 'park', Pos: 'N', UR: 'ˈp ɑː ɹ k', Spelling: 'park', SemanticTags: ['inanimate', 'place', 'concrete'] },
+      { Lemma: 'knight', Pos: 'N', UR: 'ˈn aɪ t', Spelling: 'knight', ProtoUR: 'ˈk n iː x t', SemanticTags: ['animate', 'human', 'concrete'] },
+      { Lemma: 'walk', Pos: 'V', UR: 'ˈw ɔː k', Spelling: 'walk', SemanticTags: ['subj:animate', 'obj:concrete'] },
+      { Lemma: 'chase', Pos: 'V', UR: 'ˈtʃ eɪ s', Spelling: 'chase', SemanticTags: ['subj:animate', 'obj:animate'] },
+      { Lemma: 'see', Pos: 'V', UR: 'ˈs iː', Spelling: 'see', Irregulars: { 'Tense=Past': 'ˈs ɔː', 'Aspect=Part': 'ˈs iː n' }, SemanticTags: ['subj:animate', 'obj:concrete'] },
+      { Lemma: 'go', Pos: 'V', UR: 'ˈg oʊ', Spelling: 'go', Irregulars: { 'Tense=Past': 'ˈw ɛ n t', 'Person=3,Number=Sing,Tense=Pres': 'ˈg oʊ z', 'Aspect=Part': 'ˈg ɔː n' }, SemanticTags: ['subj:animate', 'obj:place'] },
       { Lemma: 'small', Pos: 'ADJ', UR: 'ˈs m ɔː l', Spelling: 'small' },
       { Lemma: 'tall', Pos: 'ADJ', UR: 'ˈt ɔː l', Spelling: 'tall' },
     ],
@@ -3539,6 +4155,7 @@ export function normalizeLoadedProjectState(raw: Partial<LanguageProjectState>):
       : defaults.GeneratorOptions,
     StressPattern: raw.StressPattern ?? defaults.StressPattern,
     PhonologyRules: Array.isArray(raw.PhonologyRules) ? raw.PhonologyRules : defaults.PhonologyRules,
+    DiachronicRules: Array.isArray(raw.DiachronicRules) ? raw.DiachronicRules : [],
     Lexemes: Array.isArray(raw.Lexemes) ? raw.Lexemes : defaults.Lexemes,
     Affixes: Array.isArray(raw.Affixes) ? raw.Affixes : defaults.Affixes,
     OrthographyRules: Array.isArray(raw.OrthographyRules) ? raw.OrthographyRules : defaults.OrthographyRules,
@@ -3587,6 +4204,8 @@ export function buildEngineFromState(state: LanguageProjectState): LangEngine {
       lexClass: l.LexClass,
       spelling: l.Spelling,
       irregulars: l.Irregulars,
+      semanticTags: l.SemanticTags,
+      protoUr: l.ProtoUR,
     }))
   );
 

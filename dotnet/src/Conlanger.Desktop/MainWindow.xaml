@@ -104,6 +104,9 @@
             <TabItem Header="Extensions &amp; Pipeline">
                 <views:ExtensionsTab />
             </TabItem>
+            <TabItem Header="Evolution">
+                <views:EvolutionTab />
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

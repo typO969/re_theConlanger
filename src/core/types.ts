@@ -88,6 +88,8 @@ export interface Lexeme {
   lexClass?: string;
   spelling?: string;
   irregulars?: Record<string, string>;
+  semanticTags?: string[];
+  protoUr?: string;
 }
 
 export interface Morpheme {
@@ -222,6 +224,8 @@ export interface LexemeState {
   LexClass?: string;
   Spelling?: string;
   Irregulars?: Record<string, string>;
+  SemanticTags?: string[];
+  ProtoUR?: string;
 }
 
 export interface AffixState {
@@ -268,6 +272,75 @@ export interface PhonologyRuleState {
   Enabled: boolean;
 }
 
+export interface DiachronicRule {
+  Name: string;
+  Era?: string;
+  Target: string;
+  Replacement: string;
+  PrevPhone?: string | null;
+  NextPhone?: string | null;
+  Condition?: string;
+  Enabled: boolean;
+}
+
+export interface DiachronicStepTrace {
+  ruleName: string;
+  era: string;
+  phones: string[];
+  changed: boolean;
+}
+
+export interface DiachronicCognateDiff {
+  lemma: string;
+  pos: string;
+  protoUr: string;
+  daughterPhones: string[];
+  daughterUr: string;
+  daughterWritten: string;
+  changed: boolean;
+  steps: DiachronicStepTrace[];
+}
+
+export interface DiachronicAffixDiff {
+  name: string;
+  pos: string;
+  protoAffix: string;
+  daughterAffix: string;
+  changed: boolean;
+}
+
+export interface DiachronicSimulationResult {
+  cognates: DiachronicCognateDiff[];
+  affixDiffs: DiachronicAffixDiff[];
+  emergentPhones: string[];
+  lostPhones: string[];
+  changedCount: number;
+}
+
+export interface DiscourseOptions {
+  sentenceCount?: number;
+  approxWords?: number;
+  constraints?: Record<string, string>;
+  trackDefiniteness?: boolean;
+  useAnaphoricPronouns?: boolean;
+  useConnectives?: boolean;
+  enforceSelectionalRestrictions?: boolean;
+}
+
+export interface DiscourseSentenceItem {
+  index: number;
+  written: string;
+  surface: string;
+  entitiesMentioned: string[];
+  issues: string[];
+}
+
+export interface DiscourseResult {
+  paragraph: string;
+  sentences: DiscourseSentenceItem[];
+  trackedEntities: string[];
+}
+
 export interface DiagnosticIssue {
   severity: 'error' | 'warning';
   subsystem: 'Phonology' | 'Morphology' | 'Syntax' | 'Orthography' | 'Phonotactics';
@@ -286,6 +359,7 @@ export interface LanguageProjectState {
   GeneratorOptions: GeneratorOptions;
   StressPattern: StressPattern;
   PhonologyRules: PhonologyRuleState[];
+  DiachronicRules?: DiachronicRule[];
   Lexemes: LexemeState[];
   Affixes: AffixState[];
   WordOrder: WordOrder;

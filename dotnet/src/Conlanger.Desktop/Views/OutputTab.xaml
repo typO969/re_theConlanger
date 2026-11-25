@@ -1,20 +1,24 @@
 <UserControl x:Class="Conlanger.Desktop.Views.OutputTab"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="clr-namespace:Conlanger.Desktop.ViewModels"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
-             d:DesignHeight="680" d:DesignWidth="1200">
+             d:DesignHeight="780" d:DesignWidth="1200">
     <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="1.1*" />
+            <RowDefinition Height="1*" />
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="1*" />
             <ColumnDefinition Width="1.2*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Left: Phonotactic Word Generator -->
-        <GroupBox Grid.Column="0" Header="Phonotactic Word Generator" Margin="0,0,10,0">
+        <!-- Left Top: Phonotactic Word Generator -->
+        <GroupBox Grid.Row="0" Grid.Column="0" Header="Phonotactic Word Generator" Margin="0,0,10,10">
             <DockPanel>
                 <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
                     <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,4,4" />
@@ -29,8 +33,8 @@
             </DockPanel>
         </GroupBox>
 
-        <!-- Right: Batch Sentence Corpus & Export -->
-        <GroupBox Grid.Column="1" Header="Full Pipeline Batch Sentence Corpus &amp; Export">
+        <!-- Right Top: Batch Sentence Corpus & Export -->
+        <GroupBox Grid.Row="0" Grid.Column="1" Header="Full Pipeline Batch Sentence Corpus &amp; Export" Margin="0,0,0,10">
             <DockPanel>
                 <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
                     <TextBlock Text="Samples (N):" VerticalAlignment="Center" Margin="0,0,4,4" />
@@ -53,6 +57,32 @@
                 </WrapPanel>
                 <TextBox Text="{Binding BatchOutputText, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontSize="15" TextWrapping="Wrap" Padding="10" Background="#F8FAFC" />
             </DockPanel>
+        </GroupBox>
+
+        <!-- Bottom Full Width: Discourse & Narrative Paragraph Generator -->
+        <GroupBox Grid.Row="1" Grid.ColumnSpan="2" Header="Discourse &amp; Narrative Paragraph Generator (Multi-Sentence Coherence, Definiteness &amp; Anaphora)">
+            <Grid Margin="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="280"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Sentences:" VerticalAlignment="Center" Margin="0,0,4,2"/>
+                        <TextBox Text="{Binding DiscourseSentenceCount, UpdateSourceTrigger=PropertyChanged}" Width="45" Margin="0,0,8,2"/>
+                        <TextBlock Text="Words/Cl:" VerticalAlignment="Center" Margin="0,0,4,2"/>
+                        <TextBox Text="{Binding DiscourseApproxWords, UpdateSourceTrigger=PropertyChanged}" Width="45" Margin="0,0,0,2"/>
+                    </WrapPanel>
+                    <CheckBox Content="Selectional Restrictions" IsChecked="{Binding DiscourseUseSemantics}" Margin="0,4"/>
+                    <CheckBox Content="Track Definiteness (a → the)" IsChecked="{Binding DiscourseTrackDefiniteness}" Margin="0,4"/>
+                    <CheckBox Content="Anaphoric Pronouns" IsChecked="{Binding DiscourseUsePronouns}" Margin="0,4"/>
+                    <CheckBox Content="Connectives &amp; Coordination" IsChecked="{Binding DiscourseUseConnectives}" Margin="0,4"/>
+                    <Button Content="Generate Discourse Paragraph" Command="{Binding GenerateDiscourseCommand}" Background="#2D7D9A" Foreground="White" FontWeight="Bold" Margin="0,10,0,4" Padding="8,5"/>
+                    <TextBlock Text="Tracked Entities:" FontWeight="SemiBold" Margin="0,6,0,2"/>
+                    <TextBox Height="50" IsReadOnly="True" Text="{Binding DiscourseEntitiesSummary}" Background="#252526" Foreground="#9CDCFE" FontFamily="Consolas" FontSize="11"/>
+                </StackPanel>
+                <TextBox Grid.Column="1" Text="{Binding DiscourseParagraphText, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontSize="15" TextWrapping="Wrap" Padding="8" Background="#F8FAFC"/>
+            </Grid>
         </GroupBox>
     </Grid>
 </UserControl>

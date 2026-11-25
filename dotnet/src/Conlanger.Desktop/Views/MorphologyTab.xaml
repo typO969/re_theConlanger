@@ -18,31 +18,37 @@
         </Grid.ColumnDefinitions>
 
         <!-- Lexicon Editor -->
-        <GroupBox Grid.Row="0" Grid.Column="0" Header="Lexicon (UR, Class, Deep Spelling &amp; Irregulars)" Margin="0,0,10,10">
+        <GroupBox Grid.Row="0" Grid.Column="0" Header="Lexicon (Proto UR, Semantic Tags, Deep Spelling &amp; Irregulars)" Margin="0,0,10,10">
             <DockPanel>
                 <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                     <TextBlock Text="Lemma:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexLemma, UpdateSourceTrigger=PropertyChanged}" Width="70" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexLemma, UpdateSourceTrigger=PropertyChanged}" Width="65" Margin="0,0,6,4" />
                     <TextBlock Text="POS:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexPos, UpdateSourceTrigger=PropertyChanged}" Width="40" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexPos, UpdateSourceTrigger=PropertyChanged}" Width="35" Margin="0,0,6,4" />
                     <TextBlock Text="Class:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexClass, UpdateSourceTrigger=PropertyChanged}" Width="54" ToolTip="Lexical / Gender Class (e.g. Fem, Masc, Anim, C1)" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexClass, UpdateSourceTrigger=PropertyChanged}" Width="45" Margin="0,0,6,4" />
+                    <TextBlock Text="Proto UR:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewLexProtoUr, UpdateSourceTrigger=PropertyChanged}" Width="75" ToolTip="Proto-Ur for Diachronic Evolution" Margin="0,0,6,4" />
+                    <TextBlock Text="Tags:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewLexSemanticTags, UpdateSourceTrigger=PropertyChanged}" Width="75" ToolTip="Semantic Tags (e.g. animate, human, mass)" Margin="0,0,6,4" />
                     <TextBlock Text="UR:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexUr, UpdateSourceTrigger=PropertyChanged}" Width="88" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexUr, UpdateSourceTrigger=PropertyChanged}" Width="75" Margin="0,0,6,4" />
                     <TextBlock Text="Spelling:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexSpelling, UpdateSourceTrigger=PropertyChanged}" Width="66" ToolTip="Deep/Morphophonemic Spelling" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexSpelling, UpdateSourceTrigger=PropertyChanged}" Width="60" Margin="0,0,6,4" />
                     <TextBlock Text="Irreg:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexIrregulars, UpdateSourceTrigger=PropertyChanged}" Width="125" ToolTip="Format: Number=Pl -> ˈm aɪ s; Tense=Past -> ˈw ɛ n t" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexIrregulars, UpdateSourceTrigger=PropertyChanged}" Width="90" Margin="0,0,6,4" />
                     <Button Content="+ Lexeme" Command="{Binding AddLexemeCommand}" Margin="0,0,0,4" />
                 </WrapPanel>
                 <DataGrid ItemsSource="{Binding Lexemes}" AutoGenerateColumns="False" CanUserAddRows="False">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Lemma" Binding="{Binding Lemma}" Width="72" />
-                        <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="44" />
-                        <DataGridTextColumn Header="Class" Binding="{Binding LexClass}" Width="56" />
+                        <DataGridTextColumn Header="Lemma" Binding="{Binding Lemma}" Width="65" />
+                        <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="40" />
+                        <DataGridTextColumn Header="Class" Binding="{Binding LexClass}" Width="45" />
+                        <DataGridTextColumn Header="Proto UR" Binding="{Binding ProtoUR}" Width="80" />
+                        <DataGridTextColumn Header="Tags" Binding="{Binding SemanticTagsSummary, UpdateSourceTrigger=LostFocus}" Width="90" />
                         <DataGridTextColumn Header="UR (Phones)" Binding="{Binding UR}" Width="*" />
-                        <DataGridTextColumn Header="Spelling" Binding="{Binding Spelling}" Width="68" />
-                        <DataGridTextColumn Header="Irregulars" Binding="{Binding IrregularsSummary, UpdateSourceTrigger=LostFocus}" Width="1.15*" />
+                        <DataGridTextColumn Header="Spelling" Binding="{Binding Spelling}" Width="60" />
+                        <DataGridTextColumn Header="Irregulars" Binding="{Binding IrregularsSummary, UpdateSourceTrigger=LostFocus}" Width="110" />
                         <DataGridTemplateColumn Width="36">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>

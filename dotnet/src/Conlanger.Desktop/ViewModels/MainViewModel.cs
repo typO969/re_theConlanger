@@ -118,6 +118,34 @@ public sealed class MainViewModel : ViewModelBase
     private string _newLexClass = "";
     private string _newLexSpelling = "";
     private string _newLexIrregulars = "";
+    private string _newLexProtoUr = "";
+    private string _newLexSemanticTags = "";
+
+    // Evolution tab state
+    private IReadOnlyList<DiachronicPresetSpec> _diachronicPresets = DiachronicEngine.GetPresets();
+    private string _selectedDiachronicPresetId = "great-vowel-shift";
+    private string _newDiachronicName = "";
+    private string _newDiachronicEra = "Era 1";
+    private string _newDiachronicTarget = "";
+    private string _newDiachronicReplacement = "";
+    private string _newDiachronicPrev = "";
+    private string _newDiachronicNext = "";
+    private string _newDiachronicCond = "";
+    private string _protoTestUr = "ˈk n iː x t";
+    private string _protoTraceOutput = "";
+    private string _evolutionDeltaSummary = "";
+    private string _daughterLanguageName = "";
+    private bool _preserveHistoricalSpelling = true;
+
+    // Discourse tab state
+    private int _discourseSentenceCount = 4;
+    private int _discourseApproxWords = 6;
+    private bool _discourseUseSemantics = true;
+    private bool _discourseTrackDefiniteness = true;
+    private bool _discourseUsePronouns = true;
+    private bool _discourseUseConnectives = true;
+    private string _discourseParagraphText = "";
+    private string _discourseEntitiesSummary = "";
     private string _newAffixName = "";
     private string _newAffixPos = "N";
     private string _newAffixFeatName = "Number";
@@ -254,6 +282,19 @@ public sealed class MainViewModel : ViewModelBase
         GenerateWordsCommand = new RelayCommand(GenerateWords);
         RefreshInspectorsCommand = new RelayCommand(RefreshInspectors);
 
+        LoadDiachronicPresetReplaceCommand = new RelayCommand(() => LoadDiachronicPreset(replace: true));
+        LoadDiachronicPresetAppendCommand = new RelayCommand(() => LoadDiachronicPreset(replace: false));
+        AddDiachronicRuleCommand = new RelayCommand(AddDiachronicRule, () => !string.IsNullOrWhiteSpace(NewDiachronicName));
+        RemoveDiachronicRuleCommand = new RelayCommand(p => RemoveDiachronicRule(p as PhonologyRuleSpec));
+        MoveDiachronicRuleUpCommand = new RelayCommand(p => MoveDiachronicRule(p as PhonologyRuleSpec, -1));
+        MoveDiachronicRuleDownCommand = new RelayCommand(p => MoveDiachronicRule(p as PhonologyRuleSpec, 1));
+        TraceProtoFormCommand = new RelayCommand(TraceProtoForm);
+        LoadProtoSampleKnightCommand = new RelayCommand(() => { ProtoTestUr = "ˈk n iː x t"; TraceProtoForm(); });
+        LoadProtoSampleMouseCommand = new RelayCommand(() => { ProtoTestUr = "ˈm uː s"; TraceProtoForm(); });
+        SimulateEvolutionCommand = new RelayCommand(SimulateEvolution);
+        ApplyEvolutionCommand = new RelayCommand(ApplyEvolution);
+        GenerateDiscourseCommand = new RelayCommand(GenerateDiscourse);
+
         RefreshPluginsCommand = new RelayCommand(LoadPluginsCatalog);
         AddPluginFolderCommand = new AsyncRelayCommand(() => AddCustomPluginFolderAsync(NewPluginFolderPath), () => !string.IsNullOrWhiteSpace(NewPluginFolderPath));
         RemovePluginFolderCommand = new AsyncRelayCommand(() => RemoveCustomPluginFolderAsync(SelectedCustomPluginFolder), () => !string.IsNullOrWhiteSpace(SelectedCustomPluginFolder));
@@ -346,6 +387,49 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<ExecutedPluginOutput> PluginOutputs { get; } = new();
     public ObservableCollection<string> CustomPluginFolders { get; } = new();
     public ObservableCollection<string> ActivePluginSearchPaths { get; } = new();
+    public ObservableCollection<PhonologyRuleSpec> DiachronicRulesCollection { get; } = new();
+    public ObservableCollection<DiachronicCognateDiff> DiachronicCognateDiffs { get; } = new();
+    public ObservableCollection<DiachronicAffixDiff> DiachronicAffixDiffs { get; } = new();
+
+    public IReadOnlyList<DiachronicPresetSpec> DiachronicPresets => _diachronicPresets;
+    public string SelectedDiachronicPresetId { get => _selectedDiachronicPresetId; set => SetField(ref _selectedDiachronicPresetId, value); }
+    public string NewDiachronicName { get => _newDiachronicName; set => SetField(ref _newDiachronicName, value); }
+    public string NewDiachronicEra { get => _newDiachronicEra; set => SetField(ref _newDiachronicEra, value); }
+    public string NewDiachronicTarget { get => _newDiachronicTarget; set => SetField(ref _newDiachronicTarget, value); }
+    public string NewDiachronicReplacement { get => _newDiachronicReplacement; set => SetField(ref _newDiachronicReplacement, value); }
+    public string NewDiachronicPrev { get => _newDiachronicPrev; set => SetField(ref _newDiachronicPrev, value); }
+    public string NewDiachronicNext { get => _newDiachronicNext; set => SetField(ref _newDiachronicNext, value); }
+    public string NewDiachronicCond { get => _newDiachronicCond; set => SetField(ref _newDiachronicCond, value); }
+    public string ProtoTestUr { get => _protoTestUr; set => SetField(ref _protoTestUr, value); }
+    public string ProtoTraceOutput { get => _protoTraceOutput; set => SetField(ref _protoTraceOutput, value); }
+    public string EvolutionDeltaSummary { get => _evolutionDeltaSummary; set => SetField(ref _evolutionDeltaSummary, value); }
+    public string DaughterLanguageName { get => _daughterLanguageName; set => SetField(ref _daughterLanguageName, value); }
+    public bool PreserveHistoricalSpelling { get => _preserveHistoricalSpelling; set => SetField(ref _preserveHistoricalSpelling, value); }
+
+    public int DiscourseSentenceCount { get => _discourseSentenceCount; set => SetField(ref _discourseSentenceCount, value); }
+    public int DiscourseApproxWords { get => _discourseApproxWords; set => SetField(ref _discourseApproxWords, value); }
+    public bool DiscourseUseSemantics { get => _discourseUseSemantics; set => SetField(ref _discourseUseSemantics, value); }
+    public bool DiscourseTrackDefiniteness { get => _discourseTrackDefiniteness; set => SetField(ref _discourseTrackDefiniteness, value); }
+    public bool DiscourseUsePronouns { get => _discourseUsePronouns; set => SetField(ref _discourseUsePronouns, value); }
+    public bool DiscourseUseConnectives { get => _discourseUseConnectives; set => SetField(ref _discourseUseConnectives, value); }
+    public string DiscourseParagraphText { get => _discourseParagraphText; set => SetField(ref _discourseParagraphText, value); }
+    public string DiscourseEntitiesSummary { get => _discourseEntitiesSummary; set => SetField(ref _discourseEntitiesSummary, value); }
+
+    public string NewLexProtoUr { get => _newLexProtoUr; set => SetField(ref _newLexProtoUr, value); }
+    public string NewLexSemanticTags { get => _newLexSemanticTags; set => SetField(ref _newLexSemanticTags, value); }
+
+    public ICommand LoadDiachronicPresetReplaceCommand { get; }
+    public ICommand LoadDiachronicPresetAppendCommand { get; }
+    public ICommand AddDiachronicRuleCommand { get; }
+    public ICommand RemoveDiachronicRuleCommand { get; }
+    public ICommand MoveDiachronicRuleUpCommand { get; }
+    public ICommand MoveDiachronicRuleDownCommand { get; }
+    public ICommand TraceProtoFormCommand { get; }
+    public ICommand LoadProtoSampleKnightCommand { get; }
+    public ICommand LoadProtoSampleMouseCommand { get; }
+    public ICommand SimulateEvolutionCommand { get; }
+    public ICommand ApplyEvolutionCommand { get; }
+    public ICommand GenerateDiscourseCommand { get; }
 
     public Array WordOrders => Enum.GetValues(typeof(WordOrder));
     public Array ClauseTemplates => Enum.GetValues(typeof(ClauseTemplate));
@@ -871,6 +955,7 @@ public sealed class MainViewModel : ViewModelBase
         _project.Phonemes = Phonemes.ToList();
         _project.SyllableTemplates = SyllableTemplates.ToList();
         _project.PhonologyRules = PhonologyRules.ToList();
+        _project.DiachronicRules = DiachronicRulesCollection.ToList();
         _project.Lexemes = Lexemes.ToList();
         _project.Affixes = Affixes.ToList();
         _project.OrthographyRules = OrthographyRules.ToList();
@@ -887,6 +972,7 @@ public sealed class MainViewModel : ViewModelBase
         ReplaceCollection(Vowels, _project.Phonemes.Where(p => p.Type == "V"));
         ReplaceCollection(SyllableTemplates, _project.SyllableTemplates);
         ReplaceCollection(PhonologyRules, _project.PhonologyRules);
+        ReplaceCollection(DiachronicRulesCollection, _project.DiachronicRules ?? new());
         ReplaceCollection(Lexemes, _project.Lexemes);
         ReplaceCollection(LexemeIds, _project.Lexemes.OrderBy(l => l.Lemma).Select(l => l.Lemma));
         if (!LexemeIds.Contains(_selectedInspectorLexeme) && LexemeIds.Count > 0)
@@ -1045,7 +1131,9 @@ public sealed class MainViewModel : ViewModelBase
             Pos = string.IsNullOrWhiteSpace(NewLexPos) ? "N" : NewLexPos.Trim(),
             UR = string.Join(" ", MorphologyEngine.SplitPhones(NewLexUr)),
             LexClass = string.IsNullOrWhiteSpace(NewLexClass) ? null : NewLexClass.Trim(),
-            Spelling = string.IsNullOrWhiteSpace(NewLexSpelling) ? null : NewLexSpelling.Trim()
+            Spelling = string.IsNullOrWhiteSpace(NewLexSpelling) ? null : NewLexSpelling.Trim(),
+            ProtoUR = string.IsNullOrWhiteSpace(NewLexProtoUr) ? null : string.Join(" ", MorphologyEngine.SplitPhones(NewLexProtoUr)),
+            SemanticTagsSummary = NewLexSemanticTags
         };
         if (!string.IsNullOrWhiteSpace(NewLexIrregulars))
             entry.IrregularsSummary = NewLexIrregulars.Trim();
@@ -1056,6 +1144,8 @@ public sealed class MainViewModel : ViewModelBase
         NewLexClass = "";
         NewLexSpelling = "";
         NewLexIrregulars = "";
+        NewLexProtoUr = "";
+        NewLexSemanticTags = "";
         SyncCollectionsFromProject();
         CommitAndRefresh($"Added lexeme '{lemma}'");
     }
@@ -1594,5 +1684,146 @@ public sealed class MainViewModel : ViewModelBase
     {
         target.Clear();
         foreach (var item in source) target.Add(item);
+    }
+
+    private void LoadDiachronicPreset(bool replace)
+    {
+        var preset = _diachronicPresets.FirstOrDefault(p => p.Id == SelectedDiachronicPresetId);
+        if (preset is null) return;
+        if (replace) DiachronicRulesCollection.Clear();
+        foreach (var r in preset.Rules)
+        {
+            DiachronicRulesCollection.Add(new PhonologyRuleSpec
+            {
+                Name = r.Name,
+                Era = r.Era,
+                Target = r.Target,
+                Replacement = r.Replacement,
+                PrevPhone = r.PrevPhone,
+                NextPhone = r.NextPhone,
+                Condition = r.Condition,
+                Enabled = r.Enabled
+            });
+        }
+        PushEvolutionRulesBack();
+        SimulateEvolution();
+    }
+
+    private void AddDiachronicRule()
+    {
+        if (string.IsNullOrWhiteSpace(NewDiachronicName)) return;
+        DiachronicRulesCollection.Add(new PhonologyRuleSpec
+        {
+            Name = NewDiachronicName.Trim(),
+            Era = string.IsNullOrWhiteSpace(NewDiachronicEra) ? "Era 1" : NewDiachronicEra.Trim(),
+            Target = NewDiachronicTarget.Trim(),
+            Replacement = NewDiachronicReplacement.Trim(),
+            PrevPhone = string.IsNullOrWhiteSpace(NewDiachronicPrev) ? null : NewDiachronicPrev.Trim(),
+            NextPhone = string.IsNullOrWhiteSpace(NewDiachronicNext) ? null : NewDiachronicNext.Trim(),
+            Condition = string.IsNullOrWhiteSpace(NewDiachronicCond) ? null : NewDiachronicCond.Trim(),
+            Enabled = true
+        });
+        NewDiachronicName = "";
+        NewDiachronicTarget = "";
+        NewDiachronicReplacement = "";
+        PushEvolutionRulesBack();
+        SimulateEvolution();
+    }
+
+    private void RemoveDiachronicRule(PhonologyRuleSpec? r)
+    {
+        if (r is null) return;
+        DiachronicRulesCollection.Remove(r);
+        PushEvolutionRulesBack();
+        SimulateEvolution();
+    }
+
+    private void MoveDiachronicRule(PhonologyRuleSpec? r, int direction)
+    {
+        if (r is null) return;
+        int idx = DiachronicRulesCollection.IndexOf(r);
+        int newIdx = idx + direction;
+        if (newIdx < 0 || newIdx >= DiachronicRulesCollection.Count) return;
+        DiachronicRulesCollection.Move(idx, newIdx);
+        PushEvolutionRulesBack();
+        SimulateEvolution();
+    }
+
+    private void PushEvolutionRulesBack()
+    {
+        _project.DiachronicRules = DiachronicRulesCollection.ToList();
+    }
+
+    private void TraceProtoForm()
+    {
+        try
+        {
+            var traces = DiachronicEngine.TraceProtoForm(ProtoTestUr, DiachronicRulesCollection, _project);
+            ProtoTraceOutput = string.Join(Environment.NewLine, traces.Select(t => $"[{t.Era}] {t.RuleName} → {t.SurfaceForm}"));
+        }
+        catch (Exception ex)
+        {
+            ProtoTraceOutput = $"Error tracing proto form: {ex.Message}";
+        }
+    }
+
+    private void SimulateEvolution()
+    {
+        try
+        {
+            var res = DiachronicEngine.SimulateEvolution(_project, DiachronicRulesCollection, DaughterLanguageName);
+            ReplaceCollection(DiachronicCognateDiffs, res.CognateDiffs);
+            ReplaceCollection(DiachronicAffixDiffs, res.AffixDiffs);
+            EvolutionDeltaSummary = $"Emergent Phones: {(res.EmergentPhones.Count > 0 ? string.Join(", ", res.EmergentPhones) : "(none)")}\n" +
+                                     $"Lost Phones: {(res.LostPhones.Count > 0 ? string.Join(", ", res.LostPhones) : "(none)")}";
+            TraceProtoForm();
+        }
+        catch (Exception ex)
+        {
+            EvolutionDeltaSummary = $"Simulation error: {ex.Message}";
+        }
+    }
+
+    private void ApplyEvolution()
+    {
+        try
+        {
+            PushCollectionsBackToProject();
+            var daughter = DiachronicEngine.ApplyEvolutionToProject(_project, DiachronicRulesCollection, DaughterLanguageName, PreserveHistoricalSpelling);
+            _project = daughter;
+            _history.PushSnapshot(_project);
+            SyncCollectionsFromProject();
+            RefreshDerivedViews();
+            StatusMessage = $"Applied evolution! Created daughter language '{daughter.Name}'.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Evolution error: {ex.Message}";
+        }
+    }
+
+    private void GenerateDiscourse()
+    {
+        try
+        {
+            PushCollectionsBackToProject();
+            var res = DiscourseEngine.GenerateDiscourse(
+                _project,
+                seed: 42,
+                sentenceCount: DiscourseSentenceCount,
+                approxWords: DiscourseApproxWords,
+                enforceSelectionalRestrictions: DiscourseUseSemantics,
+                trackDefiniteness: DiscourseTrackDefiniteness,
+                useAnaphoricPronouns: DiscourseUsePronouns,
+                useConnectives: DiscourseUseConnectives
+            );
+            DiscourseParagraphText = res.ParagraphText;
+            DiscourseEntitiesSummary = string.Join(", ", res.TrackedEntities);
+            StatusMessage = $"Generated discourse paragraph ({res.Sentences.Count} sentences).";
+        }
+        catch (Exception ex)
+        {
+            DiscourseParagraphText = $"Discourse generation error: {ex.Message}";
+        }
     }
 }

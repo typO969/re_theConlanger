@@ -82,7 +82,17 @@ public static class ProjectFactory
         ["ɝː"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "central", Roundness = "unrounded", Custom = "rhotic stressed" },
         ["aɪ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "low", Backness = "front", Roundness = "unrounded", Custom = "diphthong" },
         ["aʊ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "low", Backness = "back", Roundness = "rounded", Custom = "diphthong" },
-        ["ɔɪ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "back", Roundness = "rounded", Custom = "diphthong" }
+        ["ɔɪ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "back", Roundness = "rounded", Custom = "diphthong" },
+        ["bʰ"] = new() { Voicing = "voiced", Manner = "stop", Place = "bilabial", Custom = "aspirated" },
+        ["dʰ"] = new() { Voicing = "voiced", Manner = "stop", Place = "alveolar", Custom = "aspirated" },
+        ["gʰ"] = new() { Voicing = "voiced", Manner = "stop", Place = "velar", Custom = "aspirated" },
+        ["ts"] = new() { Voicing = "voiceless", Manner = "affricate", Place = "alveolar", Custom = "sibilant" },
+        ["dz"] = new() { Voicing = "voiced", Manner = "affricate", Place = "alveolar", Custom = "sibilant" },
+        ["ɸ"] = new() { Voicing = "voiceless", Manner = "fricative", Place = "bilabial" },
+        ["β"] = new() { Voicing = "voiced", Manner = "fricative", Place = "bilabial" },
+        ["ç"] = new() { Voicing = "voiceless", Manner = "fricative", Place = "palatal" },
+        ["eː"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "front", Roundness = "unrounded", Custom = "tense long" },
+        ["oː"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "back", Roundness = "rounded", Custom = "tense long" }
     };
 
     internal static PhonologicalFeatures? TryGetKnownFeatures(string symbol)
@@ -436,6 +446,7 @@ public static class ProjectFactory
         project.GeneratorOptions ??= new GeneratorOptions();
         project.SyntaxConfig ??= new SyntaxConfig();
         project.SyntaxConfig.CustomRules ??= new();
+        project.DiachronicRules ??= new();
         project.SyntaxConfig.MaxClauseDepth = Math.Clamp(project.SyntaxConfig.MaxClauseDepth, 0, 3);
         project.SchemaVersion = 2;
     }

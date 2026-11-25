@@ -29,6 +29,7 @@ import { WritingSystemsTab } from './components/WritingSystemsTab';
 import { OutputTab } from './components/OutputTab';
 import { InspectorsTab } from './components/InspectorsTab';
 import { ExtensionsTab } from './components/ExtensionsTab';
+import { EvolutionTab } from './components/EvolutionTab';
 
 type TabId =
   | 'Phonology'
@@ -36,6 +37,7 @@ type TabId =
   | 'Syntax'
   | 'Orthography'
   | 'Writing Systems'
+  | 'Evolution'
   | 'Output'
   | 'Inspectors'
   | 'Extensions';
@@ -46,6 +48,7 @@ const TABS: TabId[] = [
   'Syntax',
   'Orthography',
   'Writing Systems',
+  'Evolution',
   'Output',
   'Inspectors',
   'Extensions',
@@ -431,6 +434,9 @@ export const App: React.FC = () => {
         )}
         {activeTab === 'Writing Systems' && (
           <WritingSystemsTab state={projectState} onUpdate={updateProject} />
+        )}
+        {activeTab === 'Evolution' && (
+          <EvolutionTab state={projectState} onUpdate={updateProject} />
         )}
         {activeTab === 'Output' && <OutputTab state={projectState} />}
         {activeTab === 'Inspectors' && <InspectorsTab state={projectState} />}

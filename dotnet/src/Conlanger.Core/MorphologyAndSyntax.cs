@@ -974,8 +974,8 @@ public class MorphologyEngine : IMorphologyRealizer
     private static readonly HashSet<string> MultiCharSegments = new(StringComparer.Ordinal)
     {
         "iː", "eɪ", "oʊ", "ɔː", "uː", "ɑː", "ɝː", "aɪ", "aʊ", "ɔɪ",
-        "yː", "øː",
-        "tʃ", "dʒ", "pʰ", "tʰ", "kʰ"
+        "yː", "øː", "eː", "oː",
+        "tʃ", "dʒ", "ts", "dz", "pʰ", "tʰ", "kʰ", "bʰ", "dʰ", "gʰ"
     };
 
     private static bool IsCombiningOrChao(char ch) =>

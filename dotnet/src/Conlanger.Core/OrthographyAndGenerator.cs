@@ -457,6 +457,96 @@ public sealed class LangEngine
             $"Cat  : {string.Concat(cols.Select(c => c.Cat)).TrimEnd()}"
         });
     }
+
+    public DiscourseGenerationResult GenerateDiscourse(
+        LanguageProject project,
+        int seed = 42,
+        int sentenceCount = 4,
+        int approxWords = 6,
+        bool enforceSelectionalRestrictions = true,
+        bool trackDefiniteness = true,
+        bool useAnaphoricPronouns = true,
+        bool useConnectives = true,
+        IReadOnlyDictionary<string, string>? baseConstraints = null) =>
+        DiscourseEngine.GenerateDiscourse(project, seed, sentenceCount, approxWords, enforceSelectionalRestrictions, trackDefiniteness, useAnaphoricPronouns, useConnectives, baseConstraints);
+}
+
+public sealed record DiscourseSentenceEntry(
+    int SentenceIndex,
+    string Written,
+    string InterlinearGloss,
+    IReadOnlyList<string> Tokens
+);
+
+public sealed record DiscourseGenerationResult(
+    string ParagraphText,
+    IReadOnlyList<DiscourseSentenceEntry> Sentences,
+    IReadOnlyList<string> TrackedEntities
+);
+
+public static class DiscourseEngine
+{
+    public static DiscourseGenerationResult GenerateDiscourse(
+        LanguageProject project,
+        int seed = 42,
+        int sentenceCount = 4,
+        int approxWords = 6,
+        bool enforceSelectionalRestrictions = true,
+        bool trackDefiniteness = true,
+        bool useAnaphoricPronouns = true,
+        bool useConnectives = true,
+        IReadOnlyDictionary<string, string>? baseConstraints = null)
+    {
+        var rng = new Random(seed);
+        var engine = new LangEngine();
+        var sentences = new List<DiscourseSentenceEntry>();
+        var introducedLemmas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var trackedEntities = new List<string>();
+
+        string[] tenses = { "Pres", "Past", "Fut" };
+
+        for (int i = 0; i < sentenceCount; i++)
+        {
+            var constraints = new Dictionary<string, string>(baseConstraints ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+            constraints["SemanticFilter"] = enforceSelectionalRestrictions ? "true" : "false";
+            constraints["Tense"] = tenses[rng.Next(tenses.Length)];
+
+            if (trackDefiniteness)
+            {
+                constraints["TrackDefiniteness"] = "true";
+                constraints["IntroducedLemmas"] = string.Join(",", introducedLemmas);
+            }
+
+            if (useAnaphoricPronouns && i > 0 && introducedLemmas.Count > 0 && rng.NextDouble() < 0.45)
+            {
+                var lst = introducedLemmas.ToList();
+                constraints["ForceSubjLemma"] = lst[rng.Next(lst.Count)];
+            }
+
+            if (useConnectives && i > 0 && rng.NextDouble() < 0.35 && project.Lexemes.Any(l => string.Equals(l.Pos, "CONJ", StringComparison.OrdinalIgnoreCase)))
+            {
+                constraints["Coordinated"] = "true";
+            }
+
+            var gen = engine.GenerateSentence(project, seed + i, approxWords, constraints);
+            var gloss = LangEngine.FormatInterlinearGloss(engine, gen.Tree, project);
+
+            foreach (var leaf in gen.Tree.Leaves())
+            {
+                if (string.Equals(leaf.Category, "N", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(leaf.Lemma))
+                {
+                    introducedLemmas.Add(leaf.Lemma);
+                    if (!trackedEntities.Contains(leaf.Lemma, StringComparer.OrdinalIgnoreCase))
+                        trackedEntities.Add(leaf.Lemma);
+                }
+            }
+
+            sentences.Add(new DiscourseSentenceEntry(i + 1, gen.Written, gloss, gen.Tokens.Select(t => t.Grapheme).ToList()));
+        }
+
+        string paragraph = string.Join(" ", sentences.Select(s => s.Written));
+        return new DiscourseGenerationResult(paragraph, sentences, trackedEntities);
+    }
 }
 
 public static class ProjectValidator
