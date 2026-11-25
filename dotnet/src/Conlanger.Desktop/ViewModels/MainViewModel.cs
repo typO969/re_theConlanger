@@ -182,17 +182,13 @@ public sealed class MainViewModel : ViewModelBase
     private DiscoveredAction? _selectedAction;
     private ExecutedPluginOutput? _selectedPluginOutput;
     private string _pluginLogsText = "";
+    private string _newPluginFolderPath = "";
+    private string? _selectedCustomPluginFolder;
 
     public MainViewModel()
     {
         _isDesignMode = DesignerProperties.GetIsInDesignMode(new DependencyObject());
-        var pluginDirs = _isDesignMode ? Array.Empty<string>() : PluginService.GetPluginSearchPaths();
-        _pipelineRegistry = PipelineRegistry.CreateDefaultWithPlugins(pluginDirs.FirstOrDefault());
-        if (!_isDesignMode)
-        {
-            foreach (var dir in pluginDirs.Skip(1))
-                _pipelineRegistry.LoadExtensionsFromDirectory(dir);
-        }
+        _pipelineRegistry = PipelineRegistry.CreateDefaultWithPlugins();
         _engine = new LangEngine(_pipelineRegistry);
         _project = ProjectFactory.CreateStarterProject();
         _history.PushSnapshot(_project);
@@ -243,6 +239,8 @@ public sealed class MainViewModel : ViewModelBase
         RefreshInspectorsCommand = new RelayCommand(RefreshInspectors);
 
         RefreshPluginsCommand = new RelayCommand(LoadPluginsCatalog);
+        AddPluginFolderCommand = new AsyncRelayCommand(() => AddCustomPluginFolderAsync(NewPluginFolderPath), () => !string.IsNullOrWhiteSpace(NewPluginFolderPath));
+        RemovePluginFolderCommand = new AsyncRelayCommand(() => RemoveCustomPluginFolderAsync(SelectedCustomPluginFolder), () => !string.IsNullOrWhiteSpace(SelectedCustomPluginFolder));
         RunActionCommand = new AsyncRelayCommand(p => RunPluginActionAsync(p as DiscoveredAction));
 
         PopulatePipelineOptions();
@@ -255,6 +253,7 @@ public sealed class MainViewModel : ViewModelBase
         }
         else
         {
+            ReplaceCollection(CustomPluginFolders, ProjectPersistence.LoadCustomPluginFolders());
             LoadPluginsCatalog();
         }
     }
@@ -265,11 +264,13 @@ public sealed class MainViewModel : ViewModelBase
         {
             var loaded = await ProjectPersistence.LoadAutosaveOrStarterAsync().ConfigureAwait(true);
             var recents = await ProjectPersistence.LoadRecentProjectsAsync().ConfigureAwait(true);
+            var customFolders = await ProjectPersistence.LoadCustomPluginFoldersAsync().ConfigureAwait(true);
             var backups = ProjectPersistence.LoadBackupSnapshots();
 
             _project = loaded;
             _history.PushSnapshot(_project);
             ReplaceCollection(RecentProjects, recents);
+            ReplaceCollection(CustomPluginFolders, customFolders);
             ReplaceCollection(BackupSnapshots, backups);
             SyncCollectionsFromProject();
             RefreshDerivedViews();
@@ -327,6 +328,8 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<DiscoveredAction> Actions { get; } = new();
     public ObservableCollection<PluginActionArgRow> ActionArgs { get; } = new();
     public ObservableCollection<ExecutedPluginOutput> PluginOutputs { get; } = new();
+    public ObservableCollection<string> CustomPluginFolders { get; } = new();
+    public ObservableCollection<string> ActivePluginSearchPaths { get; } = new();
 
     public Array WordOrders => Enum.GetValues(typeof(WordOrder));
     public Array ClauseTemplates => Enum.GetValues(typeof(ClauseTemplate));
@@ -650,6 +653,16 @@ public sealed class MainViewModel : ViewModelBase
     }
     public ExecutedPluginOutput? SelectedPluginOutput { get => _selectedPluginOutput; set => SetField(ref _selectedPluginOutput, value); }
     public string PluginLogsText { get => _pluginLogsText; set => SetField(ref _pluginLogsText, value); }
+    public string NewPluginFolderPath
+    {
+        get => _newPluginFolderPath;
+        set { if (SetField(ref _newPluginFolderPath, value)) AddPluginFolderCommand.RaiseCanExecuteChanged(); }
+    }
+    public string? SelectedCustomPluginFolder
+    {
+        get => _selectedCustomPluginFolder;
+        set { if (SetField(ref _selectedCustomPluginFolder, value)) RemovePluginFolderCommand.RaiseCanExecuteChanged(); }
+    }
 
     // Commands
     public AsyncRelayCommand NewProjectCommand { get; }
@@ -691,6 +704,8 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand GenerateWordsCommand { get; }
     public RelayCommand RefreshInspectorsCommand { get; }
     public RelayCommand RefreshPluginsCommand { get; }
+    public AsyncRelayCommand AddPluginFolderCommand { get; }
+    public AsyncRelayCommand RemovePluginFolderCommand { get; }
     public AsyncRelayCommand RunActionCommand { get; }
 
     private void PopulatePipelineOptions()
@@ -1192,9 +1207,35 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(DiagnosticsSummary));
     }
 
+    public async Task AddCustomPluginFolderAsync(string? folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath)) return;
+        string trimmed = folderPath.Trim();
+        if (!CustomPluginFolders.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+            CustomPluginFolders.Add(trimmed);
+        NewPluginFolderPath = "";
+        await ProjectPersistence.SaveCustomPluginFoldersAsync(CustomPluginFolders);
+        LoadPluginsCatalog();
+        StatusMessage = $"Added plugin folder: {trimmed}";
+    }
+
+    private async Task RemoveCustomPluginFolderAsync(string? folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath)) return;
+        var match = CustomPluginFolders.FirstOrDefault(f => string.Equals(f, folderPath, StringComparison.OrdinalIgnoreCase));
+        if (match is null) return;
+        CustomPluginFolders.Remove(match);
+        await ProjectPersistence.SaveCustomPluginFoldersAsync(CustomPluginFolders);
+        LoadPluginsCatalog();
+        StatusMessage = $"Removed plugin folder: {match}";
+    }
+
     private void LoadPluginsCatalog()
     {
-        var discovered = new PluginService().DiscoverPlugins();
+        var searchPaths = PluginService.GetPluginSearchPaths(CustomPluginFolders);
+        ReplaceCollection(ActivePluginSearchPaths, searchPaths);
+
+        var discovered = new PluginService().DiscoverPlugins(CustomPluginFolders);
         ReplaceCollection(Plugins, discovered);
         var acts = discovered.SelectMany(p => p.Actions).ToList();
         ReplaceCollection(Actions, acts);
@@ -1203,12 +1244,15 @@ public sealed class MainViewModel : ViewModelBase
 
         if (!_isDesignMode)
         {
-            foreach (var dir in PluginService.GetPluginSearchPaths())
+            foreach (var p in discovered)
+                _pipelineRegistry.LoadExtensionAssembly(p.DllPath);
+            foreach (var dir in CustomPluginFolders)
                 _pipelineRegistry.LoadExtensionsFromDirectory(dir);
+
             PopulatePipelineOptions();
             RebuildPipelinePhonoItems();
         }
-        AppendPluginLog($"Discovered {Plugins.Count} plugin(s), {Actions.Count} action(s), and {_pipelineRegistry.PhonoRules.Count} pipeline phonology rule(s).");
+        AppendPluginLog($"Discovered {Plugins.Count} plugin(s), {Actions.Count} action(s) across {ActivePluginSearchPaths.Count} search folder(s); {_pipelineRegistry.PhonoRules.Count} pipeline phonology rule(s).");
     }
 
     private async Task RunPluginActionAsync(DiscoveredAction? action)

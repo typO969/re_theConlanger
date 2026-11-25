@@ -58,7 +58,52 @@ public static class ProjectPersistence
 
     private static string AutosavePath => Path.Combine(AppDir, "autosave.clproj.json");
     private static string RecentPath => Path.Combine(AppDir, "recent-projects.json");
+    private static string PluginFoldersPath => Path.Combine(AppDir, "plugin-folders.json");
     private static string BackupsDir => Path.Combine(AppDir, "backups");
+    public static string UserPluginsDir => Path.Combine(AppDir, "plugins");
+
+    public static List<string> LoadCustomPluginFolders()
+    {
+        try
+        {
+            if (!File.Exists(PluginFoldersPath)) return new();
+            var list = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(PluginFoldersPath), ProjectFactory.JsonOptions) ?? new();
+            return list.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
+    public static async Task<List<string>> LoadCustomPluginFoldersAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            if (!File.Exists(PluginFoldersPath)) return new();
+            var json = await File.ReadAllTextAsync(PluginFoldersPath, ct).ConfigureAwait(false);
+            var list = JsonSerializer.Deserialize<List<string>>(json, ProjectFactory.JsonOptions) ?? new();
+            return list.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
+    public static async Task SaveCustomPluginFoldersAsync(IEnumerable<string> folders, CancellationToken ct = default)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppDir);
+            var clean = folders.Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => f.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            await File.WriteAllTextAsync(PluginFoldersPath, JsonSerializer.Serialize(clean, ProjectFactory.JsonOptions), ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Ignore disk write issues
+        }
+    }
 
     public static async Task SaveAutosaveAsync(LanguageProject project, CancellationToken ct = default)
     {
@@ -235,45 +280,79 @@ public sealed record ExecutedPluginOutput(
 
 public sealed class PluginService
 {
-    public static IReadOnlyList<string> GetPluginSearchPaths()
+    public static IReadOnlyList<string> GetPluginSearchPaths(IEnumerable<string>? customFolders = null)
     {
         var paths = new List<string>();
-        var localPlugins = Path.Combine(AppContext.BaseDirectory, "plugins");
-        if (Directory.Exists(localPlugins)) paths.Add(localPlugins);
-
-        // Allow automatic discovery when launching from Visual Studio bin/Debug/net10.0-windows/
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        for (int i = 0; i < 6 && dir is not null; i++)
+        void AddIfNew(string? rawPath)
         {
-            var candidate = Path.Combine(dir.FullName, "plugins");
-            if (Directory.Exists(candidate) && !paths.Contains(candidate, StringComparer.OrdinalIgnoreCase))
-                paths.Add(candidate);
-            dir = dir.Parent;
+            if (string.IsNullOrWhiteSpace(rawPath)) return;
+            try
+            {
+                var full = Path.GetFullPath(rawPath.Trim());
+                if (Directory.Exists(full) && !paths.Contains(full, StringComparer.OrdinalIgnoreCase))
+                    paths.Add(full);
+            }
+            catch
+            {
+                // Ignore malformed folder paths
+            }
         }
+
+        // 1. User-selected custom plugin folders (persisted or live) + CONLANGER_PLUGIN_DIRS env var
+        foreach (var custom in customFolders ?? ProjectPersistence.LoadCustomPluginFolders())
+            AddIfNew(custom);
+
+        var envDirs = Environment.GetEnvironmentVariable("CONLANGER_PLUGIN_DIRS");
+        if (!string.IsNullOrWhiteSpace(envDirs))
+        {
+            foreach (var part in envDirs.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                AddIfNew(part);
+        }
+
+        // 2. Adjacent /plugins folder & user %LocalAppData%\Conlanger\plugins
+        AddIfNew(Path.Combine(AppContext.BaseDirectory, "plugins"));
+        AddIfNew(ProjectPersistence.UserPluginsDir);
+
+        // 3. Walk up 12 parent levels from both BaseDirectory and CWD so x64/AnyCPU Debug/Release output folders
+        //    (e.g., ...\dotnet\src\Conlanger.Desktop\bin\x64\Debug\net10.0-windows\) reach ...\dotnet\plugins cleanly
+        foreach (var anchor in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
+        {
+            if (string.IsNullOrWhiteSpace(anchor)) continue;
+            DirectoryInfo? dir = new(anchor);
+            for (int i = 0; i < 12 && dir is not null; i++)
+            {
+                AddIfNew(Path.Combine(dir.FullName, "plugins"));
+                dir = dir.Parent;
+            }
+        }
+
         return paths;
     }
 
-    public IReadOnlyList<DiscoveredPlugin> DiscoverPlugins()
+    public IReadOnlyList<DiscoveredPlugin> DiscoverPlugins(IEnumerable<string>? customFolders = null)
     {
-        var results = new List<DiscoveredPlugin>();
-        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var candidates = new Dictionary<string, (DiscoveredPlugin Plugin, DateTime BuiltUtc)>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var root in GetPluginSearchPaths())
+        foreach (var root in GetPluginSearchPaths(customFolders))
         {
             foreach (var manifestFile in Directory.EnumerateFiles(root, "*.plugin.json", SearchOption.AllDirectories))
             {
+                if (IsIgnoredBuildPath(manifestFile)) continue;
                 try
                 {
                     var manifest = JsonSerializer.Deserialize<PluginManifest>(File.ReadAllText(manifestFile), ProjectFactory.JsonOptions);
                     if (manifest is null || string.IsNullOrWhiteSpace(manifest.EntryAssembly)) continue;
-                    if (!seenIds.Add(manifest.Id)) continue;
 
                     string manifestDir = Path.GetDirectoryName(manifestFile)!;
                     string? dll = LocateCompiledPluginDll(manifestDir, manifest.EntryAssembly);
                     if (dll is null) continue;
 
+                    DateTime builtUtc = File.GetLastWriteTimeUtc(dll);
+                    if (candidates.TryGetValue(manifest.Id, out var existing) && existing.BuiltUtc >= builtUtc)
+                        continue;
+
                     var actions = InspectPluginActions(manifest, dll);
-                    results.Add(new DiscoveredPlugin(manifest, dll, actions));
+                    candidates[manifest.Id] = (new DiscoveredPlugin(manifest, dll, actions), builtUtc);
                 }
                 catch
                 {
@@ -281,18 +360,51 @@ public sealed class PluginService
                 }
             }
         }
-        return results;
+        return candidates.Values.Select(c => c.Plugin).OrderBy(p => p.Manifest.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static bool IsIgnoredBuildPath(string path)
+    {
+        var sep = Path.DirectorySeparatorChar;
+        return path.Contains($"{sep}obj{sep}", StringComparison.OrdinalIgnoreCase)
+            || path.Contains($"{sep}ref{sep}", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? LocateCompiledPluginDll(string manifestDir, string entryAssembly)
     {
         var direct = Path.Combine(manifestDir, entryAssembly);
-        if (File.Exists(direct)) return direct;
+        if (File.Exists(direct) && !IsIgnoredBuildPath(direct)) return direct;
 
+        var candidates = new List<string>();
         var binDir = Path.Combine(manifestDir, "bin");
-        if (!Directory.Exists(binDir)) return null;
-        return Directory.EnumerateFiles(binDir, entryAssembly, SearchOption.AllDirectories)
-            .OrderByDescending(File.GetLastWriteTimeUtc)
+        if (Directory.Exists(binDir))
+        {
+            candidates.AddRange(Directory.EnumerateFiles(binDir, entryAssembly, SearchOption.AllDirectories)
+                .Where(p => !IsIgnoredBuildPath(p)));
+        }
+
+        // Also support users pointing custom plugin folders straight at a directory containing DLLs or nested builds
+        if (candidates.Count == 0)
+        {
+            candidates.AddRange(Directory.EnumerateFiles(manifestDir, entryAssembly, SearchOption.AllDirectories)
+                .Where(p => !IsIgnoredBuildPath(p)));
+        }
+
+        if (candidates.Count == 0) return null;
+
+        bool hostIsX64 = AppContext.BaseDirectory.Contains($"{Path.DirectorySeparatorChar}x64{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
+        bool hostIsRelease = AppContext.BaseDirectory.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
+
+        return candidates
+            .OrderByDescending(p =>
+            {
+                int score = 0;
+                if (hostIsX64 && p.Contains($"{Path.DirectorySeparatorChar}x64{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)) score += 2;
+                if (hostIsRelease && p.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)) score += 1;
+                if (!hostIsRelease && p.Contains($"{Path.DirectorySeparatorChar}Debug{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)) score += 1;
+                return score;
+            })
+            .ThenByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
     }
 
@@ -403,6 +515,23 @@ public sealed class PluginService
         var adjacentDll = Path.Combine(AppContext.BaseDirectory, "Conlanger.PluginHost.dll");
         if (File.Exists(adjacentDll) && File.Exists(Path.ChangeExtension(adjacentDll, ".exe")))
             return Path.ChangeExtension(adjacentDll, ".exe");
+
+        DirectoryInfo? dir = new(AppContext.BaseDirectory);
+        for (int i = 0; i < 10 && dir is not null; i++)
+        {
+            var hostBin = Path.Combine(dir.FullName, "Conlanger.PluginHost", "bin");
+            if (Directory.Exists(hostBin))
+            {
+                bool hostIsX64 = AppContext.BaseDirectory.Contains($"{Path.DirectorySeparatorChar}x64{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
+                var match = Directory.EnumerateFiles(hostBin, "Conlanger.PluginHost.exe", SearchOption.AllDirectories)
+                    .Where(p => !IsIgnoredBuildPath(p))
+                    .OrderByDescending(p => hostIsX64 && p.Contains($"{Path.DirectorySeparatorChar}x64{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                    .ThenByDescending(File.GetLastWriteTimeUtc)
+                    .FirstOrDefault();
+                if (match is not null) return match;
+            }
+            dir = dir.Parent;
+        }
         return null;
     }
 

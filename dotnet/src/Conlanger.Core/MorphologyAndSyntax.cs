@@ -272,36 +272,66 @@ public sealed class PipelineRegistry
 
     public void LoadExtensionsFromDirectory(string pluginsDirectory)
     {
+        if (string.IsNullOrWhiteSpace(pluginsDirectory) || !Directory.Exists(pluginsDirectory))
+            return;
+
         foreach (var dll in Directory.EnumerateFiles(pluginsDirectory, "*.dll", SearchOption.AllDirectories))
         {
-            try
+            if (IsIgnoredBuildPath(dll)) continue;
+            LoadExtensionAssembly(dll);
+        }
+    }
+
+    public void LoadExtensionAssembly(string dllPath)
+    {
+        if (string.IsNullOrWhiteSpace(dllPath) || !File.Exists(dllPath) || IsIgnoredBuildPath(dllPath))
+            return;
+
+        var fileName = Path.GetFileName(dllPath);
+        if (fileName.StartsWith("Conlanger.", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var alc = new AssemblyLoadContext($"ext-{Path.GetFileNameWithoutExtension(dllPath)}-{Guid.NewGuid():N}", isCollectible: true);
+        bool registeredAny = false;
+        try
+        {
+            using var fs = new FileStream(dllPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var asm = alc.LoadFromStream(fs);
+            foreach (var t in asm.GetExportedTypes())
             {
-                var alc = new AssemblyLoadContext($"ext-{Path.GetFileNameWithoutExtension(dll)}", isCollectible: true);
-                using var fs = new FileStream(dll, FileMode.Open, FileAccess.Read, FileShare.Read);
-                var asm = alc.LoadFromStream(fs);
-                foreach (var t in asm.GetExportedTypes())
+                if (typeof(IPipelineExtensionProvider).IsAssignableFrom(t) && !t.IsAbstract)
                 {
-                    if (typeof(IPipelineExtensionProvider).IsAssignableFrom(t) && !t.IsAbstract)
+                    if (Activator.CreateInstance(t) is IPipelineExtensionProvider provider)
                     {
-                        if (Activator.CreateInstance(t) is IPipelineExtensionProvider provider)
-                        {
-                            foreach (var sg in provider.GetSyntaxGenerators())
-                                if (_syntaxGenerators.All(x => x.Id != sg.Id)) _syntaxGenerators.Add(sg);
-                            foreach (var mr in provider.GetMorphologyRealizers())
-                                if (_morphologyRealizers.All(x => x.Id != mr.Id)) _morphologyRealizers.Add(mr);
-                            foreach (var or in provider.GetOrthographyRenderers())
-                                if (_orthographyRenderers.All(x => x.Id != or.Id)) _orthographyRenderers.Add(or);
-                            foreach (var pr in provider.GetPhonoRules())
-                                if (_phonoRules.All(x => x.Id != pr.Id)) _phonoRules.Add(pr);
-                        }
+                        registeredAny = true;
+                        foreach (var sg in provider.GetSyntaxGenerators())
+                            if (_syntaxGenerators.All(x => x.Id != sg.Id)) _syntaxGenerators.Add(sg);
+                        foreach (var mr in provider.GetMorphologyRealizers())
+                            if (_morphologyRealizers.All(x => x.Id != mr.Id)) _morphologyRealizers.Add(mr);
+                        foreach (var or in provider.GetOrthographyRenderers())
+                            if (_orthographyRenderers.All(x => x.Id != or.Id)) _orthographyRenderers.Add(or);
+                        foreach (var pr in provider.GetPhonoRules())
+                            if (_phonoRules.All(x => x.Id != pr.Id)) _phonoRules.Add(pr);
                     }
                 }
             }
-            catch
-            {
-                // Keep UI resilient if an external plugin assembly fails to load
-            }
         }
+        catch
+        {
+            // Keep UI resilient if an external plugin assembly fails to load
+        }
+        finally
+        {
+            if (!registeredAny)
+                alc.Unload();
+        }
+    }
+
+    private static bool IsIgnoredBuildPath(string path)
+    {
+        var sep = Path.DirectorySeparatorChar;
+        return path.Contains($"{sep}obj{sep}", StringComparison.OrdinalIgnoreCase)
+            || path.Contains($"{sep}ref{sep}", StringComparison.OrdinalIgnoreCase);
     }
 
     public ISyntaxGenerator ResolveSyntax(string? id) =>
