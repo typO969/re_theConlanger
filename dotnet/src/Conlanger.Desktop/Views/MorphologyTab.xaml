@@ -18,28 +18,31 @@
         </Grid.ColumnDefinitions>
 
         <!-- Lexicon Editor -->
-        <GroupBox Grid.Row="0" Grid.Column="0" Header="Lexicon (UR, Deep Spelling &amp; Irregulars)" Margin="0,0,10,10">
+        <GroupBox Grid.Row="0" Grid.Column="0" Header="Lexicon (UR, Class, Deep Spelling &amp; Irregulars)" Margin="0,0,10,10">
             <DockPanel>
                 <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                     <TextBlock Text="Lemma:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexLemma, UpdateSourceTrigger=PropertyChanged}" Width="75" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexLemma, UpdateSourceTrigger=PropertyChanged}" Width="70" Margin="0,0,6,4" />
                     <TextBlock Text="POS:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexPos, UpdateSourceTrigger=PropertyChanged}" Width="44" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexPos, UpdateSourceTrigger=PropertyChanged}" Width="40" Margin="0,0,6,4" />
+                    <TextBlock Text="Class:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewLexClass, UpdateSourceTrigger=PropertyChanged}" Width="54" ToolTip="Lexical / Gender Class (e.g. Fem, Masc, Anim, C1)" Margin="0,0,6,4" />
                     <TextBlock Text="UR:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexUr, UpdateSourceTrigger=PropertyChanged}" Width="95" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexUr, UpdateSourceTrigger=PropertyChanged}" Width="88" Margin="0,0,6,4" />
                     <TextBlock Text="Spelling:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexSpelling, UpdateSourceTrigger=PropertyChanged}" Width="72" ToolTip="Deep/Morphophonemic Spelling" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexSpelling, UpdateSourceTrigger=PropertyChanged}" Width="66" ToolTip="Deep/Morphophonemic Spelling" Margin="0,0,6,4" />
                     <TextBlock Text="Irreg:" VerticalAlignment="Center" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewLexIrregulars, UpdateSourceTrigger=PropertyChanged}" Width="145" ToolTip="Format: Number=Pl -> ˈm aɪ s; Tense=Past -> ˈw ɛ n t" Margin="0,0,6,4" />
+                    <TextBox Text="{Binding NewLexIrregulars, UpdateSourceTrigger=PropertyChanged}" Width="125" ToolTip="Format: Number=Pl -> ˈm aɪ s; Tense=Past -> ˈw ɛ n t" Margin="0,0,6,4" />
                     <Button Content="+ Lexeme" Command="{Binding AddLexemeCommand}" Margin="0,0,0,4" />
                 </WrapPanel>
                 <DataGrid ItemsSource="{Binding Lexemes}" AutoGenerateColumns="False" CanUserAddRows="False">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Lemma" Binding="{Binding Lemma}" Width="78" />
-                        <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="48" />
+                        <DataGridTextColumn Header="Lemma" Binding="{Binding Lemma}" Width="72" />
+                        <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="44" />
+                        <DataGridTextColumn Header="Class" Binding="{Binding LexClass}" Width="56" />
                         <DataGridTextColumn Header="UR (Phones)" Binding="{Binding UR}" Width="*" />
-                        <DataGridTextColumn Header="Spelling" Binding="{Binding Spelling}" Width="75" />
-                        <DataGridTextColumn Header="Irregulars" Binding="{Binding IrregularsSummary, UpdateSourceTrigger=LostFocus}" Width="1.2*" />
+                        <DataGridTextColumn Header="Spelling" Binding="{Binding Spelling}" Width="68" />
+                        <DataGridTextColumn Header="Irregulars" Binding="{Binding IrregularsSummary, UpdateSourceTrigger=LostFocus}" Width="1.15*" />
                         <DataGridTemplateColumn Width="36">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -55,29 +58,37 @@
         </GroupBox>
 
         <!-- Affixes Editor -->
-        <GroupBox Grid.Row="0" Grid.Column="1" Header="Inflectional &amp; Conditioned Allomorph Affixes" Margin="0,0,0,10">
+        <GroupBox Grid.Row="0" Grid.Column="1" Header="Inflectional, Conditioned &amp; Non-Linear Morphology (Prefix/Suffix/Infix/Circumfix/Template)" Margin="0,0,0,10">
             <DockPanel>
                 <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBox Text="{Binding NewAffixName, UpdateSourceTrigger=PropertyChanged}" Width="80" ToolTip="Affix Name" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewAffixPos, UpdateSourceTrigger=PropertyChanged}" Width="40" ToolTip="POS" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewAffixFeatName, UpdateSourceTrigger=PropertyChanged}" Width="68" ToolTip="Feature Name" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewAffixFeatVal, UpdateSourceTrigger=PropertyChanged}" Width="54" ToolTip="Feature Value" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewAffixForm, UpdateSourceTrigger=PropertyChanged}" Width="54" ToolTip="Affix Phones" Margin="0,0,4,4" />
-                    <TextBox Text="{Binding NewAffixCondition, UpdateSourceTrigger=PropertyChanged}" Width="88" ToolTip="Stem Condition (e.g. [+sibilant], [-voice])" Margin="0,0,6,4" />
-                    <CheckBox Content="Prefix" IsChecked="{Binding NewAffixIsPrefix}" VerticalAlignment="Center" Margin="0,0,8,4" />
+                    <TextBox Text="{Binding NewAffixName, UpdateSourceTrigger=PropertyChanged}" Width="76" ToolTip="Rule Name" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewAffixPos, UpdateSourceTrigger=PropertyChanged}" Width="38" ToolTip="POS" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewAffixFeatName, UpdateSourceTrigger=PropertyChanged}" Width="64" ToolTip="Feature Name (e.g. Number, Class, Template)" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewAffixFeatVal, UpdateSourceTrigger=PropertyChanged}" Width="50" ToolTip="Feature Value" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewAffixForm, UpdateSourceTrigger=PropertyChanged}" Width="72" ToolTip="Form / Template (e.g. -i, um, ge+...+t, C1 a C2 a C3 a)" Margin="0,0,4,4" />
+                    <TextBox Text="{Binding NewAffixCondition, UpdateSourceTrigger=PropertyChanged}" Width="82" ToolTip="Condition (e.g. [+sibilant], [-voice], [class=Fem])" Margin="0,0,4,4" />
+                    <ComboBox ItemsSource="{Binding AffixTypes}" SelectedItem="{Binding NewAffixType}" Width="84" ToolTip="Morphology Kind" Margin="0,0,6,4" />
                     <Button Content="+ Affix" Command="{Binding AddAffixCommand}" Margin="0,0,0,4" />
                 </WrapPanel>
                 <DataGrid ItemsSource="{Binding Affixes}" AutoGenerateColumns="False" CanUserAddRows="False">
                     <DataGrid.Columns>
-                        <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="36" />
-                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="92" />
-                        <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="44" />
-                        <DataGridTextColumn Header="Feature" Binding="{Binding FeatureName}" Width="72" />
-                        <DataGridTextColumn Header="Value" Binding="{Binding FeatureValue}" Width="54" />
-                        <DataGridTextColumn Header="Affix" Binding="{Binding Affix}" Width="62" />
+                        <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="34" />
+                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="86" />
+                        <DataGridTextColumn Header="POS" Binding="{Binding Pos}" Width="40" />
+                        <DataGridTextColumn Header="Feature" Binding="{Binding FeatureName}" Width="66" />
+                        <DataGridTextColumn Header="Value" Binding="{Binding FeatureValue}" Width="50" />
+                        <DataGridTextColumn Header="Form / Pattern" Binding="{Binding Affix}" Width="78" />
                         <DataGridTextColumn Header="Condition" Binding="{Binding Condition}" Width="*" />
-                        <DataGridCheckBoxColumn Header="Pre?" Binding="{Binding IsPrefix}" Width="44" />
-                        <DataGridTemplateColumn Header="Order" Width="90">
+                        <DataGridTemplateColumn Header="Kind" Width="88">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox ItemsSource="{Binding DataContext.AffixTypes, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              SelectedItem="{Binding EffectiveAffixType, UpdateSourceTrigger=PropertyChanged}"
+                                              Padding="4,1" BorderThickness="0" Background="Transparent" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Order" Width="86">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">

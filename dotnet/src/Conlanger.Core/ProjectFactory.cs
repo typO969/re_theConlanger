@@ -24,6 +24,7 @@ public static class ProjectFactory
         ["d"] = new() { Voicing = "voiced", Manner = "stop", Place = "alveolar" },
         ["k"] = new() { Voicing = "voiceless", Manner = "stop", Place = "velar" },
         ["kʰ"] = new() { Voicing = "voiceless", Manner = "stop", Place = "velar", Custom = "aspirated" },
+        ["q"] = new() { Voicing = "voiceless", Manner = "stop", Place = "uvular" },
         ["g"] = new() { Voicing = "voiced", Manner = "stop", Place = "velar" },
         ["ʔ"] = new() { Voicing = "voiceless", Manner = "stop", Place = "glottal" },
         ["tʃ"] = new() { Voicing = "voiceless", Manner = "affricate", Place = "postalveolar", Custom = "sibilant" },
@@ -41,6 +42,10 @@ public static class ProjectFactory
         ["z"] = new() { Voicing = "voiced", Manner = "fricative", Place = "alveolar", Custom = "sibilant" },
         ["ʃ"] = new() { Voicing = "voiceless", Manner = "fricative", Place = "postalveolar", Custom = "sibilant" },
         ["ʒ"] = new() { Voicing = "voiced", Manner = "fricative", Place = "postalveolar", Custom = "sibilant" },
+        ["x"] = new() { Voicing = "voiceless", Manner = "fricative", Place = "velar" },
+        ["ɣ"] = new() { Voicing = "voiced", Manner = "fricative", Place = "velar" },
+        ["ħ"] = new() { Voicing = "voiceless", Manner = "fricative", Place = "pharyngeal" },
+        ["ʕ"] = new() { Voicing = "voiced", Manner = "fricative", Place = "pharyngeal" },
         ["h"] = new() { Voicing = "voiceless", Manner = "fricative", Place = "glottal" },
         ["ɾ"] = new() { Voicing = "voiced", Manner = "tap", Place = "alveolar" },
         ["r"] = new() { Voicing = "voiced", Manner = "trill", Place = "alveolar", Custom = "liquid" },
@@ -58,6 +63,13 @@ public static class ProjectFactory
         ["i"] = new() { Voicing = "voiced", Manner = "vowel", Height = "high", Backness = "front", Roundness = "unrounded" },
         ["iː"] = new() { Voicing = "voiced", Manner = "vowel", Height = "high", Backness = "front", Roundness = "unrounded", Custom = "tense long" },
         ["ɪ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "high", Backness = "front", Roundness = "unrounded", Custom = "lax" },
+        ["y"] = new() { Voicing = "voiced", Manner = "vowel", Height = "high", Backness = "front", Roundness = "rounded" },
+        ["yː"] = new() { Voicing = "voiced", Manner = "vowel", Height = "high", Backness = "front", Roundness = "rounded", Custom = "tense long" },
+        ["ø"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "front", Roundness = "rounded" },
+        ["øː"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "front", Roundness = "rounded", Custom = "tense long" },
+        ["œ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "front", Roundness = "rounded", Custom = "lax" },
+        ["ɯ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "high", Backness = "back", Roundness = "unrounded" },
+        ["ɤ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "back", Roundness = "unrounded" },
         ["o"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "back", Roundness = "rounded" },
         ["oʊ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "back", Roundness = "rounded", Custom = "diphthong tense" },
         ["ɔː"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "back", Roundness = "rounded", Custom = "tense long" },
@@ -73,15 +85,22 @@ public static class ProjectFactory
         ["ɔɪ"] = new() { Voicing = "voiced", Manner = "vowel", Height = "mid", Backness = "back", Roundness = "rounded", Custom = "diphthong" }
     };
 
-    internal static PhonologicalFeatures? TryGetKnownFeatures(string symbol) =>
-        KnownFeatures.TryGetValue(symbol.TrimStart('ˈ'), out var f) ? f : null;
+    internal static PhonologicalFeatures? TryGetKnownFeatures(string symbol)
+    {
+        var noStress = PhonologyEngine.StripStressMark(symbol);
+        if (KnownFeatures.TryGetValue(noStress, out var f)) return f;
+        var clean = PhonologyEngine.StripSuprasegmentals(symbol);
+        return KnownFeatures.TryGetValue(clean, out f) ? f : null;
+    }
 
     internal static IEnumerable<KeyValuePair<string, PhonologicalFeatures>> EnumerateKnownFeatures() => KnownFeatures;
 
     public static Phoneme CreatePhoneme(string symbol, string type = "C", int weight = 1, bool allowOnset = true, bool allowCoda = true)
     {
-        var clean = symbol.TrimStart('ˈ');
-        var features = KnownFeatures.TryGetValue(clean, out var preset)
+        var noStress = PhonologyEngine.StripStressMark(symbol);
+        var clean = PhonologyEngine.StripSuprasegmentals(symbol);
+        var hasPreset = KnownFeatures.TryGetValue(noStress, out var preset) || KnownFeatures.TryGetValue(clean, out preset);
+        var features = hasPreset && preset is not null
             ? new PhonologicalFeatures
             {
                 Voicing = preset.Voicing,

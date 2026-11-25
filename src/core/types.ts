@@ -79,10 +79,13 @@ export interface Syllable {
   coda: string[];
 }
 
+export type AffixType = 'Prefix' | 'Suffix' | 'Infix' | 'Circumfix' | 'Template';
+
 export interface Lexeme {
   lemma: string;
   pos: string;
   rootPhones: Record<string, string>;
+  lexClass?: string;
   spelling?: string;
   irregulars?: Record<string, string>;
 }
@@ -105,6 +108,7 @@ export interface AffixRule {
   featureValue: string;
   affix: string;
   isPrefix: boolean;
+  affixType?: AffixType;
   condition?: string;
   enabled: boolean;
 }
@@ -195,6 +199,7 @@ export interface LexemeState {
   Lemma: string;
   Pos: string;
   UR: string;
+  LexClass?: string;
   Spelling?: string;
   Irregulars?: Record<string, string>;
 }
@@ -206,6 +211,7 @@ export interface AffixState {
   FeatureValue: string;
   Affix: string;
   IsPrefix: boolean;
+  AffixType?: AffixType;
   Condition?: string;
   Enabled: boolean;
 }

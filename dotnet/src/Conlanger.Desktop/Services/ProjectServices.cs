@@ -259,7 +259,7 @@ public static class ProjectPersistence
     public static string ExportLexiconCsv(IEnumerable<LexemeEntry> lexemes)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Lemma,Pos,UR,Spelling,Irregulars");
+        sb.AppendLine("Lemma,Pos,UR,Spelling,Irregulars,LexClass");
         foreach (var l in lexemes)
         {
             var irregJson = l.Irregulars is { Count: > 0 } ? JsonSerializer.Serialize(l.Irregulars) : "";
@@ -268,7 +268,8 @@ public static class ProjectPersistence
                 EscapeCsvCell(l.Pos),
                 EscapeCsvCell(l.UR),
                 EscapeCsvCell(l.Spelling),
-                EscapeCsvCell(irregJson)));
+                EscapeCsvCell(irregJson),
+                EscapeCsvCell(l.LexClass)));
         }
         return sb.ToString();
     }
@@ -286,17 +287,27 @@ public static class ProjectPersistence
                 return parsed.Where(l => !string.IsNullOrWhiteSpace(l.Lemma)).ToList();
             }
 
-            return content.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
+            var rawLines = content.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
+            if (rawLines.Length <= 1) return new();
+
+            var headers = ParseCsvLine(rawLines[0]).Select(h => h.Trim().ToLowerInvariant()).ToList();
+            int classCol = headers.IndexOf("lexclass");
+
+            return rawLines
                 .Skip(1)
                 .Select(ParseCsvLine)
                 .Where(parts => parts.Count >= 3 && !string.IsNullOrWhiteSpace(parts[0]))
                 .Select(parts =>
                 {
+                    string? rawClass = classCol >= 0
+                        ? (classCol < parts.Count ? parts[classCol] : null)
+                        : (parts.Count > 5 ? parts[5] : null);
                     var entry = new LexemeEntry
                     {
                         Lemma = parts[0].Trim(),
                         Pos = string.IsNullOrWhiteSpace(parts[1]) ? "N" : parts[1].Trim(),
                         UR = parts[2].Trim(),
+                        LexClass = string.IsNullOrWhiteSpace(rawClass) ? null : rawClass.Trim(),
                         Spelling = parts.Count > 3 && !string.IsNullOrWhiteSpace(parts[3]) ? parts[3].Trim() : null
                     };
                     if (parts.Count > 4 && !string.IsNullOrWhiteSpace(parts[4]))

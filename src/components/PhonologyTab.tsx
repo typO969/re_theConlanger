@@ -600,7 +600,7 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
           <h3 className="text-sm font-bold text-slate-900">
             Phonological Rules{' '}
             <span className="font-normal text-xs text-slate-500">
-              (supports ∅, #, $, V/C classes, [+voice], [-stressed], [manner=stop], [αplace])
+              (supports ∅, #, $, V/C, [+voice], [-stressed], [tone=LHL], [αplace], [αback, αround])
             </span>
           </h3>
           <label className="flex items-center gap-2 text-xs">
@@ -701,7 +701,7 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
                 type="text"
                 value={newRuleReplacement}
                 onChange={(e) => setNewRuleReplacement(e.target.value)}
-                placeholder="Replace (∅ or [αplace])"
+                placeholder="Replace (∅, [αplace], [αback, αround], [tone=LH])"
                 className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
               />
             </div>
@@ -717,7 +717,7 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
                 type="text"
                 value={newRuleNext}
                 onChange={(e) => setNewRuleNext(e.target.value)}
-                placeholder="Next (# or $)"
+                placeholder="Next (#, $, [tone=LHL])"
                 className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
               />
             </div>
@@ -725,7 +725,7 @@ export const PhonologyTab: React.FC<PhonologyTabProps> = ({ state, onUpdate }) =
               type="text"
               value={newRuleCond}
               onChange={(e) => setNewRuleCond(e.target.value)}
-              placeholder="Condition (e.g. [+voice], [manner=stop])"
+              placeholder="Condition (e.g. [+voice], [manner=stop], [+high-tone])"
               className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
             />
             <button

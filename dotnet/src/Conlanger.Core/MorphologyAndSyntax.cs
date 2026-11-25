@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text;
+using System.Text.RegularExpressions;
 using Conlanger.SDK;
 
 namespace Conlanger.Core;
@@ -24,14 +25,21 @@ public class ConfigurableSyntaxGenerator : ISyntaxGenerator
         string? Constraint(string key) =>
             spec.Constraints is not null && spec.Constraints.TryGetValue(key, out var val) ? val : null;
 
-        SyntaxNode BuildNp(bool plural, bool includeAdj, string rolePrefix)
+        SyntaxNode BuildNp(bool plural, bool includeAdj, string rolePrefix, out string? headClass)
         {
-            var noun = Pick(nouns, "person");
+            var nounLex = nouns.Count == 0
+                ? null
+                : project.Lexemes.FirstOrDefault(l => string.Equals(l.Lemma, Pick(nouns, "person"), StringComparison.OrdinalIgnoreCase) && string.Equals(l.Pos, "N", StringComparison.OrdinalIgnoreCase));
+            var noun = nounLex?.Lemma ?? Pick(nouns, "person");
+            headClass = string.IsNullOrWhiteSpace(nounLex?.LexClass) ? null : nounLex!.LexClass!.Trim();
             var feats = new List<Feat> { new("Role", rolePrefix), new("Number", plural ? "Pl" : "Sing") };
+            if (!string.IsNullOrEmpty(headClass)) feats.Add(new("Class", headClass));
             var nLeaf = new SyntaxNode("N", noun, feats);
             if (!includeAdj || adjs.Count == 0)
                 return nLeaf;
-            var adjLeaf = new SyntaxNode("ADJ", Pick(adjs, "small"), new[] { new Feat("Role", "Mod") });
+            var adjFeats = new List<Feat> { new("Role", "Mod"), new("Number", plural ? "Pl" : "Sing") };
+            if (!string.IsNullOrEmpty(headClass)) adjFeats.Add(new("Class", headClass));
+            var adjLeaf = new SyntaxNode("ADJ", Pick(adjs, "small"), adjFeats);
             return new SyntaxNode("NP", $"{rolePrefix}NP", new[] { new Feat("Role", $"{rolePrefix}NP") }, new[] { adjLeaf, nLeaf });
         }
 
@@ -41,12 +49,15 @@ public class ConfigurableSyntaxGenerator : ISyntaxGenerator
         bool objPl = string.Equals(numObjStr, "Pl", StringComparison.OrdinalIgnoreCase);
 
         bool useAdjs = spec.ApproxWords >= 4 && adjs.Count > 0;
-        var subj = BuildNp(subjPl, useAdjs, "Subj");
+        var subj = BuildNp(subjPl, useAdjs, "Subj", out var subjClass);
         string tenseVal = Constraint("Tense") ?? "Pres";
-        var tenseFeats = new[] { new Feat("Role", string.Equals(spec.ClauseType, "Copular", StringComparison.OrdinalIgnoreCase) ? "Copula" : "Verb"), new Feat("Tense", tenseVal) };
         var verbLemma = string.Equals(spec.ClauseType, "Copular", StringComparison.OrdinalIgnoreCase)
             ? Pick(copulas, project.Lexemes.Any(l => l.Lemma == "be") ? "be" : "e")
             : Pick(verbs, "see");
+        var verbLex = project.Lexemes.FirstOrDefault(l => string.Equals(l.Lemma, verbLemma, StringComparison.OrdinalIgnoreCase) && string.Equals(l.Pos, "V", StringComparison.OrdinalIgnoreCase));
+        var tenseFeats = new List<Feat> { new("Role", string.Equals(spec.ClauseType, "Copular", StringComparison.OrdinalIgnoreCase) ? "Copula" : "Verb"), new("Tense", tenseVal) };
+        if (!string.IsNullOrWhiteSpace(verbLex?.LexClass)) tenseFeats.Add(new("Class", verbLex!.LexClass!.Trim()));
+        if (!string.IsNullOrEmpty(subjClass)) tenseFeats.Add(new("SubjectClass", subjClass));
         var vNode = new SyntaxNode("V", verbLemma, tenseFeats);
 
         if (string.Equals(spec.ClauseType, "Intransitive", StringComparison.OrdinalIgnoreCase))
@@ -59,7 +70,9 @@ public class ConfigurableSyntaxGenerator : ISyntaxGenerator
 
         if (string.Equals(spec.ClauseType, "Copular", StringComparison.OrdinalIgnoreCase))
         {
-            var pred = new SyntaxNode("ADJ", Pick(adjs, "small"), new[] { new Feat("Role", "Pred") });
+            var predFeats = new List<Feat> { new("Role", "Pred"), new("Number", subjPl ? "Pl" : "Sing") };
+            if (!string.IsNullOrEmpty(subjClass)) predFeats.Add(new("Class", subjClass));
+            var pred = new SyntaxNode("ADJ", Pick(adjs, "small"), predFeats);
             var children = project.WordOrder switch
             {
                 WordOrder.SOV or WordOrder.OSV => new[] { subj, pred, vNode },
@@ -69,7 +82,7 @@ public class ConfigurableSyntaxGenerator : ISyntaxGenerator
             return new SyntaxTree(new SyntaxNode("CLAUSE", spec.ClauseType, null, children));
         }
 
-        var obj = BuildNp(objPl, spec.ApproxWords >= 5 && adjs.Count > 0, "Obj");
+        var obj = BuildNp(objPl, spec.ApproxWords >= 5 && adjs.Count > 0, "Obj", out _);
         var ordered = project.WordOrder switch
         {
             WordOrder.SOV => new[] { subj, obj, vNode },
@@ -147,7 +160,7 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
         bool isNeg = string.Equals(Constraint("Polarity"), "Neg", StringComparison.OrdinalIgnoreCase)
             || (negs.Count > 0 && rng.NextDouble() < 0.15);
 
-        (SyntaxNode Node, string Person, string Number, string HeadLemma) BuildNp(string rolePrefix, string gramCase, string? avoidLemma = null)
+        (SyntaxNode Node, string Person, string Number, string HeadLemma, string? HeadClass) BuildNp(string rolePrefix, string gramCase, string? avoidLemma = null)
         {
             var eligibleProns = avoidLemma is null
                 ? prons
@@ -159,14 +172,17 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
                 var lower = pron.Lemma.ToLowerInvariant();
                 string person = lower is "i" or "we" ? "1" : lower == "you" ? "2" : "3";
                 string number = constrainedNumber ?? (lower is "they" or "we" or "you" ? "Pl" : "Sing");
-                var pNode = new SyntaxNode("PRON", pron.Lemma, new[]
+                string? pronClass = string.IsNullOrWhiteSpace(pron.LexClass) ? null : pron.LexClass!.Trim();
+                var pFeats = new List<Feat>
                 {
-                    new Feat("Role", rolePrefix),
-                    new Feat("Person", person),
-                    new Feat("Number", number),
-                    new Feat("Case", gramCase)
-                });
-                return (pNode, person, number, pron.Lemma);
+                    new("Role", rolePrefix),
+                    new("Person", person),
+                    new("Number", number),
+                    new("Case", gramCase)
+                };
+                if (!string.IsNullOrEmpty(pronClass)) pFeats.Add(new("Class", pronClass));
+                var pNode = new SyntaxNode("PRON", pron.Lemma, pFeats);
+                return (pNode, person, number, pron.Lemma, pronClass);
             }
 
             var pool = avoidLemma is null
@@ -174,6 +190,7 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
                 : nouns.Where(n => !string.Equals(n.Lemma, avoidLemma, StringComparison.OrdinalIgnoreCase)).ToList();
             var noun = Pick(pool.Count > 0 ? pool : nouns);
             string nounLemma = noun?.Lemma ?? "person";
+            string? headClass = string.IsNullOrWhiteSpace(noun?.LexClass) ? null : noun!.LexClass!.Trim();
             string num = constrainedNumber ?? (rng.NextDouble() < 0.35 ? "Pl" : "Sing");
             var children = new List<SyntaxNode>();
 
@@ -186,30 +203,36 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
                 var det = Pick(compatDets.Count > 0 ? compatDets : dets);
                 if (det is not null)
                 {
-                    children.Add(new SyntaxNode("DET", det.Lemma, new[]
+                    var detFeats = new List<Feat>
                     {
-                        new Feat("Role", "Det"),
-                        new Feat("Number", num)
-                    }));
+                        new("Role", "Det"),
+                        new("Number", num)
+                    };
+                    if (!string.IsNullOrEmpty(headClass)) detFeats.Add(new("Class", headClass));
+                    children.Add(new SyntaxNode("DET", det.Lemma, detFeats));
                 }
             }
 
             if (spec.ApproxWords >= 4 && adjs.Count > 0 && rng.NextDouble() < 0.65)
             {
                 var adj = Pick(adjs)!;
-                children.Add(new SyntaxNode("ADJ", adj.Lemma, new[] { new Feat("Role", "Mod") }));
+                var adjFeats = new List<Feat> { new("Role", "Mod"), new("Number", num) };
+                if (!string.IsNullOrEmpty(headClass)) adjFeats.Add(new("Class", headClass));
+                children.Add(new SyntaxNode("ADJ", adj.Lemma, adjFeats));
             }
 
-            children.Add(new SyntaxNode("N", nounLemma, new[]
+            var nFeats = new List<Feat>
             {
-                new Feat("Role", rolePrefix),
-                new Feat("Person", "3"),
-                new Feat("Number", num),
-                new Feat("Case", gramCase)
-            }));
+                new("Role", rolePrefix),
+                new("Person", "3"),
+                new("Number", num),
+                new("Case", gramCase)
+            };
+            if (!string.IsNullOrEmpty(headClass)) nFeats.Add(new("Class", headClass));
+            children.Add(new SyntaxNode("N", nounLemma, nFeats));
 
             var np = new SyntaxNode("NP", $"{rolePrefix}NP", new[] { new Feat("Role", $"{rolePrefix}NP") }, children);
-            return (np, "3", num, nounLemma);
+            return (np, "3", num, nounLemma, headClass);
         }
 
         var subj = BuildNp("Subj", "Nom");
@@ -219,9 +242,11 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
         var verbPool = isCopular
             ? verbs.Where(v => string.Equals(v.Lemma, "be", StringComparison.OrdinalIgnoreCase)).ToList()
             : verbs.Where(v => !string.Equals(v.Lemma, "be", StringComparison.OrdinalIgnoreCase)).ToList();
-        string chosenVerb = isCopular
-            ? (verbs.FirstOrDefault(v => string.Equals(v.Lemma, "be", StringComparison.OrdinalIgnoreCase))?.Lemma ?? "be")
-            : (Pick(verbPool.Count > 0 ? verbPool : verbs)?.Lemma ?? "see");
+        var chosenVerbLex = isCopular
+            ? verbs.FirstOrDefault(v => string.Equals(v.Lemma, "be", StringComparison.OrdinalIgnoreCase))
+            : Pick(verbPool.Count > 0 ? verbPool : verbs);
+        string chosenVerb = chosenVerbLex?.Lemma ?? (isCopular ? "be" : "see");
+        string? verbClass = string.IsNullOrWhiteSpace(chosenVerbLex?.LexClass) ? null : chosenVerbLex!.LexClass!.Trim();
 
         var vpChildren = new List<SyntaxNode>();
         bool wantFutAux = string.Equals(tense, "Fut", StringComparison.OrdinalIgnoreCase)
@@ -237,7 +262,9 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
             if (isNeg && negs.Count > 0)
                 vpChildren.Add(new SyntaxNode("NEG", negs[0].Lemma, new[] { new Feat("Role", "Neg") }));
             if (advNode is not null) vpChildren.Add(advNode);
-            vpChildren.Add(new SyntaxNode("V", chosenVerb, new[] { new Feat("Role", "Verb"), new Feat("Finiteness", "Bare") }));
+            var vBareFeats = new List<Feat> { new("Role", "Verb"), new("Finiteness", "Bare") };
+            if (!string.IsNullOrEmpty(verbClass)) vBareFeats.Add(new("Class", verbClass));
+            vpChildren.Add(new SyntaxNode("V", chosenVerb, vBareFeats));
         }
         else if (isNeg && negs.Count > 0 && !string.Equals(chosenVerb, "be", StringComparison.OrdinalIgnoreCase) && doAux is not null)
         {
@@ -253,7 +280,9 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
             vpChildren.Add(new SyntaxNode("AUX", doAux.Lemma, auxFeats));
             vpChildren.Add(new SyntaxNode("NEG", negs[0].Lemma, new[] { new Feat("Role", "Neg") }));
             if (advNode is not null) vpChildren.Add(advNode);
-            vpChildren.Add(new SyntaxNode("V", chosenVerb, new[] { new Feat("Role", "Verb"), new Feat("Finiteness", "Bare") }));
+            var vBareFeats = new List<Feat> { new("Role", "Verb"), new("Finiteness", "Bare") };
+            if (!string.IsNullOrEmpty(verbClass)) vBareFeats.Add(new("Class", verbClass));
+            vpChildren.Add(new SyntaxNode("V", chosenVerb, vBareFeats));
         }
         else
         {
@@ -268,6 +297,8 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
             };
             if (string.Equals(tense, "Pres", StringComparison.OrdinalIgnoreCase) && subj.Person == "3" && subj.Number == "Sing")
                 verbFeats.Add(new Feat("Agreement", "3sg"));
+            if (!string.IsNullOrEmpty(verbClass)) verbFeats.Add(new Feat("Class", verbClass));
+            if (!string.IsNullOrEmpty(subj.HeadClass)) verbFeats.Add(new Feat("SubjectClass", subj.HeadClass));
             vpChildren.Add(new SyntaxNode("V", chosenVerb, verbFeats));
             if (isNeg && negs.Count > 0 && isBe)
                 vpChildren.Add(new SyntaxNode("NEG", negs[0].Lemma, new[] { new Feat("Role", "Neg") }));
@@ -278,12 +309,15 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
             ? vpChildren[0]
             : new SyntaxNode("VP", "VP", new[] { new Feat("Role", "VP") }, vpChildren);
 
+        var predFeats = new List<Feat> { new("Role", "Pred"), new("Number", subj.Number) };
+        if (!string.IsNullOrEmpty(subj.HeadClass)) predFeats.Add(new Feat("Class", subj.HeadClass));
+
         bool isIntrans = string.Equals(spec.ClauseType, "Intransitive", StringComparison.OrdinalIgnoreCase);
         var roles = new Dictionary<string, SyntaxNode> { ["S"] = subj.Node, ["V"] = vNode };
         if (!isIntrans)
         {
             roles["O"] = isCopular
-                ? new SyntaxNode("ADJ", Pick(adjs)?.Lemma ?? "small", new[] { new Feat("Role", "Pred") })
+                ? new SyntaxNode("ADJ", Pick(adjs)?.Lemma ?? "small", predFeats)
                 : obj.Node;
         }
 
@@ -328,8 +362,13 @@ public class MorphologyEngine : IMorphologyRealizer
     private static readonly HashSet<string> MultiCharSegments = new(StringComparer.Ordinal)
     {
         "iː", "eɪ", "oʊ", "ɔː", "uː", "ɑː", "ɝː", "aɪ", "aʊ", "ɔɪ",
+        "yː", "øː",
         "tʃ", "dʒ", "pʰ", "tʰ", "kʰ"
     };
+
+    private static bool IsCombiningOrChao(char ch) =>
+        ch is 'ː' or 'ʰ' or '˥' or '˦' or '˧' or '˨' or '˩' ||
+        (ch >= '\u0300' && ch <= '\u036f');
 
     public static List<string> SplitPhones(string source)
     {
@@ -338,8 +377,8 @@ public class MorphologyEngine : IMorphologyRealizer
         if (trimmed.Contains(' '))
             return trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ToList();
 
-        var noStress = PhonologyEngine.StripStressMark(trimmed);
-        if (MultiCharSegments.Contains(noStress))
+        var noSupra = PhonologyEngine.StripSuprasegmentals(trimmed);
+        if (MultiCharSegments.Contains(noSupra) || MultiCharSegments.Contains(PhonologyEngine.StripStressMark(trimmed)))
             return [trimmed];
 
         var result = new List<string>();
@@ -350,7 +389,7 @@ public class MorphologyEngine : IMorphologyRealizer
             {
                 result.Add($"{ch}{trimmed[++i]}");
             }
-            else if ((ch == 'ː' || ch == 'ʰ') && result.Count > 0)
+            else if (IsCombiningOrChao(ch) && result.Count > 0)
             {
                 result[^1] += ch;
             }
@@ -360,6 +399,35 @@ public class MorphologyEngine : IMorphologyRealizer
             }
         }
         return result;
+    }
+
+    public static AffixType GetEffectiveAffixType(AffixEntry rule) => rule.EffectiveAffixType;
+
+    private static List<string> SplitTemplateSlots(string pattern)
+    {
+        var trimmed = pattern.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return new List<string>();
+        if (trimmed.IndexOfAny([' ', '\t', '\r', '\n']) >= 0)
+            return trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ToList();
+
+        var slots = new List<string>();
+        for (int i = 0; i < trimmed.Length; i++)
+        {
+            char ch = trimmed[i];
+            if ((ch == 'C' || ch == 'c') && i + 1 < trimmed.Length && trimmed[i + 1] >= '1' && trimmed[i + 1] <= '9')
+            {
+                slots.Add($"C{trimmed[++i]}");
+            }
+            else if (IsCombiningOrChao(ch) && slots.Count > 0 && !Regex.IsMatch(slots[^1], @"^C[1-9]$"))
+            {
+                slots[^1] += ch;
+            }
+            else if (ch != '-' && ch != '.')
+            {
+                slots.Add(ch.ToString());
+            }
+        }
+        return slots;
     }
 
     protected static List<string> ResolveStemPhones(string lemma, LanguageProject project)
@@ -397,7 +465,7 @@ public class MorphologyEngine : IMorphologyRealizer
                 {
                     bestScore = clauses.Count;
                     bestUr = form;
-                    bestKeys = new HashSet<string>(clauses.Select(c => c.Key), StringComparer.OrdinalIgnoreCase);
+                    bestKeys = new HashSet<string>(clauses.Select(c => c.Key), StringComparison.OrdinalIgnoreCase);
                 }
             }
 
@@ -425,7 +493,18 @@ public class MorphologyEngine : IMorphologyRealizer
         var wordPhones = SplitPhones(ur);
         var handledFeatures = new HashSet<string>(matchedFeatures, StringComparer.OrdinalIgnoreCase);
 
-        if (features is not null)
+        string? effectiveClass = !string.IsNullOrWhiteSpace(lex?.LexClass)
+            ? lex!.LexClass!.Trim()
+            : features?.FirstOrDefault(f => string.Equals(f.Name, "Class", StringComparison.OrdinalIgnoreCase))?.Value?.Trim();
+
+        var effectiveFeatures = new List<Feat>(features ?? Array.Empty<Feat>());
+        if (!string.IsNullOrEmpty(effectiveClass) &&
+            !effectiveFeatures.Any(f => string.Equals(f.Name, "Class", StringComparison.OrdinalIgnoreCase)))
+        {
+            effectiveFeatures.Add(new Feat("Class", effectiveClass));
+        }
+
+        if (effectiveFeatures.Count > 0)
         {
             foreach (var rule in project.Affixes.Where(a => a.Enabled))
             {
@@ -434,21 +513,104 @@ public class MorphologyEngine : IMorphologyRealizer
                 if (!posMatch) continue;
                 if (handledFeatures.Contains(rule.FeatureName)) continue;
 
-                bool featMatch = features.Any(f =>
+                bool featMatch = effectiveFeatures.Any(f =>
                     string.Equals(f.Name, rule.FeatureName, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(f.Value, rule.FeatureValue, StringComparison.OrdinalIgnoreCase));
                 if (!featMatch) continue;
 
+                var kind = GetEffectiveAffixType(rule);
+
                 if (!string.IsNullOrWhiteSpace(rule.Condition))
                 {
-                    if (wordPhones.Count == 0) continue;
-                    var anchor = rule.IsPrefix ? wordPhones[0] : wordPhones[^1];
-                    if (!PhonologyEngine.MatchesCondition(anchor, rule.Condition, project)) continue;
+                    if (wordPhones.Count == 0 && !rule.Condition.Contains("class=", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var anchor = wordPhones.Count == 0
+                        ? ""
+                        : (kind is AffixType.Prefix or AffixType.Infix ? wordPhones[0] : wordPhones[^1]);
+                    if (!PhonologyEngine.MatchesCondition(anchor, rule.Condition, project, lexClass: effectiveClass))
+                        continue;
                 }
 
-                var affixPhones = SplitPhones(rule.Affix.Replace("-", ""));
-                if (rule.IsPrefix) wordPhones.InsertRange(0, affixPhones);
-                else wordPhones.AddRange(affixPhones);
+                if (kind == AffixType.Infix)
+                {
+                    var cleaned = rule.Affix.Replace("-", "", StringComparison.Ordinal)
+                        .Replace("<", "", StringComparison.Ordinal)
+                        .Replace(">", "", StringComparison.Ordinal)
+                        .Trim();
+                    var infixPhones = SplitPhones(cleaned);
+                    int splitIdx = wordPhones.FindIndex(p => PhonologyEngine.IsVowel(p, project));
+                    if (splitIdx < 0) splitIdx = Math.Min(1, wordPhones.Count);
+                    wordPhones.InsertRange(splitIdx, infixPhones);
+                }
+                else if (kind == AffixType.Circumfix)
+                {
+                    var raw = rule.Affix.Trim();
+                    string preRaw = "";
+                    string sufRaw = "";
+                    if (raw.Contains("...", StringComparison.Ordinal))
+                    {
+                        var parts = raw.Split("...", 2);
+                        preRaw = parts[0];
+                        sufRaw = parts.Length > 1 ? parts[1] : "";
+                    }
+                    else if (raw.Contains('+'))
+                    {
+                        var parts = raw.Split('+', 2);
+                        preRaw = parts[0];
+                        sufRaw = parts.Length > 1 ? parts[1] : "";
+                    }
+                    else if (raw.Contains('/'))
+                    {
+                        var parts = raw.Split('/', 2);
+                        preRaw = parts[0];
+                        sufRaw = parts.Length > 1 ? parts[1] : "";
+                    }
+                    else
+                    {
+                        preRaw = raw;
+                    }
+
+                    string CleanPart(string s) => s.Replace("-", "", StringComparison.Ordinal)
+                        .Replace("+", "", StringComparison.Ordinal)
+                        .Replace("/", "", StringComparison.Ordinal)
+                        .Trim();
+
+                    var prePhones = SplitPhones(CleanPart(preRaw));
+                    var sufPhones = SplitPhones(CleanPart(sufRaw));
+                    if (prePhones.Count > 0) wordPhones.InsertRange(0, prePhones);
+                    if (sufPhones.Count > 0) wordPhones.AddRange(sufPhones);
+                }
+                else if (kind == AffixType.Template)
+                {
+                    var radicals = wordPhones.Where(p => !PhonologyEngine.IsVowel(p, project)).ToList();
+                    var slots = SplitTemplateSlots(rule.Affix);
+                    var templated = new List<string>();
+                    foreach (var slot in slots)
+                    {
+                        var m = Regex.Match(slot, @"^C([1-9])$", RegexOptions.IgnoreCase);
+                        if (m.Success)
+                        {
+                            int rIdx = int.Parse(m.Groups[1].Value) - 1;
+                            if (rIdx >= 0 && rIdx < radicals.Count)
+                                templated.Add(radicals[rIdx]);
+                        }
+                        else
+                        {
+                            templated.AddRange(SplitPhones(slot));
+                        }
+                    }
+                    wordPhones = templated;
+                }
+                else if (kind == AffixType.Prefix)
+                {
+                    var affixPhones = SplitPhones(rule.Affix.Replace("-", "", StringComparison.Ordinal));
+                    wordPhones.InsertRange(0, affixPhones);
+                }
+                else
+                {
+                    var affixPhones = SplitPhones(rule.Affix.Replace("-", "", StringComparison.Ordinal));
+                    wordPhones.AddRange(affixPhones);
+                }
 
                 handledFeatures.Add(rule.FeatureName);
             }

@@ -165,12 +165,12 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="2" Header="Ordered Phonological Rules (Supports ∅, V, C, #, $, [αplace], [+voice], [-stressed], [manner=...])">
+            <GroupBox Grid.Row="2" Header="Ordered Rules (∅, V, C, #, $, [αplace], [αback, αround], [tone=LHL], [+voice], [-stressed])">
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
                         <TextBox Text="{Binding NewRuleName, UpdateSourceTrigger=PropertyChanged}" Width="115" ToolTip="Rule Name" Margin="0,0,4,4" />
-                        <TextBox Text="{Binding NewRuleTarget, UpdateSourceTrigger=PropertyChanged}" Width="55" ToolTip="Target" Margin="0,0,4,4" />
-                        <TextBox Text="{Binding NewRuleReplacement, UpdateSourceTrigger=PropertyChanged}" Width="55" ToolTip="Replacement" Margin="0,0,4,4" />
+                        <TextBox Text="{Binding NewRuleTarget, UpdateSourceTrigger=PropertyChanged}" Width="55" ToolTip="Target (e.g. t, V, [tone=LHL])" Margin="0,0,4,4" />
+                        <TextBox Text="{Binding NewRuleReplacement, UpdateSourceTrigger=PropertyChanged}" Width="65" ToolTip="Replacement (e.g. ∅, [αback, αround], [tone=LH])" Margin="0,0,4,4" />
                         <TextBox Text="{Binding NewRulePrev, UpdateSourceTrigger=PropertyChanged}" Width="50" ToolTip="Prev Context" Margin="0,0,4,4" />
                         <TextBox Text="{Binding NewRuleNext, UpdateSourceTrigger=PropertyChanged}" Width="50" ToolTip="Next Context" Margin="0,0,4,4" />
                         <TextBox Text="{Binding NewRuleCond, UpdateSourceTrigger=PropertyChanged}" Width="85" ToolTip="Feature Condition" Margin="0,0,6,4" />

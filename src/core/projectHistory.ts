@@ -57,6 +57,30 @@ export class ProjectHistory {
   }
 }
 
+function parseCsvRow(line: string): string[] {
+  const fields: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === ',' && !inQuotes) {
+      fields.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  fields.push(cur);
+  return fields;
+}
+
 export function importLexiconFromText(filename: string, content: string): LexemeState[] {
   const lower = filename.toLowerCase();
   if (lower.endsWith('.json')) {
@@ -64,6 +88,7 @@ export function importLexiconFromText(filename: string, content: string): Lexeme
       Lemma?: string;
       Pos?: string;
       UR?: string;
+      LexClass?: string;
       Spelling?: string;
       Irregulars?: Record<string, string>;
     }>;
@@ -74,31 +99,38 @@ export function importLexiconFromText(filename: string, content: string): Lexeme
         Lemma: r.Lemma!.trim(),
         Pos: r.Pos?.trim() || 'N',
         UR: (r.UR ?? '').trim(),
+        ...(r.LexClass?.trim() ? { LexClass: r.LexClass.trim() } : {}),
         ...(r.Spelling?.trim() ? { Spelling: r.Spelling.trim() } : {}),
         ...(r.Irregulars && Object.keys(r.Irregulars).length > 0 ? { Irregulars: r.Irregulars } : {}),
       }));
   }
 
-  const lines = content.split(/\r?\n/).slice(1);
+  const rawLines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (rawLines.length <= 1) return [];
+  const headers = parseCsvRow(rawLines[0]).map((h) => h.trim().toLowerCase());
+  const classCol = headers.indexOf('lexclass');
+  const lines = rawLines.slice(1);
   return lines
-    .map((line) => line.split(','))
+    .map((line) => parseCsvRow(line))
     .filter((parts) => parts.length >= 3 && parts[0].trim().length > 0)
     .map((parts) => {
       const spelling = parts[3]?.trim();
       let irregulars: Record<string, string> | undefined;
-      const rawIrreg = parts.slice(4).join(',').trim();
+      const rawIrreg = (parts[4] ?? '').trim();
       if (rawIrreg) {
         try {
-          const parsed = JSON.parse(rawIrreg.replace(/^"|"$/g, '').replace(/""/g, '"'));
+          const parsed = JSON.parse(rawIrreg);
           if (parsed && typeof parsed === 'object') irregulars = parsed;
         } catch {
           // ignore malformed optional irregular column
         }
       }
+      const lexClass = (classCol >= 0 ? parts[classCol] : parts[5])?.trim();
       return {
         Lemma: parts[0].trim(),
         Pos: parts[1].trim() || 'N',
         UR: parts[2].trim(),
+        ...(lexClass ? { LexClass: lexClass } : {}),
         ...(spelling ? { Spelling: spelling } : {}),
         ...(irregulars && Object.keys(irregulars).length > 0 ? { Irregulars: irregulars } : {}),
       };
@@ -106,18 +138,23 @@ export function importLexiconFromText(filename: string, content: string): Lexeme
 }
 
 export function exportLexiconToCsv(lexemes: readonly LexemeState[]): string {
-  const hasExtended = lexemes.some((l) => Boolean(l.Spelling) || (l.Irregulars && Object.keys(l.Irregulars).length > 0));
+  const hasExtended = lexemes.some(
+    (l) =>
+      Boolean(l.Spelling) ||
+      Boolean(l.LexClass) ||
+      (l.Irregulars && Object.keys(l.Irregulars).length > 0)
+  );
   if (!hasExtended) {
     const lines = ['Lemma,Pos,UR', ...lexemes.map((l) => `${l.Lemma},${l.Pos},${l.UR}`)];
     return lines.join('\n');
   }
   const lines = [
-    'Lemma,Pos,UR,Spelling,Irregulars',
+    'Lemma,Pos,UR,Spelling,Irregulars,LexClass',
     ...lexemes.map((l) => {
       const irreg = l.Irregulars && Object.keys(l.Irregulars).length > 0
         ? `"${JSON.stringify(l.Irregulars).replace(/"/g, '""')}"`
         : '';
-      return `${l.Lemma},${l.Pos},${l.UR},${l.Spelling ?? ''},${irreg}`;
+      return `${l.Lemma},${l.Pos},${l.UR},${l.Spelling ?? ''},${irreg},${l.LexClass ?? ''}`;
     }),
   ];
   return lines.join('\n');

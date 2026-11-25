@@ -1,16 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { FeatBundle, LanguageProjectState } from '../core/types';
-import { buildEngineFromState } from '../core/languageEngine';
+import { AffixType, FeatBundle, LanguageProjectState } from '../core/types';
+import { buildEngineFromState, Morphology } from '../core/languageEngine';
 
 interface MorphologyTabProps {
   state: LanguageProjectState;
   onUpdate: (updater: (prev: LanguageProjectState) => LanguageProjectState, label: string) => void;
 }
 
+const AFFIX_TYPES: AffixType[] = ['Prefix', 'Suffix', 'Infix', 'Circumfix', 'Template'];
+
 export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate }) => {
   const [newLemma, setNewLemma] = useState('');
   const [newPos, setNewPos] = useState('');
   const [newPhonemes, setNewPhonemes] = useState('');
+  const [newLexClass, setNewLexClass] = useState('');
   const [newSpelling, setNewSpelling] = useState('');
   const [newIrregulars, setNewIrregulars] = useState('');
 
@@ -20,7 +23,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
   const [newFeatureValue, setNewFeatureValue] = useState('Pl');
   const [newAffixValue, setNewAffixValue] = useState('-i');
   const [newAffixCondition, setNewAffixCondition] = useState('');
-  const [newAffixIsPrefix, setNewAffixIsPrefix] = useState(false);
+  const [newAffixType, setNewAffixType] = useState<AffixType>('Suffix');
 
   const [previewLemma, setPreviewLemma] = useState('person');
   const [previewPos, setPreviewPos] = useState('N');
@@ -63,6 +66,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
     if (!newLemma.trim()) return;
     const pos = newPos.trim() || 'N';
     const ur = newPhonemes.trim().split(/\s+/).filter(Boolean).join(' ');
+    const lexClass = newLexClass.trim();
     const spelling = newSpelling.trim();
     const irregulars = parseIrregularsText(newIrregulars);
     onUpdate(
@@ -74,6 +78,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
             Lemma: newLemma.trim(),
             Pos: pos,
             UR: ur,
+            ...(lexClass ? { LexClass: lexClass } : {}),
             ...(spelling ? { Spelling: spelling } : {}),
             ...(irregulars ? { Irregulars: irregulars } : {}),
           },
@@ -84,6 +89,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
     setNewLemma('');
     setNewPos('');
     setNewPhonemes('');
+    setNewLexClass('');
     setNewSpelling('');
     setNewIrregulars('');
   };
@@ -111,7 +117,8 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
             FeatureName: newFeatureName.trim(),
             FeatureValue: newFeatureValue.trim(),
             Affix: newAffixValue.trim(),
-            IsPrefix: newAffixIsPrefix,
+            IsPrefix: newAffixType === 'Prefix',
+            AffixType: newAffixType,
             Condition: newAffixCondition.trim(),
             Enabled: true,
           },
@@ -164,6 +171,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
               <tr>
                 <th className="px-3 py-1.5 font-semibold">Lemma</th>
                 <th className="px-3 py-1.5 font-semibold w-16">POS</th>
+                <th className="px-3 py-1.5 font-semibold">Class</th>
                 <th className="px-3 py-1.5 font-semibold">UR</th>
                 <th className="px-3 py-1.5 font-semibold">Spelling</th>
                 <th className="px-3 py-1.5 font-semibold">Irregulars</th>
@@ -175,6 +183,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
                 <tr key={lex.Lemma} className="hover:bg-slate-50">
                   <td className="px-3 py-1.5 font-medium">{lex.Lemma}</td>
                   <td className="px-3 py-1.5 font-mono text-xs">{lex.Pos}</td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-indigo-700">{lex.LexClass ?? ''}</td>
                   <td className="px-3 py-1.5 font-mono text-xs">{lex.UR}</td>
                   <td className="px-3 py-1.5 text-xs text-slate-700">{lex.Spelling ?? ''}</td>
                   <td className="px-3 py-1.5 font-mono text-[11px] text-slate-600">
@@ -212,6 +221,13 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
           />
           <input
             type="text"
+            value={newLexClass}
+            onChange={(e) => setNewLexClass(e.target.value)}
+            placeholder="Class (Fem/Class1)"
+            className="w-28 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded"
+          />
+          <input
+            type="text"
             value={newPhonemes}
             onChange={(e) => setNewPhonemes(e.target.value)}
             placeholder="UR (e.g. ˈk æ t)"
@@ -229,7 +245,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
             value={newIrregulars}
             onChange={(e) => setNewIrregulars(e.target.value)}
             placeholder="Irregulars (Number=Pl: ˈm aɪ s)"
-            className="w-56 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
+            className="w-52 px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded font-mono"
           />
           <button
             type="button"
@@ -275,7 +291,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
                   <td className="px-2 py-1.5 font-mono text-xs">{afx.Affix}</td>
                   <td className="px-2 py-1.5 font-mono text-[11px] text-slate-600">{afx.Condition ?? ''}</td>
                   <td className="px-2 py-1.5 text-xs text-slate-500">
-                    {afx.IsPrefix ? 'Prefix' : 'Suffix'}
+                    {Morphology.getEffectiveAffixType({ affixType: afx.AffixType, isPrefix: afx.IsPrefix })}
                   </td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap space-x-1">
                     <button
@@ -329,7 +345,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
               type="text"
               value={newAffixValue}
               onChange={(e) => setNewAffixValue(e.target.value)}
-              placeholder="Affix (-s)"
+              placeholder="Affix (-s, um, ge+...+t, C1 a C2 a C3 a)"
               className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
             />
           </div>
@@ -338,7 +354,7 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
               type="text"
               value={newFeatureName}
               onChange={(e) => setNewFeatureName(e.target.value)}
-              placeholder="Feature Name"
+              placeholder="Feature (Number/Tense/Class)"
               className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded"
             />
             <input
@@ -353,16 +369,22 @@ export const MorphologyTab: React.FC<MorphologyTabProps> = ({ state, onUpdate })
             type="text"
             value={newAffixCondition}
             onChange={(e) => setNewAffixCondition(e.target.value)}
-            placeholder="Stem condition (e.g. [+sibilant], [-voice])"
+            placeholder="Condition (e.g. [+sibilant], [class=Fem])"
             className="w-full px-2.5 py-1 text-sm bg-white border border-slate-300 rounded font-mono"
           />
-          <label className="flex items-center gap-2 text-xs text-slate-700">
-            <input
-              type="checkbox"
-              checked={newAffixIsPrefix}
-              onChange={(e) => setNewAffixIsPrefix(e.target.checked)}
-            />
-            Prefix (unchecked = Suffix)
+          <label className="flex items-center justify-between gap-2 text-xs text-slate-700">
+            <span>Morphology Kind:</span>
+            <select
+              value={newAffixType}
+              onChange={(e) => setNewAffixType(e.target.value as AffixType)}
+              className="px-2 py-1 bg-white border border-slate-300 rounded text-xs"
+            >
+              {AFFIX_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
           </label>
           <button
             type="button"

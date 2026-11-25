@@ -424,9 +424,10 @@ public static class ProjectValidator
             {
                 foreach (var ph in phones)
                 {
-                    var cleanPh = PhonologyEngine.StripStressMark(ph);
-                    if (seenPhon.Count > 0 && !seenPhon.Contains(cleanPh))
-                        issues.Add(new(DiagnosticSeverity.Warning, "Phonology", $"Lexeme '{lex.Lemma}' UR uses unknown phone '{cleanPh}'."));
+                    var cleanStress = PhonologyEngine.StripStressMark(ph);
+                    var cleanSupra = PhonologyEngine.StripSuprasegmentals(ph);
+                    if (seenPhon.Count > 0 && !seenPhon.Contains(cleanStress) && !seenPhon.Contains(cleanSupra))
+                        issues.Add(new(DiagnosticSeverity.Warning, "Phonology", $"Lexeme '{lex.Lemma}' UR uses unknown phone '{cleanSupra}'."));
                 }
                 foreach (var pi in PhonologyEngine.ValidateWordPhonotactics(phones, project))
                     issues.Add(new(DiagnosticSeverity.Warning, "Phonotactics", $"'{lex.Lemma}' ({lex.UR}): {pi}"));

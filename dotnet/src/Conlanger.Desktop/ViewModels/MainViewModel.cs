@@ -115,6 +115,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _newLexLemma = "";
     private string _newLexPos = "N";
     private string _newLexUr = "";
+    private string _newLexClass = "";
     private string _newLexSpelling = "";
     private string _newLexIrregulars = "";
     private string _newAffixName = "";
@@ -124,6 +125,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _newAffixForm = "-i";
     private string _newAffixCondition = "";
     private bool _newAffixIsPrefix;
+    private AffixType _newAffixType = AffixType.Suffix;
     private string _morphPreviewLemma = "person";
     private string _morphPreviewPos = "N";
     private string _morphPreviewFeatName = "Number";
@@ -342,6 +344,7 @@ public sealed class MainViewModel : ViewModelBase
     public Array CapitalizationModes => Enum.GetValues(typeof(CapitalizationMode));
     public Array StressPatterns => Enum.GetValues(typeof(StressPattern));
     public Array FlowDirections => Enum.GetValues(typeof(Conlanger.SDK.FlowDirection));
+    public Array AffixTypes => Enum.GetValues(typeof(AffixType));
     public IReadOnlyList<string> FeaturicContexts { get; } = ["any", "initial", "medial", "final"];
 
     // Toolbar properties
@@ -439,6 +442,7 @@ public sealed class MainViewModel : ViewModelBase
     public string NewLexLemma { get => _newLexLemma; set { if (SetField(ref _newLexLemma, value)) AddLexemeCommand.RaiseCanExecuteChanged(); } }
     public string NewLexPos { get => _newLexPos; set => SetField(ref _newLexPos, value); }
     public string NewLexUr { get => _newLexUr; set => SetField(ref _newLexUr, value); }
+    public string NewLexClass { get => _newLexClass; set => SetField(ref _newLexClass, value); }
     public string NewLexSpelling { get => _newLexSpelling; set => SetField(ref _newLexSpelling, value); }
     public string NewLexIrregulars { get => _newLexIrregulars; set => SetField(ref _newLexIrregulars, value); }
     public string NewAffixName { get => _newAffixName; set { if (SetField(ref _newAffixName, value)) AddAffixCommand.RaiseCanExecuteChanged(); } }
@@ -447,7 +451,30 @@ public sealed class MainViewModel : ViewModelBase
     public string NewAffixFeatVal { get => _newAffixFeatVal; set => SetField(ref _newAffixFeatVal, value); }
     public string NewAffixForm { get => _newAffixForm; set => SetField(ref _newAffixForm, value); }
     public string NewAffixCondition { get => _newAffixCondition; set => SetField(ref _newAffixCondition, value); }
-    public bool NewAffixIsPrefix { get => _newAffixIsPrefix; set => SetField(ref _newAffixIsPrefix, value); }
+    public bool NewAffixIsPrefix
+    {
+        get => _newAffixIsPrefix;
+        set
+        {
+            if (SetField(ref _newAffixIsPrefix, value))
+            {
+                _newAffixType = value ? AffixType.Prefix : AffixType.Suffix;
+                OnPropertyChanged(nameof(NewAffixType));
+            }
+        }
+    }
+    public AffixType NewAffixType
+    {
+        get => _newAffixType;
+        set
+        {
+            if (SetField(ref _newAffixType, value))
+            {
+                _newAffixIsPrefix = value == AffixType.Prefix;
+                OnPropertyChanged(nameof(NewAffixIsPrefix));
+            }
+        }
+    }
     public string MorphPreviewLemma { get => _morphPreviewLemma; set { if (SetField(ref _morphPreviewLemma, value)) RefreshMorphPreview(); } }
     public string MorphPreviewPos { get => _morphPreviewPos; set { if (SetField(ref _morphPreviewPos, value)) RefreshMorphPreview(); } }
     public string MorphPreviewFeatName { get => _morphPreviewFeatName; set { if (SetField(ref _morphPreviewFeatName, value)) RefreshMorphPreview(); } }
@@ -917,6 +944,7 @@ public sealed class MainViewModel : ViewModelBase
             Lemma = lemma,
             Pos = string.IsNullOrWhiteSpace(NewLexPos) ? "N" : NewLexPos.Trim(),
             UR = string.Join(" ", MorphologyEngine.SplitPhones(NewLexUr)),
+            LexClass = string.IsNullOrWhiteSpace(NewLexClass) ? null : NewLexClass.Trim(),
             Spelling = string.IsNullOrWhiteSpace(NewLexSpelling) ? null : NewLexSpelling.Trim()
         };
         if (!string.IsNullOrWhiteSpace(NewLexIrregulars))
@@ -925,6 +953,7 @@ public sealed class MainViewModel : ViewModelBase
         _project.Lexemes.Add(entry);
         NewLexLemma = "";
         NewLexUr = "";
+        NewLexClass = "";
         NewLexSpelling = "";
         NewLexIrregulars = "";
         SyncCollectionsFromProject();
@@ -949,7 +978,8 @@ public sealed class MainViewModel : ViewModelBase
             FeatureName = NewAffixFeatName.Trim(),
             FeatureValue = NewAffixFeatVal.Trim(),
             Affix = NewAffixForm.Trim(),
-            IsPrefix = NewAffixIsPrefix,
+            IsPrefix = NewAffixType == AffixType.Prefix,
+            AffixType = NewAffixType,
             Condition = string.IsNullOrWhiteSpace(NewAffixCondition) ? null : NewAffixCondition.Trim(),
             Enabled = true
         });
@@ -1209,6 +1239,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             $"Lemma: {lex.Lemma}",
             $"POS: {lex.Pos}",
+            $"Class: {(string.IsNullOrWhiteSpace(lex.LexClass) ? "(none)" : lex.LexClass)}",
             $"UR: {lex.UR}",
             $"Spelling: {(string.IsNullOrWhiteSpace(lex.Spelling) ? "(phonemic)" : lex.Spelling)}",
             $"Irregulars: {(lex.Irregulars is { Count: > 0 } ? lex.IrregularsSummary : "(none)")}",
@@ -1232,7 +1263,7 @@ public sealed class MainViewModel : ViewModelBase
             var ctx = new RealizedWordContext(derivedForm.SurfacePhones, lex.Lemma, lex.Pos, feats, lex.Spelling, inflected.IsIrregular);
             var writtenForm = orth.RenderWords(new[] { ctx }, _project).Text;
             var condStr = string.IsNullOrWhiteSpace(afx.Condition) ? "" : $" / {afx.Condition}";
-            lines.Add($"{afx.Name} [{afx.FeatureName}={afx.FeatureValue}{condStr}]: {string.Join(" ", derivedForm.SurfacePhones)} -> {writtenForm}");
+            lines.Add($"[{afx.EffectiveAffixType}] {afx.Name} [{afx.FeatureName}={afx.FeatureValue}{condStr}]: {string.Join(" ", derivedForm.SurfacePhones)} -> {writtenForm}");
         }
         InspectorLexemeText = string.Join(Environment.NewLine, lines);
 

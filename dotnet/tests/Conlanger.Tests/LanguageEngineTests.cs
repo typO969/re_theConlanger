@@ -158,4 +158,123 @@ public sealed class LanguageEngineTests
             Assert.Empty(res.Issues);
         }
     }
+
+    [Fact]
+    public void NonLinearMorphology_SupportsSemiticTemplatesTagalogInfixGermanCircumfix()
+    {
+        var project = ProjectFactory.CreateStarterProject();
+        project.Phonemes.Add(ProjectFactory.CreatePhoneme("x", "C"));
+        project.Phonemes.Add(ProjectFactory.CreatePhoneme("b", "C"));
+        project.Phonemes.Add(ProjectFactory.CreatePhoneme("l", "C"));
+        project.Phonemes.Add(ProjectFactory.CreatePhoneme("m", "C"));
+        project.Phonemes.Add(ProjectFactory.CreatePhoneme("g", "C"));
+        project.Phonemes.Add(ProjectFactory.CreatePhoneme("r", "C"));
+
+        project.Lexemes =
+        [
+            new() { Lemma = "write", Pos = "V", UR = "k t b" },
+            new() { Lemma = "s_write", Pos = "V", UR = "s u l a t" },
+            new() { Lemma = "v_study", Pos = "V", UR = "a r a l" },
+            new() { Lemma = "make", Pos = "V", UR = "m a x" }
+        ];
+        project.Affixes =
+        [
+            new() { Name = "Form I Perf", Pos = "V", FeatureName = "Voice", FeatureValue = "FormI", Affix = "C1 a C2 a C3 a", AffixType = AffixType.Template, Enabled = true },
+            new() { Name = "Form II", Pos = "V", FeatureName = "Voice", FeatureValue = "FormII", Affix = "C1 a C2 C2 a C3 a", AffixType = AffixType.Template, Enabled = true },
+            new() { Name = "Passive Part", Pos = "N", FeatureName = "Form", FeatureValue = "Part", Affix = "m a C1 C2 uː C3", AffixType = AffixType.Template, Enabled = true },
+            new() { Name = "Actor Focus", Pos = "V", FeatureName = "Focus", FeatureValue = "Actor", Affix = "um", AffixType = AffixType.Infix, Enabled = true },
+            new() { Name = "Past Part", Pos = "V", FeatureName = "Aspect", FeatureValue = "Perf", Affix = "ge+...+t", AffixType = AffixType.Circumfix, Enabled = true }
+        ];
+
+        var morph = new MorphologyEngine();
+        Assert.Equal("kataba", string.Concat(morph.InflectSingle("write", "V", [new Feat("Voice", "FormI")], project)));
+        Assert.Equal("kattaba", string.Concat(morph.InflectSingle("write", "V", [new Feat("Voice", "FormII")], project)));
+        project.Lexemes.Add(new() { Lemma = "written", Pos = "N", UR = "k t b" });
+        Assert.Equal("maktuːb", string.Concat(morph.InflectSingle("written", "N", [new Feat("Form", "Part")], project)));
+
+        Assert.Equal("sumulat", string.Concat(morph.InflectSingle("s_write", "V", [new Feat("Focus", "Actor")], project)));
+        Assert.Equal("umaral", string.Concat(morph.InflectSingle("v_study", "V", [new Feat("Focus", "Actor")], project)));
+        Assert.Equal("gemaxt", string.Concat(morph.InflectSingle("make", "V", [new Feat("Aspect", "Perf")], project)));
+    }
+
+    [Fact]
+    public void PhonologyEngine_SupportsTurkishVowelHarmonyAndMandarinToneSandhi()
+    {
+        var turkish = ProjectFactory.CreateStarterProject();
+        turkish.Phonemes =
+        [
+            .. new[] { "v", "l", "r", "t", "k", "j", "z" }.Select(c => ProjectFactory.CreatePhoneme(c, "C")),
+            .. new[] { "a", "e", "i", "o", "u", "y", "ø", "ɯ" }.Select(v => ProjectFactory.CreatePhoneme(v, "V"))
+        ];
+        turkish.PhonologyRules =
+        [
+            new() { Name = "2-way Back Harmony", Target = "e", Replacement = "[αback]", PrevPhone = "C", Enabled = true },
+            new() { Name = "4-way Back+Round Harmony", Target = "i", Replacement = "[αback, αround]", PrevPhone = "C", Enabled = true }
+        ];
+
+        Assert.Equal("evler", string.Concat(PhonologyEngine.Derive(["e", "v", "l", "e", "r"], turkish).SurfacePhones));
+        Assert.Equal("atlar", string.Concat(PhonologyEngine.Derive(["a", "t", "l", "e", "r"], turkish).SurfacePhones));
+        Assert.Equal("køjlyk", string.Concat(PhonologyEngine.Derive(["k", "ø", "j", "l", "i", "k"], turkish).SurfacePhones));
+        Assert.Equal("kolluk", string.Concat(PhonologyEngine.Derive(["k", "o", "l", "l", "i", "k"], turkish).SurfacePhones));
+        Assert.Equal("kɯzlɯk", string.Concat(PhonologyEngine.Derive(["k", "ɯ", "z", "l", "i", "k"], turkish).SurfacePhones));
+
+        var mandarin = ProjectFactory.CreateStarterProject();
+        mandarin.Phonemes =
+        [
+            .. new[] { "n", "x" }.Select(c => ProjectFactory.CreatePhoneme(c, "C")),
+            .. new[] { "i", "aʊ" }.Select(v => ProjectFactory.CreatePhoneme(v, "V"))
+        ];
+        mandarin.Lexemes =
+        [
+            new() { Lemma = "you", Pos = "PRON", UR = "n i˧˩˧" },
+            new() { Lemma = "good", Pos = "V", UR = "x aʊ˧˩˧" }
+        ];
+        mandarin.PhonologyRules =
+        [
+            new() { Name = "Third-Tone Sandhi", Target = "[tone=LHL]", Replacement = "[tone=LH]", NextPhone = "[tone=LHL]", Enabled = true }
+        ];
+
+        Assert.DoesNotContain(ProjectValidator.Validate(mandarin), i => i.Message.Contains("unknown phone", StringComparison.OrdinalIgnoreCase));
+        var sandhi = PhonologyEngine.Derive(["n", "i˧˩˧", "x", "aʊ˧˩˧"], mandarin);
+        Assert.Equal("ni˧˥xaʊ˧˩˧", string.Concat(sandhi.SurfacePhones));
+    }
+
+    [Fact]
+    public void SyntaxAndMorphology_PropagatesLexClassAgreementAcrossDetAdjAndNoun()
+    {
+        var project = ProjectFactory.CreateStarterProject();
+        project.Phonemes =
+        [
+            .. new[] { "l", "f", "m", "p", "t", "v", "w", "n" }.Select(c => ProjectFactory.CreatePhoneme(c, "C")),
+            .. new[] { "a", "e", "i", "o", "u" }.Select(v => ProjectFactory.CreatePhoneme(v, "V"))
+        ];
+        project.Lexemes =
+        [
+            new() { Lemma = "the", Pos = "DET", UR = "l" },
+            new() { Lemma = "small", Pos = "ADJ", UR = "p e t i t" },
+            new() { Lemma = "woman", Pos = "N", UR = "f a m", LexClass = "Fem" },
+            new() { Lemma = "see", Pos = "V", UR = "v w a" }
+        ];
+        project.Affixes =
+        [
+            new() { Name = "Fem Det", Pos = "DET", FeatureName = "Class", FeatureValue = "Fem", Affix = "-a", Enabled = true },
+            new() { Name = "Fem Adj", Pos = "ADJ", FeatureName = "Class", FeatureValue = "Fem", Affix = "-e", Enabled = true },
+            new() { Name = "Fem N", Pos = "N", FeatureName = "Class", FeatureValue = "Fem", Affix = "-e", Enabled = true }
+        ];
+        project.OrthographyRules = [];
+        project.Capitalization = CapitalizationMode.None;
+
+        var engine = new LangEngine();
+        // ConfigurableSyntaxGenerator deterministically expands both SubjNP and ObjNP with ADJ at approxWords=5
+        project.Pipeline.SyntaxGeneratorId = "configurable-syntax";
+        var configSentence = engine.GenerateSentence(project, seed: 1, approxWords: 5, new Dictionary<string, string> { ["Number"] = "Sing" });
+        Assert.Equal("petite fame vwa petite fame", configSentence.Written);
+
+        // PhraseStructureSyntaxGenerator propagates Fem Class onto DET, optional ADJ, and N
+        project.Pipeline.SyntaxGeneratorId = "phrase-structure-syntax";
+        var psSentence = engine.GenerateSentence(project, seed: 4, approxWords: 5, new Dictionary<string, string> { ["Number"] = "Sing" });
+        Assert.Contains("la ", psSentence.Written);
+        Assert.Contains("fame", psSentence.Written);
+        Assert.DoesNotContain("petit ", psSentence.Written);
+    }
 }

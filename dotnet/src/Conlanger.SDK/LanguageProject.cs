@@ -20,6 +20,9 @@ public enum FlowDirection { LTR, RTL, TTB_LTR, TTB_RTL, Boustrophedon }
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum DiagnosticSeverity { Error, Warning }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum AffixType { Prefix, Suffix, Infix, Circumfix, Template }
+
 public sealed record Feat(string Name, string Value);
 
 public sealed record PhonologicalFeatures
@@ -80,6 +83,7 @@ public sealed class LexemeEntry
     public string Lemma { get; set; } = "";
     public string Pos { get; set; } = "N";
     public string UR { get; set; } = "";
+    public string? LexClass { get; set; }
     public string? Spelling { get; set; }
     public Dictionary<string, string>? Irregulars { get; set; }
 
@@ -121,8 +125,20 @@ public sealed class AffixEntry
     public string FeatureValue { get; set; } = "Pl";
     public string Affix { get; set; } = "";
     public bool IsPrefix { get; set; }
+    public AffixType? AffixType { get; set; }
     public string? Condition { get; set; }
     public bool Enabled { get; set; } = true;
+
+    [JsonIgnore]
+    public AffixType EffectiveAffixType
+    {
+        get => AffixType ?? (IsPrefix ? Conlanger.SDK.AffixType.Prefix : Conlanger.SDK.AffixType.Suffix);
+        set
+        {
+            AffixType = value;
+            IsPrefix = value == Conlanger.SDK.AffixType.Prefix;
+        }
+    }
 }
 
 public sealed class OrthRuleEntry

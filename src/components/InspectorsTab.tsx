@@ -26,26 +26,30 @@ export const InspectorsTab: React.FC<InspectorsTabProps> = ({ state }) => {
     const lex = engine.morphology.lexicon.resolve(activeLexeme);
     const ur = lex.rootPhones.UR ?? lex.lemma;
 
-    const pres = engine.morphology.realizeForPreview(lex.lemma, lex.pos, new FeatBundle([]));
+    const baseFeats: Array<{ name: string; value: string }> = lex.lexClass
+      ? [{ name: 'Class', value: lex.lexClass }]
+      : [];
+    const pres = engine.morphology.realizeForPreview(lex.lemma, lex.pos, new FeatBundle(baseFeats));
     const past = engine.morphology.realizeForPreview(
       lex.lemma,
       lex.pos,
-      new FeatBundle([{ name: 'Tense', value: 'Past' }])
+      new FeatBundle([...baseFeats, { name: 'Tense', value: 'Past' }])
     );
     const plural = engine.morphology.realizeForPreview(
       lex.lemma,
       lex.pos,
-      new FeatBundle([{ name: 'Number', value: 'Pl' }])
+      new FeatBundle([...baseFeats, { name: 'Number', value: 'Pl' }])
     );
     const acc = engine.morphology.realizeForPreview(
       lex.lemma,
       lex.pos,
-      new FeatBundle([{ name: 'Case', value: 'Acc' }])
+      new FeatBundle([...baseFeats, { name: 'Case', value: 'Acc' }])
     );
     const sg3 = engine.morphology.realizeForPreview(
       lex.lemma,
       lex.pos,
       new FeatBundle([
+        ...baseFeats,
         { name: 'Person', value: '3' },
         { name: 'Number', value: 'Sing' },
         { name: 'Tense', value: 'Pres' },
@@ -62,6 +66,7 @@ export const InspectorsTab: React.FC<InspectorsTabProps> = ({ state }) => {
     const lexText = [
       `Lemma: ${lex.lemma}`,
       `POS: ${lex.pos}`,
+      `Class: ${lex.lexClass ?? '(none)'}`,
       `UR: ${ur}`,
       `Spelling: ${lex.spelling ?? '(rule-driven)'}`,
       `Irregulars: ${irregSummary}`,

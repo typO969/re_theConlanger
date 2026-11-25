@@ -1,5 +1,6 @@
 import {
   AffixRule,
+  AffixType,
   CapitalizationMode,
   ClauseTemplate,
   DerivationStep,
@@ -39,12 +40,110 @@ export function emptyFeatures(): PhonologicalFeatures {
   };
 }
 
+const TONE_COMBINING_RE = /[\u0300\u0301\u0302\u0304\u0308\u030B\u030C\u030F]/g;
+const CHAO_TONE_SINGLE_RE = /[˥˦˧˨˩]/;
+const SUPRASEGMENTAL_STRIP_RE = /[ˈʰ˥˦˧˨˩\u0300\u0301\u0302\u0304\u0308\u030B\u030C\u030F]/g;
+
 export function stripStressMark(symbol: string): string {
   return symbol.replace(/^ˈ/, '');
 }
 
+export function stripSuprasegmentals(symbol: string): string {
+  return symbol
+    .normalize('NFD')
+    .replace(/^ˈ/, '')
+    .replace(TONE_COMBINING_RE, '')
+    .replace(/[˥˦˧˨˩]/g, '')
+    .normalize('NFC');
+}
+
 export function hasStressMark(symbol: string): boolean {
   return symbol.startsWith('ˈ');
+}
+
+const CHAO_TO_TONE: Record<string, string> = {
+  '˥': 'H',
+  '˥˥': 'H',
+  '˦': 'MH',
+  '˦˦': 'MH',
+  '˧': 'M',
+  '˧˧': 'M',
+  '˨': 'ML',
+  '˨˨': 'ML',
+  '˩': 'L',
+  '˩˩': 'L',
+  '˧˥': 'LH',
+  '˨˦': 'LH',
+  '˩˥': 'LH',
+  '˥˩': 'HL',
+  '˥˧': 'HL',
+  '˧˩': 'HL',
+  '˨˩˦': 'LHL',
+  '˧˩˧': 'LHL',
+  '˨˩˧': 'LHL',
+};
+
+const DIACRITIC_TO_TONE: Record<string, string> = {
+  '\u0301': 'H',
+  '\u030B': 'H',
+  '\u0304': 'M',
+  '\u0300': 'L',
+  '\u030F': 'L',
+  '\u030C': 'LH',
+  '\u0302': 'HL',
+};
+
+const TONE_TO_CHAO: Record<string, string> = {
+  H: '˥',
+  HIGH: '˥',
+  MH: '˦',
+  M: '˧',
+  MID: '˧',
+  ML: '˨',
+  L: '˩',
+  LOW: '˩',
+  LH: '˧˥',
+  RISING: '˧˥',
+  HL: '˥˩',
+  FALLING: '˥˩',
+  LHL: '˨˩˦',
+  DIPPING: '˨˩˦',
+};
+
+export function extractToneRaw(symbol: string): string {
+  const chao = symbol.match(/[˥˦˧˨˩]+/);
+  if (chao) return chao[0];
+  const nfd = symbol.normalize('NFD');
+  for (const ch of nfd) {
+    if (DIACRITIC_TO_TONE[ch]) return ch;
+  }
+  return '';
+}
+
+export function extractTone(symbol: string): string {
+  const chao = symbol.match(/[˥˦˧˨˩]+/);
+  if (chao) {
+    return CHAO_TO_TONE[chao[0]] ?? chao[0];
+  }
+  const nfd = symbol.normalize('NFD');
+  for (const ch of nfd) {
+    if (DIACRITIC_TO_TONE[ch]) return DIACRITIC_TO_TONE[ch];
+  }
+  return '';
+}
+
+export function applyToneToPhone(symbol: string, targetTone: string): string {
+  const stressPrefix = hasStressMark(symbol) ? 'ˈ' : '';
+  const base = stripSuprasegmentals(symbol);
+  const trimmed = targetTone.trim();
+  if (!trimmed || trimmed === '∅' || trimmed.toLowerCase() === 'none') {
+    return `${stressPrefix}${base}`;
+  }
+  const upper = trimmed.toUpperCase();
+  const suffix = /^[˥˦˧˨˩]+$/.test(trimmed)
+    ? trimmed
+    : (TONE_TO_CHAO[upper] ?? trimmed);
+  return `${stressPrefix}${base}${suffix}`;
 }
 
 const DEFAULT_IPA_FEATURES: Record<string, Partial<PhonologicalFeatures>> = {
@@ -54,6 +153,7 @@ const DEFAULT_IPA_FEATURES: Record<string, Partial<PhonologicalFeatures>> = {
   'tʰ': { voicing: 'voiceless', manner: 'stop', place: 'alveolar', custom: 'aspirated' },
   k: { voicing: 'voiceless', manner: 'stop', place: 'velar' },
   'kʰ': { voicing: 'voiceless', manner: 'stop', place: 'velar', custom: 'aspirated' },
+  q: { voicing: 'voiceless', manner: 'stop', place: 'uvular' },
   b: { voicing: 'voiced', manner: 'stop', place: 'bilabial' },
   d: { voicing: 'voiced', manner: 'stop', place: 'alveolar' },
   g: { voicing: 'voiced', manner: 'stop', place: 'velar' },
@@ -68,6 +168,10 @@ const DEFAULT_IPA_FEATURES: Record<string, Partial<PhonologicalFeatures>> = {
   v: { voicing: 'voiced', manner: 'fricative', place: 'labiodental' },
   θ: { voicing: 'voiceless', manner: 'fricative', place: 'dental' },
   ð: { voicing: 'voiced', manner: 'fricative', place: 'dental' },
+  x: { voicing: 'voiceless', manner: 'fricative', place: 'velar' },
+  ɣ: { voicing: 'voiced', manner: 'fricative', place: 'velar' },
+  ħ: { voicing: 'voiceless', manner: 'fricative', place: 'pharyngeal' },
+  ʕ: { voicing: 'voiced', manner: 'fricative', place: 'pharyngeal' },
   h: { voicing: 'voiceless', manner: 'fricative', place: 'glottal' },
   m: { voicing: 'voiced', manner: 'nasal', place: 'bilabial' },
   ɱ: { voicing: 'voiced', manner: 'nasal', place: 'labiodental' },
@@ -90,6 +194,13 @@ const DEFAULT_IPA_FEATURES: Record<string, Partial<PhonologicalFeatures>> = {
   i: { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'front', roundness: 'unrounded' },
   'iː': { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'front', roundness: 'unrounded', custom: 'tense long' },
   ɪ: { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'front', roundness: 'unrounded', custom: 'lax' },
+  y: { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'front', roundness: 'rounded' },
+  'yː': { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'front', roundness: 'rounded', custom: 'tense long' },
+  ø: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'front', roundness: 'rounded' },
+  'øː': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'front', roundness: 'rounded', custom: 'tense long' },
+  œ: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'front', roundness: 'rounded', custom: 'lax' },
+  ɯ: { voicing: 'voiced', manner: 'vowel', height: 'high', backness: 'back', roundness: 'unrounded' },
+  ɤ: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'unrounded' },
   o: { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'rounded' },
   'oʊ': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'rounded', custom: 'diphthong tense' },
   'ɔː': { voicing: 'voiced', manner: 'vowel', height: 'mid', backness: 'back', roundness: 'rounded', custom: 'tense long' },
@@ -133,7 +244,7 @@ export class Phonotactics {
   }
 
   public isValidOnset(cluster: string, segmentCount?: number): boolean {
-    const clean = cluster.replace(/[ˈʰ]/g, '');
+    const clean = cluster.normalize('NFD').replace(SUPRASEGMENTAL_STRIP_RE, '').normalize('NFC');
     if (clean.length === 0) return true;
     const count = segmentCount ?? clean.length;
     if (this.allowedOnsets.has(clean)) return true;
@@ -143,7 +254,7 @@ export class Phonotactics {
   }
 
   public isValidCoda(cluster: string, segmentCount?: number): boolean {
-    const clean = cluster.replace(/[ˈʰ]/g, '');
+    const clean = cluster.normalize('NFD').replace(SUPRASEGMENTAL_STRIP_RE, '').normalize('NFC');
     if (clean.length === 0) return true;
     const count = segmentCount ?? clean.length;
     if (this.allowedCodas.has(clean)) return true;
@@ -153,6 +264,17 @@ export class Phonotactics {
   }
 }
 
+export function isVowelSymbol(p: string, inventory: readonly Phoneme[] = []): boolean {
+  if (!p) return false;
+  const clean = stripSuprasegmentals(p);
+  if (inventory.length > 0) {
+    const found = inventory.find((ph) => stripSuprasegmentals(ph.symbol) === clean);
+    if (found) return found.type === 'V';
+  }
+  const baseVowels = 'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤɚ';
+  return baseVowels.includes(clean[0] ?? '') || baseVowels.includes(clean);
+}
+
 export class Syllabifier {
   private readonly vowelSet: Set<string>;
   private readonly tactics?: Phonotactics;
@@ -160,14 +282,14 @@ export class Syllabifier {
   constructor(vowels: readonly Phoneme[] = [], tactics?: Phonotactics) {
     this.vowelSet = new Set([
       ...'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤɚ',
-      ...vowels.map((v) => stripStressMark(v.symbol)),
+      ...vowels.map((v) => stripSuprasegmentals(v.symbol)),
     ]);
     this.tactics = tactics;
   }
 
   public isVowel(p: string): boolean {
     if (!p) return false;
-    const clean = stripStressMark(p);
+    const clean = stripSuprasegmentals(p);
     return this.vowelSet.has(clean) || (clean.length > 0 && this.vowelSet.has(clean[0]));
   }
 
@@ -203,8 +325,8 @@ export class Syllabifier {
       for (let split = Math.max(v1 + 1, v2 - maxOnset); split <= v2; split++) {
         const onsetPhones = phones.slice(split, v2);
         const codaPhones = phones.slice(v1 + 1, split);
-        const onsetSlice = onsetPhones.map((p) => p.replace(/[ˈʰ]/g, '')).join('');
-        const codaSlice = codaPhones.map((p) => p.replace(/[ˈʰ]/g, '')).join('');
+        const onsetSlice = onsetPhones.map((p) => p.normalize('NFD').replace(SUPRASEGMENTAL_STRIP_RE, '').normalize('NFC')).join('');
+        const codaSlice = codaPhones.map((p) => p.normalize('NFD').replace(SUPRASEGMENTAL_STRIP_RE, '').normalize('NFC')).join('');
         const onsetOk = !this.tactics || this.tactics.isValidOnset(onsetSlice, onsetPhones.length);
         const codaOk = !this.tactics || this.tactics.isValidCoda(codaSlice, codaPhones.length);
         if (onsetOk && codaOk) {
@@ -254,10 +376,13 @@ export function resolveStressSyllableIndex(
 }
 
 function getEffectiveFeatures(symbol: string, inventory: readonly Phoneme[]): { phoneme?: Phoneme; features: PhonologicalFeatures } | null {
-  const clean = stripStressMark(symbol);
-  const phoneme = inventory.find((p) => stripStressMark(p.symbol) === clean);
+  const cleanStress = stripStressMark(symbol);
+  const cleanBase = stripSuprasegmentals(symbol);
+  const phoneme =
+    inventory.find((p) => stripStressMark(p.symbol) === cleanStress) ??
+    inventory.find((p) => stripSuprasegmentals(p.symbol) === cleanBase);
   if (phoneme) return { phoneme, features: phoneme.features };
-  const def = DEFAULT_IPA_FEATURES[clean];
+  const def = DEFAULT_IPA_FEATURES[cleanBase] ?? DEFAULT_IPA_FEATURES[cleanStress];
   if (def) {
     return {
       features: {
@@ -269,27 +394,61 @@ function getEffectiveFeatures(symbol: string, inventory: readonly Phoneme[]): { 
   return null;
 }
 
+function isToneContextSelector(expected: string): boolean {
+  const trimmed = expected.trim();
+  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return false;
+  const inner = trimmed.slice(1, -1).toLowerCase();
+  return (
+    inner.includes('tone') ||
+    inner.includes('high-tone') ||
+    inner.includes('mid-tone') ||
+    inner.includes('low-tone')
+  );
+}
+
 function matchesSingleFeatureClause(
   symbol: string,
   clause: string,
   inventory: readonly Phoneme[],
   stressedSet?: ReadonlySet<number>,
-  phoneIndex?: number
+  phoneIndex?: number,
+  lexClass?: string
 ): boolean {
   const cond = clause.trim();
   if (!cond) return true;
-  const clean = stripStressMark(symbol);
+  const clean = stripSuprasegmentals(symbol);
 
   if (cond.startsWith('+') || cond.startsWith('-')) {
     const positive = cond.startsWith('+');
     const name = cond.slice(1).toLowerCase();
+
+    if (name.startsWith('class=')) {
+      const targetCls = name.slice('class='.length).trim();
+      const actualCls = (lexClass ?? '').trim().toLowerCase();
+      return positive ? actualCls === targetCls : actualCls !== targetCls;
+    }
+
     if (name === 'stress' || name === 'stressed') {
       if (!stressedSet || phoneIndex === undefined) return !positive;
       const isStressed = stressedSet.has(phoneIndex);
       return positive ? isStressed : !isStressed;
     }
 
-    const resolved = getEffectiveFeatures(clean, inventory);
+    if (name === 'high-tone' || name === 'h-tone') {
+      const t = extractTone(symbol).toUpperCase();
+      return positive ? t === 'H' : t !== 'H';
+    }
+    if (name === 'mid-tone' || name === 'm-tone') {
+      const t = extractTone(symbol).toUpperCase();
+      return positive ? t === 'M' : t !== 'M';
+    }
+    if (name === 'low-tone' || name === 'l-tone') {
+      const t = extractTone(symbol).toUpperCase();
+      return positive ? t === 'L' : t !== 'L';
+    }
+
+    if (!clean) return false;
+    const resolved = getEffectiveFeatures(symbol, inventory);
     if (!resolved) return false;
     const feat = resolved.features;
     const isVowel = resolved.phoneme ? resolved.phoneme.type === 'V' : feat.manner === 'vowel';
@@ -319,12 +478,25 @@ function matchesSingleFeatureClause(
   }
 
   if (cond.includes('=')) {
-    const resolved = getEffectiveFeatures(clean, inventory);
-    if (!resolved) return false;
-    const feat = resolved.features;
     const [rawKey, rawVal] = cond.split('=', 2);
     const key = rawKey.trim().toLowerCase();
     const val = rawVal.trim().toLowerCase();
+
+    if (key === 'class') {
+      return (lexClass ?? '').trim().toLowerCase() === val;
+    }
+    if (key === 'tone') {
+      if (!symbol) return false;
+      const tNorm = extractTone(symbol).toLowerCase();
+      const tRaw = extractToneRaw(symbol).toLowerCase();
+      if (!tNorm && !tRaw) return val === 'none' || val === '∅';
+      return tNorm === val || tRaw === val;
+    }
+
+    if (!clean) return false;
+    const resolved = getEffectiveFeatures(symbol, inventory);
+    if (!resolved) return false;
+    const feat = resolved.features;
     const featVal =
       key === 'voicing'
         ? feat.voicing
@@ -350,7 +522,8 @@ function matchesCondition(
   condition: string | undefined,
   inventory: readonly Phoneme[],
   stressedSet?: ReadonlySet<number>,
-  phoneIndex?: number
+  phoneIndex?: number,
+  lexClass?: string
 ): boolean {
   if (!condition || !condition.trim()) return true;
   let cond = condition.trim();
@@ -360,7 +533,7 @@ function matchesCondition(
   if (!cond) return true;
 
   const clauses = cond.split(',').map((c) => c.trim()).filter(Boolean);
-  return clauses.every((cl) => matchesSingleFeatureClause(symbol, cl, inventory, stressedSet, phoneIndex));
+  return clauses.every((cl) => matchesSingleFeatureClause(symbol, cl, inventory, stressedSet, phoneIndex, lexClass));
 }
 
 function matchesPhoneOrClass(
@@ -373,20 +546,23 @@ function matchesPhoneOrClass(
   if (!expected) return true;
   if (expected === '#') return actual === null;
   if (actual === null) return false;
-  const cleanActual = stripStressMark(actual);
+  const cleanStress = stripStressMark(actual);
+  const cleanBase = stripSuprasegmentals(actual);
 
   if (expected === 'V') {
-    const ph = inventory.find((p) => stripStressMark(p.symbol) === cleanActual);
-    return ph ? ph.type === 'V' : 'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤɚ'.includes(cleanActual[0] ?? '');
+    return isVowelSymbol(actual, inventory);
   }
   if (expected === 'C') {
-    const ph = inventory.find((p) => stripStressMark(p.symbol) === cleanActual);
-    return ph ? ph.type === 'C' : !'aeiouɑɔɛɪʊyøœæəɨʌɒɐɯɤɚ'.includes(cleanActual[0] ?? '');
+    return !isVowelSymbol(actual, inventory);
   }
   if (expected.startsWith('[') && expected.endsWith(']')) {
-    return matchesCondition(cleanActual, expected, inventory, stressedSet, actualIndex);
+    return matchesCondition(actual, expected, inventory, stressedSet, actualIndex);
   }
-  return expected.startsWith('ˈ') ? actual === expected : cleanActual === expected;
+  if (expected.startsWith('ˈ')) return actual === expected;
+  if (CHAO_TONE_SINGLE_RE.test(expected) || TONE_COMBINING_RE.test(expected.normalize('NFD'))) {
+    return cleanStress === expected;
+  }
+  return cleanBase === expected || cleanStress === expected;
 }
 
 function computeSyllableBoundarySets(
@@ -409,6 +585,20 @@ function computeSyllableBoundarySets(
   return { starts, ends };
 }
 
+function findAdjacentTbuIndex(
+  phones: readonly string[],
+  startIdx: number,
+  step: -1 | 1,
+  inventory: readonly Phoneme[]
+): number {
+  for (let i = startIdx; i >= 0 && i < phones.length; i += step) {
+    if (extractTone(phones[i]) || isVowelSymbol(phones[i], inventory)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 function contextMatch(
   phones: readonly string[],
   pos: number,
@@ -422,6 +612,10 @@ function contextMatch(
   let prevOk: boolean;
   if (prevTarget === '$' || prevTarget === '.') {
     prevOk = Boolean(sylBounds?.starts.has(pos));
+  } else if (prevTarget && isToneContextSelector(prevTarget)) {
+    const tbuIdx = findAdjacentTbuIndex(phones, pos - 1, -1, inventory);
+    const prevPhone = tbuIdx >= 0 ? phones[tbuIdx] : null;
+    prevOk = matchesPhoneOrClass(prevPhone, prevTarget, inventory, stressedSet, tbuIdx);
   } else {
     const prevPhone = pos > 0 ? phones[pos - 1] : null;
     prevOk = matchesPhoneOrClass(prevPhone, prevTarget, inventory, stressedSet, pos - 1);
@@ -431,6 +625,10 @@ function contextMatch(
   let nextOk: boolean;
   if (nextTarget === '$' || nextTarget === '.') {
     nextOk = Boolean(sylBounds?.ends.has(pos + spanLen - 1));
+  } else if (nextTarget && isToneContextSelector(nextTarget)) {
+    const tbuIdx = findAdjacentTbuIndex(phones, afterIdx, 1, inventory);
+    const nextPhone = tbuIdx >= 0 ? phones[tbuIdx] : null;
+    nextOk = matchesPhoneOrClass(nextPhone, nextTarget, inventory, stressedSet, tbuIdx);
   } else {
     const nextPhone = afterIdx < phones.length ? phones[afterIdx] : null;
     nextOk = matchesPhoneOrClass(nextPhone, nextTarget, inventory, stressedSet, afterIdx);
@@ -503,6 +701,119 @@ function resolveAlphaPlaceReplacement(
   return targetPhone;
 }
 
+function resolveAlphaHarmonyReplacement(
+  targetPhone: string,
+  phones: readonly string[],
+  pos: number,
+  prevTarget: string,
+  nextTarget: string,
+  matchBack: boolean,
+  matchRound: boolean,
+  inventory: readonly Phoneme[]
+): string {
+  // Progressive harmony (left-to-right) unless rule specifies only rightward context
+  const regressiveOnly =
+    !prevTarget &&
+    Boolean(nextTarget && nextTarget !== '#' && nextTarget !== '$' && nextTarget !== '.');
+
+  let triggerPhone: string | null = null;
+  if (regressiveOnly) {
+    for (let j = pos + 1; j < phones.length; j++) {
+      if (isVowelSymbol(phones[j], inventory)) {
+        triggerPhone = phones[j];
+        break;
+      }
+    }
+  } else {
+    for (let j = pos - 1; j >= 0; j--) {
+      if (isVowelSymbol(phones[j], inventory)) {
+        triggerPhone = phones[j];
+        break;
+      }
+    }
+    if (!triggerPhone) {
+      for (let j = pos + 1; j < phones.length; j++) {
+        if (isVowelSymbol(phones[j], inventory)) {
+          triggerPhone = phones[j];
+          break;
+        }
+      }
+    }
+  }
+  if (!triggerPhone) return targetPhone;
+
+  const triggerFeat = getEffectiveFeatures(triggerPhone, inventory)?.features;
+  const srcFeat = getEffectiveFeatures(targetPhone, inventory)?.features;
+  if (!triggerFeat || !srcFeat) return targetPhone;
+
+  const rawTriggerBack = triggerFeat.backness.trim().toLowerCase();
+  const triggerBack = rawTriggerBack === 'central' ? 'back' : rawTriggerBack;
+  const triggerRound = triggerFeat.roundness.trim().toLowerCase();
+
+  const srcHeight = srcFeat.height.trim().toLowerCase();
+  const srcBackRaw = srcFeat.backness.trim().toLowerCase();
+  const srcBack = srcBackRaw === 'central' ? 'back' : srcBackRaw;
+  const srcRound = srcFeat.roundness.trim().toLowerCase();
+
+  const desiredBack = matchBack && triggerBack ? triggerBack : srcBack;
+  const desiredRound = matchRound && triggerRound ? triggerRound : srcRound;
+
+  const matchesHarmony = (f: Partial<PhonologicalFeatures>, allowLowBackFallback: boolean): boolean => {
+    const h = (f.height ?? '').toLowerCase();
+    const bRaw = (f.backness ?? '').toLowerCase();
+    const b = bRaw === 'central' && allowLowBackFallback ? 'back' : bRaw;
+    const r = (f.roundness ?? '').toLowerCase();
+    const backOk = !desiredBack || b === desiredBack || (desiredBack === 'back' && bRaw === 'central' && allowLowBackFallback);
+    const roundOk = !desiredRound || r === desiredRound;
+    if (allowLowBackFallback && (srcHeight === 'mid' || srcHeight === 'low') && desiredRound === 'unrounded') {
+      return (h === 'mid' || h === 'low') && backOk && roundOk;
+    }
+    return (!srcHeight || h === srcHeight) && backOk && roundOk;
+  };
+
+  const reapplyProsody = (sym: string): string => {
+    const cleanNew = stripSuprasegmentals(sym);
+    const stress = hasStressMark(targetPhone) ? 'ˈ' : '';
+    const toneRaw = extractToneRaw(targetPhone);
+    return `${stress}${cleanNew}${toneRaw}`;
+  };
+
+  // Preserve current segment if it already satisfies desired harmony
+  if (matchesHarmony(srcFeat, true)) {
+    return targetPhone;
+  }
+
+  // 1) Search active vowel inventory for exact height+back+round match
+  const invExact = inventory.find((p) => p.type === 'V' && matchesHarmony(p.features, false));
+  if (invExact) return reapplyProsody(invExact.symbol);
+
+  // 2) Search active vowel inventory allowing mid/low unrounded pairing (e.g. Turkish e <-> a)
+  const invHarmonic = inventory.find((p) => p.type === 'V' && matchesHarmony(p.features, true));
+  if (invHarmonic) return reapplyProsody(invHarmonic.symbol);
+
+  // 3) Fallback to DEFAULT_IPA_FEATURES (exact first, then non-high Turkish e/a pair)
+  if ((srcHeight === 'mid' || srcHeight === 'low') && desiredBack === 'back' && desiredRound === 'unrounded') {
+    const hasGammaInInv = inventory.some((p) => stripSuprasegmentals(p.symbol) === 'ɤ');
+    if (!hasGammaInInv) return reapplyProsody('a');
+  }
+  if ((srcHeight === 'mid' || srcHeight === 'low') && desiredBack === 'front' && desiredRound === 'unrounded') {
+    const hasEInInv = inventory.some((p) => stripSuprasegmentals(p.symbol) === 'e');
+    if (hasEInInv || inventory.length === 0) return reapplyProsody('e');
+  }
+
+  for (const [sym, def] of Object.entries(DEFAULT_IPA_FEATURES)) {
+    if (def.manner === 'vowel' && matchesHarmony(def, false)) {
+      return reapplyProsody(sym);
+    }
+  }
+  for (const [sym, def] of Object.entries(DEFAULT_IPA_FEATURES)) {
+    if (def.manner === 'vowel' && matchesHarmony(def, true)) {
+      return reapplyProsody(sym);
+    }
+  }
+  return targetPhone;
+}
+
 export function applyRuleSpec(
   spec: RuleSpec,
   phones: readonly string[],
@@ -544,8 +855,15 @@ export function applyRuleSpec(
     return out;
   }
 
+  const lowerRep = replacement.toLowerCase();
   const isAlphaPlace =
-    replacement === '[αplace]' || replacement.toLowerCase() === '[alpha-place]';
+    replacement === '[αplace]' || lowerRep === '[alpha-place]';
+  const isAlphaBack =
+    lowerRep.includes('αback') || lowerRep.includes('alpha-back');
+  const isAlphaRound =
+    lowerRep.includes('αround') || lowerRep.includes('alpha-round');
+  const toneMatch = replacement.match(/^\[tone\s*=\s*([^\]]+)\]$/i);
+
   const output: string[] = [];
   const repPhones =
     replacement === '∅' || replacement === '' ? [] : replacement.split(/\s+/).filter(Boolean);
@@ -560,6 +878,21 @@ export function applyRuleSpec(
     ) {
       if (isAlphaPlace) {
         output.push(resolveAlphaPlaceReplacement(phone, phones, i, prevTarget, nextTarget, inventory));
+      } else if (isAlphaBack || isAlphaRound) {
+        output.push(
+          resolveAlphaHarmonyReplacement(
+            phone,
+            phones,
+            i,
+            prevTarget,
+            nextTarget,
+            isAlphaBack,
+            isAlphaRound,
+            inventory
+          )
+        );
+      } else if (toneMatch) {
+        output.push(applyToneToPhone(phone, toneMatch[1]));
       } else if (repPhones.length > 0 && hasStressMark(phone) && !target.startsWith('ˈ') && !hasStressMark(repPhones[0])) {
         output.push(`ˈ${repPhones[0]}`, ...repPhones.slice(1));
       } else {
@@ -705,8 +1038,8 @@ export class Phonology {
 
     const syls = syllables ?? this.syllabifier.split(phones);
     syls.forEach((syl, idx) => {
-      const onset = syl.onset.map((p) => p.replace(/[ˈʰ]/g, '')).join('');
-      const coda = syl.coda.map((p) => p.replace(/[ˈʰ]/g, '')).join('');
+      const onset = syl.onset.map((p) => p.normalize('NFD').replace(SUPRASEGMENTAL_STRIP_RE, '').normalize('NFC')).join('');
+      const coda = syl.coda.map((p) => p.normalize('NFD').replace(SUPRASEGMENTAL_STRIP_RE, '').normalize('NFC')).join('');
       if (onset && !this.tactics.isValidOnset(onset, syl.onset.length)) {
         issues.push(`Illegal onset "${onset}" in syllable ${idx + 1}`);
       }
@@ -842,40 +1175,61 @@ export class ConfigurableSyntaxGenerator {
     const numSubj = spec.constraints?.Number ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
     const numObj = spec.constraints?.Number ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
 
-    let subjNode: SyntaxNode = this.newRoleNode('N', subjLemma, 'Subj', [
-      { name: 'Number', value: numSubj },
-    ]);
-    let objNode: SyntaxNode = this.newRoleNode('N', objLemma, 'Obj', [
-      { name: 'Number', value: numObj },
-    ]);
+    const subjLex = nouns.find((n) => n.lemma === subjLemma);
+    const objLex = nouns.find((n) => n.lemma === objLemma);
+    const verbLex = verbs.find((v) => v.lemma === verbLemma);
+    const subjClass = subjLex?.lexClass?.trim();
+    const objClass = objLex?.lexClass?.trim();
+    const verbClass = verbLex?.lexClass?.trim();
 
-    // If approxWords >= 4 and adjectives exist, expand NP with an adjective modifier
+    const subjFeats: Feat[] = [{ name: 'Number', value: numSubj }];
+    if (subjClass) subjFeats.push({ name: 'Class', value: subjClass });
+
+    const objFeats: Feat[] = [{ name: 'Number', value: numObj }];
+    if (objClass) objFeats.push({ name: 'Class', value: objClass });
+
+    let subjNode: SyntaxNode = this.newRoleNode('N', subjLemma, 'Subj', subjFeats);
+    let objNode: SyntaxNode = this.newRoleNode('N', objLemma, 'Obj', objFeats);
+
+    // If approxWords >= 4 and adjectives exist, expand NP with an adjective modifier (with Class + Number agreement)
     if (spec.approxWords >= 4 && adjs.length > 0) {
       const modAdj = this.pickFrom(adjs, rng, 'small');
+      const modFeats: Feat[] = [{ name: 'Number', value: numSubj }];
+      if (subjClass) modFeats.push({ name: 'Class', value: subjClass });
       subjNode = new SyntaxNode('NP', 'SubjNP', new FeatBundle([{ name: 'Role', value: 'SubjNP' }]), [
-        this.newRoleNode('ADJ', modAdj, 'Mod', []),
+        this.newRoleNode('ADJ', modAdj, 'Mod', modFeats),
         subjNode,
       ]);
     }
     if (spec.approxWords >= 5 && adjs.length > 0 && this.clauseTemplate === 'Transitive') {
       const modAdj2 = this.pickFrom(adjs, rng, 'small');
+      const modFeats2: Feat[] = [{ name: 'Number', value: numObj }];
+      if (objClass) modFeats2.push({ name: 'Class', value: objClass });
       objNode = new SyntaxNode('NP', 'ObjNP', new FeatBundle([{ name: 'Role', value: 'ObjNP' }]), [
-        this.newRoleNode('ADJ', modAdj2, 'Mod', []),
+        this.newRoleNode('ADJ', modAdj2, 'Mod', modFeats2),
         objNode,
       ]);
     }
 
-    const verbNode = this.newRoleNode('V', verbLemma, 'Verb', [{ name: 'Tense', value: tense }]);
-    const predNode = this.newRoleNode('ADJ', predLemma, 'Pred', []);
+    const verbFeats: Feat[] = [{ name: 'Tense', value: tense }];
+    if (verbClass) verbFeats.push({ name: 'Class', value: verbClass });
+    if (subjClass) verbFeats.push({ name: 'SubjectClass', value: subjClass });
+    const verbNode = this.newRoleNode('V', verbLemma, 'Verb', verbFeats);
+
+    const predFeats: Feat[] = [{ name: 'Number', value: numSubj }];
+    if (subjClass) predFeats.push({ name: 'Class', value: subjClass });
+    const predNode = this.newRoleNode('ADJ', predLemma, 'Pred', predFeats);
 
     if (this.clauseTemplate === 'Intransitive') {
       return { S: subjNode, V: verbNode };
     }
     if (this.clauseTemplate === 'Copular') {
       const copulaLex = this.lexicon.resolveExact('be') ? 'be' : 'e';
+      const copFeats: Feat[] = [{ name: 'Tense', value: tense }];
+      if (subjClass) copFeats.push({ name: 'SubjectClass', value: subjClass });
       return {
         S: subjNode,
-        V: this.newRoleNode('V', copulaLex, 'Copula', [{ name: 'Tense', value: tense }]),
+        V: this.newRoleNode('V', copulaLex, 'Copula', copFeats),
         O: predNode,
       };
     }
@@ -951,6 +1305,38 @@ export class Morphology {
     };
   }
 
+  public static getEffectiveAffixType(rule: Pick<AffixRule, 'affixType' | 'isPrefix'>): AffixType {
+    return rule.affixType ?? (rule.isPrefix ? 'Prefix' : 'Suffix');
+  }
+
+  private static splitTemplateSlots(pattern: string): string[] {
+    const trimmed = pattern.trim();
+    if (!trimmed) return [];
+    if (/\s/.test(trimmed)) {
+      return trimmed.split(/\s+/).filter(Boolean);
+    }
+    const slots: string[] = [];
+    const chars = [...trimmed];
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
+      if ((ch === 'C' || ch === 'c') && i + 1 < chars.length && /[1-9]/.test(chars[i + 1])) {
+        slots.push(`C${chars[++i]}`);
+      } else if (
+        (ch === 'ː' ||
+          ch === 'ʰ' ||
+          CHAO_TONE_SINGLE_RE.test(ch) ||
+          TONE_COMBINING_RE.test(ch)) &&
+        slots.length > 0 &&
+        !/^C[1-9]$/.test(slots[slots.length - 1])
+      ) {
+        slots[slots.length - 1] += ch;
+      } else if (ch !== '-' && ch !== '.') {
+        slots.push(ch);
+      }
+    }
+    return slots;
+  }
+
   public inflectNodeDetailed(node: SyntaxNode): { tokens: MorphemeToken[]; isIrregular: boolean; spelling?: string } {
     const lex = this.lexicon.resolve(node.lemmaId);
     const { ur, matchedFeatures, isIrregular } = this.resolveIrregularStem(lex, node.features);
@@ -963,30 +1349,132 @@ export class Morphology {
       },
     ];
 
+    const effectiveClass =
+      lex.lexClass?.trim() ||
+      node.features.items.find((f) => f.name === 'Class')?.value?.trim() ||
+      undefined;
+
+    const effectiveFeatures =
+      effectiveClass && !node.features.items.some((f) => f.name === 'Class')
+        ? new FeatBundle([...node.features.items, { name: 'Class', value: effectiveClass }])
+        : node.features;
+
     const handledFeatures = new Set<string>(matchedFeatures);
 
     for (const rule of this.affixRules) {
       if (!rule.enabled || rule.pos !== node.pos) continue;
       if (handledFeatures.has(rule.featureName)) continue;
-      if (!node.features.has(rule.featureName, rule.featureValue)) continue;
+      if (!effectiveFeatures.has(rule.featureName, rule.featureValue)) continue;
+
+      const kind = Morphology.getEffectiveAffixType(rule);
 
       if (rule.condition?.trim()) {
         const currentFlat = morphemes.flatMap((m) => m.underlyingPhones);
-        if (currentFlat.length === 0) continue;
-        const anchor = rule.isPrefix ? currentFlat[0] : currentFlat[currentFlat.length - 1];
-        if (!matchesCondition(anchor, rule.condition, this.phonemes)) continue;
+        const anchor =
+          currentFlat.length === 0
+            ? ''
+            : kind === 'Prefix' || kind === 'Infix'
+              ? currentFlat[0]
+              : currentFlat[currentFlat.length - 1];
+        if (!matchesCondition(anchor, rule.condition, this.phonemes, undefined, undefined, effectiveClass)) {
+          continue;
+        }
       }
 
-      const affixPhones = Morphology.splitPhones(rule.affix.replace(/-/g, ''));
-      const morpheme = {
-        id: `AFX_${rule.name}`,
-        gloss: rule.name,
-        underlyingPhones: affixPhones,
-      };
-      if (rule.isPrefix) {
-        morphemes.unshift(morpheme);
+      if (kind === 'Infix') {
+        const infixPhones = Morphology.splitPhones(rule.affix.replace(/[-<>]/g, '').trim());
+        const stemIdx = morphemes.findIndex((m) => m.id === 'STEM' || m.id === 'STEM_IRREG');
+        const targetIdx = stemIdx >= 0 ? stemIdx : 0;
+        const stem = morphemes[targetIdx];
+        const stemPhones = stem.underlyingPhones;
+        let splitIdx = stemPhones.findIndex((p) => isVowelSymbol(p, this.phonemes));
+        if (splitIdx < 0) splitIdx = Math.min(1, stemPhones.length);
+
+        const before = stemPhones.slice(0, splitIdx);
+        const after = stemPhones.slice(splitIdx);
+        const replacementMorphemes = [];
+        if (before.length > 0) {
+          replacementMorphemes.push({ id: stem.id, gloss: stem.gloss, underlyingPhones: before });
+        }
+        replacementMorphemes.push({
+          id: `AFX_${rule.name}`,
+          gloss: rule.name,
+          underlyingPhones: infixPhones,
+        });
+        if (after.length > 0) {
+          replacementMorphemes.push({
+            id: before.length > 0 ? `${stem.id}_CONT` : stem.id,
+            gloss: stem.gloss,
+            underlyingPhones: after,
+          });
+        }
+        morphemes.splice(targetIdx, 1, ...replacementMorphemes);
+      } else if (kind === 'Circumfix') {
+        const raw = rule.affix.trim();
+        let preRaw = '';
+        let sufRaw = '';
+        if (raw.includes('...')) {
+          [preRaw, sufRaw] = raw.split('...', 2);
+        } else if (raw.includes('+')) {
+          [preRaw, sufRaw] = raw.split('+', 2);
+        } else if (raw.includes('/')) {
+          [preRaw, sufRaw] = raw.split('/', 2);
+        } else {
+          preRaw = raw;
+        }
+        const prePhones = Morphology.splitPhones(preRaw.replace(/[-+/]/g, '').trim());
+        const sufPhones = Morphology.splitPhones(sufRaw.replace(/[-+/]/g, '').trim());
+        if (prePhones.length > 0) {
+          morphemes.unshift({
+            id: `AFX_${rule.name}_PRE`,
+            gloss: `${rule.name}.PRE`,
+            underlyingPhones: prePhones,
+          });
+        }
+        if (sufPhones.length > 0) {
+          morphemes.push({
+            id: `AFX_${rule.name}_SUF`,
+            gloss: `${rule.name}.SUF`,
+            underlyingPhones: sufPhones,
+          });
+        }
+      } else if (kind === 'Template') {
+        const stemIdx = morphemes.findIndex((m) => m.id === 'STEM' || m.id === 'STEM_IRREG');
+        const targetIdx = stemIdx >= 0 ? stemIdx : 0;
+        const stem = morphemes[targetIdx];
+        const radicals = stem.underlyingPhones.filter((p) => !isVowelSymbol(p, this.phonemes));
+        const slots = Morphology.splitTemplateSlots(rule.affix);
+        const templated: string[] = [];
+        for (const slot of slots) {
+          const radMatch = slot.match(/^C([1-9])$/i);
+          if (radMatch) {
+            const rIdx = Number(radMatch[1]) - 1;
+            if (rIdx >= 0 && rIdx < radicals.length) {
+              templated.push(radicals[rIdx]);
+            }
+          } else {
+            templated.push(...Morphology.splitPhones(slot));
+          }
+        }
+        morphemes[targetIdx] = {
+          id: `TEMPLATE_${rule.name}`,
+          gloss: `${stem.gloss}.${rule.name}`,
+          underlyingPhones: templated,
+        };
+      } else if (kind === 'Prefix') {
+        const affixPhones = Morphology.splitPhones(rule.affix.replace(/-/g, ''));
+        morphemes.unshift({
+          id: `AFX_${rule.name}`,
+          gloss: rule.name,
+          underlyingPhones: affixPhones,
+        });
       } else {
-        morphemes.push(morpheme);
+        const affixPhones = Morphology.splitPhones(rule.affix.replace(/-/g, ''));
+        morphemes.push({
+          id: `AFX_${rule.name}`,
+          gloss: rule.name,
+          underlyingPhones: affixPhones,
+        });
       }
       handledFeatures.add(rule.featureName);
     }
@@ -1014,6 +1502,7 @@ export class Morphology {
 
   private static readonly MULTI_CHAR_SEGMENTS = new Set([
     'iː', 'eɪ', 'oʊ', 'ɔː', 'uː', 'ɑː', 'ɝː', 'aɪ', 'aʊ', 'ɔɪ',
+    'yː', 'øː',
     'tʃ', 'dʒ', 'pʰ', 'tʰ', 'kʰ',
   ]);
 
@@ -1023,8 +1512,8 @@ export class Morphology {
     if (trimmed.includes(' ')) {
       return trimmed.split(/\s+/).filter(Boolean);
     }
-    const noStress = trimmed.replace(/^ˈ/, '');
-    if (Morphology.MULTI_CHAR_SEGMENTS.has(noStress)) {
+    const noSupra = stripSuprasegmentals(trimmed);
+    if (Morphology.MULTI_CHAR_SEGMENTS.has(noSupra) || Morphology.MULTI_CHAR_SEGMENTS.has(trimmed.replace(/^ˈ/, ''))) {
       return [trimmed];
     }
     const chars = [...trimmed];
@@ -1033,7 +1522,13 @@ export class Morphology {
       const ch = chars[i];
       if (ch === 'ˈ' && i + 1 < chars.length) {
         result.push(ch + chars[++i]);
-      } else if ((ch === 'ː' || ch === 'ʰ') && result.length > 0) {
+      } else if (
+        (ch === 'ː' ||
+          ch === 'ʰ' ||
+          CHAO_TONE_SINGLE_RE.test(ch) ||
+          /[\u0300-\u036f]/.test(ch)) &&
+        result.length > 0
+      ) {
         result[result.length - 1] += ch;
       } else {
         result.push(ch);
@@ -1221,11 +1716,30 @@ export class WordGenerator {
     let phones = pieces.flat();
 
     if (this.state.Affixes.length > 0 && this.rng.nextDouble() < 0.2) {
-      const enabledAffixes = this.state.Affixes.filter((a) => a.Enabled && a.Affix.trim());
+      const enabledAffixes = this.state.Affixes.filter(
+        (a) => a.Enabled && a.Affix.trim() && Morphology.getEffectiveAffixType({ affixType: a.AffixType, isPrefix: a.IsPrefix }) !== 'Template'
+      );
       if (enabledAffixes.length > 0) {
         const afx = enabledAffixes[this.rng.next(enabledAffixes.length)];
-        const afxPhones = Morphology.splitPhones(afx.Affix.replace(/-/g, ''));
-        phones = afx.IsPrefix ? [...afxPhones, ...phones] : [...phones, ...afxPhones];
+        const kind = Morphology.getEffectiveAffixType({ affixType: afx.AffixType, isPrefix: afx.IsPrefix });
+        if (kind === 'Prefix') {
+          const afxPhones = Morphology.splitPhones(afx.Affix.replace(/-/g, ''));
+          phones = [...afxPhones, ...phones];
+        } else if (kind === 'Infix') {
+          const afxPhones = Morphology.splitPhones(afx.Affix.replace(/[-<>]/g, ''));
+          const vIdx = phones.findIndex((p) => isVowelSymbol(p, this.state.Phonemes));
+          const splitAt = vIdx >= 0 ? vIdx : Math.min(1, phones.length);
+          phones = [...phones.slice(0, splitAt), ...afxPhones, ...phones.slice(splitAt)];
+        } else if (kind === 'Circumfix') {
+          const raw = afx.Affix.trim();
+          const [pre, suf = ''] = raw.includes('...') ? raw.split('...', 2) : raw.includes('+') ? raw.split('+', 2) : raw.split('/', 2);
+          const prePhones = Morphology.splitPhones(pre.replace(/[-+/]/g, '').trim());
+          const sufPhones = Morphology.splitPhones(suf.replace(/[-+/]/g, '').trim());
+          phones = [...prePhones, ...phones, ...sufPhones];
+        } else {
+          const afxPhones = Morphology.splitPhones(afx.Affix.replace(/-/g, ''));
+          phones = [...phones, ...afxPhones];
+        }
       }
     }
 
@@ -1363,29 +1877,29 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
       rolePrefix: 'Subj' | 'Obj',
       gramCase: 'Nom' | 'Acc',
       avoidLemma?: string
-    ): { node: SyntaxNode; person: string; number: string; headLemma: string } => {
+    ): { node: SyntaxNode; person: string; number: string; headLemma: string; headClass?: string } => {
       const eligibleProns = avoidLemma ? prons.filter((p) => p.lemma !== avoidLemma) : prons;
       if (eligibleProns.length > 0 && rng.nextDouble() < 0.35) {
         const pron = pick(eligibleProns)!;
         const lower = pron.lemma.toLowerCase();
         const person = lower === 'i' || lower === 'we' ? '1' : lower === 'you' ? '2' : '3';
         const number = constrainedNumber ?? (lower === 'they' || lower === 'we' || lower === 'you' ? 'Pl' : 'Sing');
-        const pronNode = new SyntaxNode(
-          'PRON',
-          pron.lemma,
-          new FeatBundle([
-            { name: 'Role', value: rolePrefix },
-            { name: 'Person', value: person },
-            { name: 'Number', value: number },
-            { name: 'Case', value: gramCase },
-          ])
-        );
-        return { node: pronNode, person, number, headLemma: pron.lemma };
+        const pronClass = pron.lexClass?.trim();
+        const pronFeats: Feat[] = [
+          { name: 'Role', value: rolePrefix },
+          { name: 'Person', value: person },
+          { name: 'Number', value: number },
+          { name: 'Case', value: gramCase },
+        ];
+        if (pronClass) pronFeats.push({ name: 'Class', value: pronClass });
+        const pronNode = new SyntaxNode('PRON', pron.lemma, new FeatBundle(pronFeats));
+        return { node: pronNode, person, number, headLemma: pron.lemma, headClass: pronClass };
       }
 
       const pool = nouns.filter((n) => n.lemma !== avoidLemma);
       const noun = pick(pool.length > 0 ? pool : nouns);
       const nounLemma = noun?.lemma ?? 'person';
+      const headClass = noun?.lexClass?.trim();
       const number = constrainedNumber ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
       const children: SyntaxNode[] = [];
 
@@ -1397,36 +1911,33 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
             : dets;
         const det = pick(compatibleDets.length > 0 ? compatibleDets : dets);
         if (det) {
-          children.push(
-            new SyntaxNode(
-              'DET',
-              det.lemma,
-              new FeatBundle([
-                { name: 'Role', value: 'Det' },
-                { name: 'Number', value: number },
-              ])
-            )
-          );
+          const detFeats: Feat[] = [
+            { name: 'Role', value: 'Det' },
+            { name: 'Number', value: number },
+          ];
+          if (headClass) detFeats.push({ name: 'Class', value: headClass });
+          children.push(new SyntaxNode('DET', det.lemma, new FeatBundle(detFeats)));
         }
       }
 
       if (spec.approxWords >= 4 && adjs.length > 0 && rng.nextDouble() < 0.65) {
         const adj = pick(adjs)!;
-        children.push(new SyntaxNode('ADJ', adj.lemma, new FeatBundle([{ name: 'Role', value: 'Mod' }])));
+        const adjFeats: Feat[] = [
+          { name: 'Role', value: 'Mod' },
+          { name: 'Number', value: number },
+        ];
+        if (headClass) adjFeats.push({ name: 'Class', value: headClass });
+        children.push(new SyntaxNode('ADJ', adj.lemma, new FeatBundle(adjFeats)));
       }
 
-      children.push(
-        new SyntaxNode(
-          'N',
-          nounLemma,
-          new FeatBundle([
-            { name: 'Role', value: rolePrefix },
-            { name: 'Person', value: '3' },
-            { name: 'Number', value: number },
-            { name: 'Case', value: gramCase },
-          ])
-        )
-      );
+      const nFeats: Feat[] = [
+        { name: 'Role', value: rolePrefix },
+        { name: 'Person', value: '3' },
+        { name: 'Number', value: number },
+        { name: 'Case', value: gramCase },
+      ];
+      if (headClass) nFeats.push({ name: 'Class', value: headClass });
+      children.push(new SyntaxNode('N', nounLemma, new FeatBundle(nFeats)));
 
       const np = new SyntaxNode(
         'NP',
@@ -1434,7 +1945,7 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
         new FeatBundle([{ name: 'Role', value: `${rolePrefix}NP` }]),
         children
       );
-      return { node: np, person: '3', number, headLemma: nounLemma };
+      return { node: np, person: '3', number, headLemma: nounLemma, headClass };
     };
 
     const subj = buildNp('Subj', 'Nom');
@@ -1443,10 +1954,12 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
     const verbPool = this.clauseTemplate === 'Copular'
       ? verbs.filter((v) => v.lemma === 'be')
       : verbs.filter((v) => v.lemma !== 'be');
-    const chosenVerb =
+    const chosenVerbLex =
       this.clauseTemplate === 'Copular'
-        ? (this.lexRef.resolveExact('be')?.lemma ?? 'be')
-        : (pick(verbPool.length > 0 ? verbPool : verbs)?.lemma ?? 'see');
+        ? this.lexRef.resolveExact('be')
+        : pick(verbPool.length > 0 ? verbPool : verbs);
+    const chosenVerb = chosenVerbLex?.lemma ?? (this.clauseTemplate === 'Copular' ? 'be' : 'see');
+    const verbClass = chosenVerbLex?.lexClass?.trim();
 
     const vpChildren: SyntaxNode[] = [];
     const wantFutureAux = tense === 'Fut' && auxes.some((a) => a.lemma === 'will');
@@ -1464,13 +1977,9 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
         vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
       }
       if (advNode) vpChildren.push(advNode);
-      vpChildren.push(
-        new SyntaxNode(
-          'V',
-          chosenVerb,
-          new FeatBundle([{ name: 'Role', value: 'Verb' }, { name: 'Finiteness', value: 'Bare' }])
-        )
-      );
+      const vBareFeats: Feat[] = [{ name: 'Role', value: 'Verb' }, { name: 'Finiteness', value: 'Bare' }];
+      if (verbClass) vBareFeats.push({ name: 'Class', value: verbClass });
+      vpChildren.push(new SyntaxNode('V', chosenVerb, new FeatBundle(vBareFeats)));
     } else if (isNeg && negs.length > 0 && chosenVerb !== 'be' && doAux) {
       const auxFeats: Feat[] = [
         { name: 'Role', value: 'Aux' },
@@ -1484,13 +1993,9 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
       vpChildren.push(new SyntaxNode('AUX', doAux.lemma, new FeatBundle(auxFeats)));
       vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
       if (advNode) vpChildren.push(advNode);
-      vpChildren.push(
-        new SyntaxNode(
-          'V',
-          chosenVerb,
-          new FeatBundle([{ name: 'Role', value: 'Verb' }, { name: 'Finiteness', value: 'Bare' }])
-        )
-      );
+      const vBareFeats: Feat[] = [{ name: 'Role', value: 'Verb' }, { name: 'Finiteness', value: 'Bare' }];
+      if (verbClass) vBareFeats.push({ name: 'Class', value: verbClass });
+      vpChildren.push(new SyntaxNode('V', chosenVerb, new FeatBundle(vBareFeats)));
     } else {
       if (advNode && chosenVerb !== 'be') vpChildren.push(advNode);
       const verbFeats: Feat[] = [
@@ -1502,6 +2007,8 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
       if (tense === 'Pres' && subj.person === '3' && subj.number === 'Sing') {
         verbFeats.push({ name: 'Agreement', value: '3sg' });
       }
+      if (verbClass) verbFeats.push({ name: 'Class', value: verbClass });
+      if (subj.headClass) verbFeats.push({ name: 'SubjectClass', value: subj.headClass });
       vpChildren.push(new SyntaxNode('V', chosenVerb, new FeatBundle(verbFeats)));
       if (isNeg && negs.length > 0 && chosenVerb === 'be') {
         vpChildren.push(new SyntaxNode('NEG', negs[0].lemma, new FeatBundle([{ name: 'Role', value: 'Neg' }])));
@@ -1514,6 +2021,12 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
         ? vpChildren[0]
         : new SyntaxNode('VP', 'VP', new FeatBundle([{ name: 'Role', value: 'VP' }]), vpChildren);
 
+    const predFeats: Feat[] = [
+      { name: 'Role', value: 'Pred' },
+      { name: 'Number', value: subj.number },
+    ];
+    if (subj.headClass) predFeats.push({ name: 'Class', value: subj.headClass });
+
     const roles: Record<string, SyntaxNode> =
       this.clauseTemplate === 'Intransitive'
         ? { S: subj.node, V: vNode }
@@ -1521,11 +2034,7 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
           ? {
               S: subj.node,
               V: vNode,
-              O: new SyntaxNode(
-                'ADJ',
-                pick(adjs)?.lemma ?? 'small',
-                new FeatBundle([{ name: 'Role', value: 'Pred' }])
-              ),
+              O: new SyntaxNode('ADJ', pick(adjs)?.lemma ?? 'small', new FeatBundle(predFeats)),
             }
           : { S: subj.node, V: vNode, O: obj.node };
 
@@ -1907,12 +2416,13 @@ export function validateProject(state: LanguageProjectState): DiagnosticIssue[] 
       issues.push({ severity: 'warning', subsystem: 'Morphology', message: `Lexeme "${lex.Lemma}" has empty UR.` });
     } else {
       for (const ph of phones) {
-        const cleanPh = stripStressMark(ph);
-        if (!seenPhon.has(cleanPh)) {
+        const cleanStress = stripStressMark(ph);
+        const cleanSupra = stripSuprasegmentals(ph);
+        if (!seenPhon.has(cleanStress) && !seenPhon.has(cleanSupra)) {
           issues.push({
             severity: 'warning',
             subsystem: 'Phonology',
-            message: `Lexeme "${lex.Lemma}" uses phone "${cleanPh}" which is not in the inventory.`,
+            message: `Lexeme "${lex.Lemma}" uses phone "${cleanSupra}" which is not in the inventory.`,
           });
         }
       }
@@ -2373,6 +2883,7 @@ export function buildEngineFromState(state: LanguageProjectState): LangEngine {
       lemma: l.Lemma,
       pos: l.Pos,
       rootPhones: { UR: l.UR },
+      lexClass: l.LexClass,
       spelling: l.Spelling,
       irregulars: l.Irregulars,
     }))
@@ -2390,6 +2901,7 @@ export function buildEngineFromState(state: LanguageProjectState): LangEngine {
       featureValue: a.FeatureValue,
       affix: a.Affix,
       isPrefix: a.IsPrefix,
+      affixType: a.AffixType,
       condition: a.Condition ?? '',
       enabled: a.Enabled,
     })),
