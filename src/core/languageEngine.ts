@@ -1228,12 +1228,12 @@ export function parseCustomCfgRules(rules?: readonly string[]): Map<string, stri
   return map;
 }
 
-export function resolveMoodFromSpec(spec: SentenceSpec): SentenceMood {
-  const raw = spec.constraints?.Mood?.trim().toLowerCase() ?? '';
-  if (raw === 'ynquestion' || raw === 'question' || raw === 'interrogative' || spec.clauseType.toLowerCase() === 'ynquestion') {
+export function resolveMoodFromSpec(spec?: SentenceSpec): SentenceMood {
+  const raw = spec?.constraints?.Mood?.trim().toLowerCase() ?? '';
+  if (raw === 'ynquestion' || raw === 'question' || raw === 'interrogative' || spec?.clauseType?.toLowerCase() === 'ynquestion') {
     return 'YNQuestion';
   }
-  if (raw === 'imp' || raw === 'imperative' || spec.clauseType.toLowerCase() === 'imp') {
+  if (raw === 'imp' || raw === 'imperative' || spec?.clauseType?.toLowerCase() === 'imp') {
     return 'Imp';
   }
   return 'Decl';
@@ -4118,6 +4118,952 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
     },
   };
 }
+
+export function createSpanishPresetProjectState(): LanguageProjectState {
+  const consonants = ['p', 't', 'k', 'b', 'd', 'g', 'tʃ', 'f', 's', 'x', 'm', 'n', 'ɲ', 'l', 'ʎ', 'ɾ', 'r', 'w', 'j', 'β', 'ð', 'ɣ'];
+  const vowels = ['a', 'e', 'i', 'o', 'u'];
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) => createPhoneme(c, 'C')),
+    ...vowels.map((v) => createPhoneme(v, 'V')),
+  ];
+  return {
+    SchemaVersion: 2,
+    Name: 'Spanish (Español)',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 4 },
+      { pattern: 'CVC', weight: 2 },
+      { pattern: 'CCV', weight: 1 },
+      { pattern: 'V', weight: 1 },
+    ],
+    Phonotactics: {
+      allowedOnsets: ['p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'x', 'm', 'n', 'ɲ', 'l', 'ɾ', 'r', 'pr', 'br', 'tr', 'dr', 'kr', 'gr', 'fr', 'pl', 'bl', 'kl', 'gl', 'fl'],
+      allowedCodas: ['n', 's', 'l', 'r', 'd', 'θ', 'x', 'j', 'w'],
+      maxOnsetCluster: 2,
+      maxCodaCluster: 1,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: { hyphenateSyllables: false, allowDuplicates: true },
+    StressPattern: 'Penultimate',
+    PhonologyRules: [
+      { Name: 'Intervocalic /b/ spirantization', Target: 'b', Replacement: 'β', PrevPhone: 'V', NextPhone: 'V', Condition: '', Enabled: true },
+      { Name: 'Intervocalic /d/ spirantization', Target: 'd', Replacement: 'ð', PrevPhone: 'V', NextPhone: 'V', Condition: '', Enabled: true },
+      { Name: 'Intervocalic /g/ spirantization', Target: 'g', Replacement: 'ɣ', PrevPhone: 'V', NextPhone: 'V', Condition: '', Enabled: true },
+      { Name: 'Nasal place assimilation', Target: 'n', Replacement: '[αplace]', PrevPhone: null, NextPhone: '[manner=stop]', Condition: '', Enabled: true },
+    ],
+    DiachronicRules: [],
+    Lexemes: [
+      { Lemma: 'el', Pos: 'DET', UR: 'e l', Spelling: 'el', SemanticTags: ['det:def'], LexClass: 'Masc' },
+      { Lemma: 'la', Pos: 'DET', UR: 'l a', Spelling: 'la', SemanticTags: ['det:def'], LexClass: 'Fem' },
+      { Lemma: 'un', Pos: 'DET', UR: 'u n', Spelling: 'un', SemanticTags: ['det:indef'], LexClass: 'Masc' },
+      { Lemma: 'una', Pos: 'DET', UR: 'u n a', Spelling: 'una', SemanticTags: ['det:indef'], LexClass: 'Fem' },
+      { Lemma: 'perro', Pos: 'N', UR: 'ˈp e r o', Spelling: 'perro', SemanticTags: ['animate', 'animal'], LexClass: 'Masc', ProtoUR: 'ˈp e r o' },
+      { Lemma: 'gato', Pos: 'N', UR: 'ˈg a t o', Spelling: 'gato', SemanticTags: ['animate', 'animal'], LexClass: 'Masc', ProtoUR: 'ˈg a t o' },
+      { Lemma: 'hombre', Pos: 'N', UR: 'ˈo m b ɾ e', Spelling: 'hombre', SemanticTags: ['animate', 'human'], LexClass: 'Masc', ProtoUR: 'ˈh o m i n e m' },
+      { Lemma: 'mujer', Pos: 'N', UR: 'm u ˈx e ɾ', Spelling: 'mujer', SemanticTags: ['animate', 'human'], LexClass: 'Fem', ProtoUR: 'm u ˈl j e r' },
+      { Lemma: 'agua', Pos: 'N', UR: 'ˈa ɣ w a', Spelling: 'agua', SemanticTags: ['liquid', 'mass'], ProtoUR: 'ˈa k w a' },
+      { Lemma: 'casa', Pos: 'N', UR: 'ˈk a s a', Spelling: 'casa', SemanticTags: ['place', 'concrete'], LexClass: 'Fem' },
+      { Lemma: 'parque', Pos: 'N', UR: 'ˈp a ɾ k e', Spelling: 'parque', SemanticTags: ['place', 'concrete'], LexClass: 'Masc' },
+      { Lemma: 'ver', Pos: 'V', UR: 'ˈb e ɾ', Spelling: 'ver', Irregulars: { 'Tense=Past': 'ˈb j o', 'Agreement=3sg': 'ˈb e' }, ProtoUR: 'ˈw i d eː r e' },
+      { Lemma: 'correr', Pos: 'V', UR: 'k o ˈr e ɾ', Spelling: 'correr', Irregulars: { 'Tense=Past': 'k o ˈr j o', 'Agreement=3sg': 'ˈk o r e' }, ProtoUR: 'k u ˈr e r e' },
+      { Lemma: 'caminar', Pos: 'V', UR: 'k a m i ˈn a ɾ', Spelling: 'caminar', Irregulars: { 'Tense=Past': 'k a m i ˈn o', 'Agreement=3sg': 'k a ˈm i n a' } },
+      { Lemma: 'pequeño', Pos: 'ADJ', UR: 'p e ˈk e ɲ o', Spelling: 'pequeño' },
+      { Lemma: 'grande', Pos: 'ADJ', UR: 'ˈg ɾ a n d e', Spelling: 'grande' },
+      { Lemma: 'en', Pos: 'PREP', UR: 'e n', Spelling: 'en' },
+      { Lemma: 'con', Pos: 'PREP', UR: 'k o n', Spelling: 'con' },
+      { Lemma: 'y', Pos: 'CONJ', UR: 'i', Spelling: 'y' },
+      { Lemma: 'que', Pos: 'COMP', UR: 'k e', Spelling: 'que' },
+      { Lemma: 'yo', Pos: 'PRON', UR: 'ˈdʒ o', Spelling: 'yo' },
+      { Lemma: 'ella', Pos: 'PRON', UR: 'ˈe ʎ a', Spelling: 'ella' },
+      { Lemma: 'ellos', Pos: 'PRON', UR: 'ˈe ʎ o s', Spelling: 'ellos' },
+    ],
+    Affixes: [
+      { Name: 'Plural /s/', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-s', IsPrefix: false, Condition: '[manner=vowel]', Enabled: true },
+      { Name: 'Plural /es/', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-e s', IsPrefix: false, Condition: '[-sonorant]', Enabled: true },
+      { Name: 'Fem Adj', Pos: 'ADJ', FeatureName: 'Class', FeatureValue: 'Fem', Affix: '-a', IsPrefix: false, Enabled: true },
+      { Name: 'Masc Adj', Pos: 'ADJ', FeatureName: 'Class', FeatureValue: 'Masc', Affix: '-o', IsPrefix: false, Enabled: true },
+      { Name: '3sg Pres', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-e', IsPrefix: false, Enabled: true },
+      { Name: 'Past Preterite', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-o', IsPrefix: false, Enabled: true },
+    ],
+    WordOrder: 'SVO',
+    ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      alignment: 'NomAcc',
+      adjectiveOrder: 'AfterNoun',
+      determinerOrder: 'BeforeNoun',
+      adpositionType: 'Preposition',
+      proDrop: true,
+      allowPassive: true,
+      allowEmbeddedClauses: true,
+      allowRelativeClauses: true,
+    },
+    OrthographyRules: [
+      { Phone: 'tʃ', Grapheme: 'ch', Enabled: true },
+      { Phone: 'ɲ', Grapheme: 'ñ', Enabled: true },
+      { Phone: 'ʎ', Grapheme: 'll', Enabled: true },
+      { Phone: 'r', Grapheme: 'rr', Enabled: true },
+      { Phone: 'x', Grapheme: 'j', Enabled: true },
+      { Phone: 'β', Grapheme: 'b', Enabled: true },
+      { Phone: 'ð', Grapheme: 'd', Enabled: true },
+      { Phone: 'ɣ', Grapheme: 'g', Enabled: true },
+      { Phone: 'ɾ', Grapheme: 'r', Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'el', Output: 'el' },
+      { Input: 'un', Output: 'un' },
+      { Input: 'la', Output: 'la' },
+      { Input: 'una', Output: 'una' },
+      { Input: 'aɣwa', Output: 'agua' },
+      { Input: 'pero', Output: 'perro' },
+      { Input: 'gato', Output: 'gato' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
+  };
+}
+
+export function createGermanPresetProjectState(): LanguageProjectState {
+  const consonants = ['p', 't', 'k', 'b', 'd', 'g', 'pf', 'ts', 'tʃ', 'f', 'v', 's', 'z', 'ʃ', 'ç', 'x', 'h', 'm', 'n', 'ŋ', 'l', 'ʁ', 'j'];
+  const vowels = ['a', 'eː', 'iː', 'oː', 'uː', 'ɛ', 'ɪ', 'ɔ', 'ʊ', 'yː', 'øː', 'aɪ', 'aʊ', 'ɔɪ', 'ə', 'ɐ'];
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) => createPhoneme(c, 'C')),
+    ...vowels.map((v) => createPhoneme(v, 'V')),
+  ];
+  return {
+    SchemaVersion: 2,
+    Name: 'Standard German (Deutsch)',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 2 },
+      { pattern: 'CVC', weight: 3 },
+      { pattern: 'CCVC', weight: 2 },
+    ],
+    Phonotactics: {
+      allowedOnsets: ['p', 't', 'k', 'b', 'd', 'g', 'f', 'v', 's', 'z', 'ʃ', 'ts', 'pf', 'm', 'n', 'l', 'ʁ', 'j', 'sp', 'st', 'ʃp', 'ʃt', 'kʁ', 'gʁ', 'bʁ', 'dʁ', 'tʁ', 'pʁ', 'fl', 'kl', 'pl', 'bl', 'gl'],
+      allowedCodas: ['p', 't', 'k', 'f', 's', 'ʃ', 'ç', 'x', 'm', 'n', 'ŋ', 'l', 'ʁ', 'st', 'nt', 'nd', 'lt', 'ld', 'ʁt', 'ts', 'kst'],
+      maxOnsetCluster: 3,
+      maxCodaCluster: 3,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: { hyphenateSyllables: false, allowDuplicates: true },
+    StressPattern: 'Initial',
+    PhonologyRules: [
+      { Name: 'Final Devoicing /b/ -> [p]', Target: 'b', Replacement: 'p', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Final Devoicing /d/ -> [t]', Target: 'd', Replacement: 't', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Final Devoicing /g/ -> [k]', Target: 'g', Replacement: 'k', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Final Devoicing /v/ -> [f]', Target: 'v', Replacement: 'f', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Final Devoicing /z/ -> [s]', Target: 'z', Replacement: 's', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Ich/Ach-Laut allophony', Target: 'x', Replacement: 'ç', PrevPhone: '[height=high]', NextPhone: null, Condition: '', Enabled: true },
+    ],
+    DiachronicRules: [],
+    Lexemes: [
+      { Lemma: 'der', Pos: 'DET', UR: 'd eː ɐ', Spelling: 'der', SemanticTags: ['det:def'], LexClass: 'Masc' },
+      { Lemma: 'die', Pos: 'DET', UR: 'd iː', Spelling: 'die', SemanticTags: ['det:def'], LexClass: 'Fem' },
+      { Lemma: 'das', Pos: 'DET', UR: 'd a s', Spelling: 'das', SemanticTags: ['det:def'], LexClass: 'Neut' },
+      { Lemma: 'ein', Pos: 'DET', UR: 'aɪ n', Spelling: 'ein', SemanticTags: ['det:indef'] },
+      { Lemma: 'Hund', Pos: 'N', UR: 'ˈh ʊ n t', Spelling: 'Hund', SemanticTags: ['animate', 'animal'], LexClass: 'Masc', ProtoUR: 'ˈh u n d' },
+      { Lemma: 'Katze', Pos: 'N', UR: 'ˈk a ts ə', Spelling: 'Katze', SemanticTags: ['animate', 'animal'], LexClass: 'Fem', ProtoUR: 'ˈk a t s a' },
+      { Lemma: 'Mensch', Pos: 'N', UR: 'ˈm ɛ n ʃ', Spelling: 'Mensch', SemanticTags: ['animate', 'human'], LexClass: 'Masc' },
+      { Lemma: 'Wasser', Pos: 'N', UR: 'ˈv a s ɐ', Spelling: 'Wasser', SemanticTags: ['liquid', 'mass'], LexClass: 'Neut', ProtoUR: 'ˈw a t s e r' },
+      { Lemma: 'Haus', Pos: 'N', UR: 'ˈh aʊ s', Spelling: 'Haus', SemanticTags: ['place', 'concrete'], LexClass: 'Neut' },
+      { Lemma: 'Park', Pos: 'N', UR: 'ˈp a ʁ k', Spelling: 'Park', SemanticTags: ['place', 'concrete'], LexClass: 'Masc' },
+      { Lemma: 'Buch', Pos: 'N', UR: 'ˈb uː x', Spelling: 'Buch', SemanticTags: ['concrete'], LexClass: 'Neut' },
+      { Lemma: 'sehen', Pos: 'V', UR: 'ˈz eː ə n', Spelling: 'sehen', Irregulars: { 'Tense=Past': 'ˈz aː', 'Agreement=3sg': 'ˈz iː t' } },
+      { Lemma: 'gehen', Pos: 'V', UR: 'ˈg eː ə n', Spelling: 'gehen', Irregulars: { 'Tense=Past': 'ˈg i ŋ', 'Agreement=3sg': 'ˈg eː t' } },
+      { Lemma: 'laufen', Pos: 'V', UR: 'ˈl aʊ f ə n', Spelling: 'laufen', Irregulars: { 'Tense=Past': 'ˈl iː f', 'Agreement=3sg': 'ˈl ɔɪ f t' } },
+      { Lemma: 'trinken', Pos: 'V', UR: 'ˈt ʁ ɪ ŋ k ə n', Spelling: 'trinken', Irregulars: { 'Tense=Past': 'ˈt ʁ a ŋ k', 'Agreement=3sg': 'ˈt ʁ ɪ ŋ k t' } },
+      { Lemma: 'klein', Pos: 'ADJ', UR: 'k l aɪ n', Spelling: 'klein' },
+      { Lemma: 'groß', Pos: 'ADJ', UR: 'g ʁ oː s', Spelling: 'groß' },
+      { Lemma: 'schnell', Pos: 'ADJ', UR: 'ʃ n ɛ l', Spelling: 'schnell' },
+      { Lemma: 'in', Pos: 'PREP', UR: 'ɪ n', Spelling: 'in' },
+      { Lemma: 'mit', Pos: 'PREP', UR: 'm ɪ t', Spelling: 'mit' },
+      { Lemma: 'und', Pos: 'CONJ', UR: 'ʊ n t', Spelling: 'und' },
+      { Lemma: 'dass', Pos: 'COMP', UR: 'd a s', Spelling: 'dass' },
+      { Lemma: 'ich', Pos: 'PRON', UR: 'ˈɪ ç', Spelling: 'ich' },
+      { Lemma: 'er', Pos: 'PRON', UR: 'ˈeː ɐ', Spelling: 'er' },
+      { Lemma: 'sie', Pos: 'PRON', UR: 'ˈz iː', Spelling: 'sie' },
+      { Lemma: 'wir', Pos: 'PRON', UR: 'ˈv iː ɐ', Spelling: 'wir' },
+    ],
+    Affixes: [
+      { Name: 'Plural -e', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-ə', IsPrefix: false, Enabled: true },
+      { Name: '3sg Pres', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-t', IsPrefix: false, Enabled: true },
+      { Name: 'Past -te', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-t ə', IsPrefix: false, Enabled: true },
+    ],
+    WordOrder: 'SVO',
+    ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      alignment: 'NomAcc',
+      adjectiveOrder: 'BeforeNoun',
+      determinerOrder: 'BeforeNoun',
+      adpositionType: 'Preposition',
+      allowPassive: true,
+      allowEmbeddedClauses: true,
+      allowRelativeClauses: true,
+    },
+    OrthographyRules: [
+      { Phone: 'ʃ', Grapheme: 'sch', Enabled: true },
+      { Phone: 'ç', Grapheme: 'ch', Enabled: true },
+      { Phone: 'x', Grapheme: 'ch', Enabled: true },
+      { Phone: 'ts', Grapheme: 'z', Enabled: true },
+      { Phone: 'pf', Grapheme: 'pf', Enabled: true },
+      { Phone: 'aɪ', Grapheme: 'ei', Enabled: true },
+      { Phone: 'aʊ', Grapheme: 'au', Enabled: true },
+      { Phone: 'ɔɪ', Grapheme: 'eu', Enabled: true },
+      { Phone: 'v', Grapheme: 'w', Enabled: true },
+      { Phone: 'f', Grapheme: 'v', Enabled: true },
+      { Phone: 'iː', Grapheme: 'ie', Enabled: true },
+      { Phone: 'yː', Grapheme: 'ü', Enabled: true },
+      { Phone: 'øː', Grapheme: 'ö', Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'ʊnt', Output: 'und' },
+      { Input: 'ɪn', Output: 'in' },
+      { Input: 'mɪt', Output: 'mit' },
+      { Input: 'hʊnt', Output: 'Hund' },
+      { Input: 'das', Output: 'das' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
+  };
+}
+
+export function createMandarinPresetProjectState(): LanguageProjectState {
+  const consonants = ['p', 't', 'k', 'pʰ', 'tʰ', 'kʰ', 'ts', 'tsʰ', 'tʂ', 'tʂʰ', 'tɕ', 'tɕʰ', 'f', 's', 'ʂ', 'ɕ', 'x', 'm', 'n', 'ŋ', 'l', 'ɻ', 'w', 'j'];
+  const vowels = ['a', 'o', 'ɤ', 'e', 'i', 'u', 'y', 'aɪ', 'eɪ', 'aʊ', 'oʊ'];
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) => createPhoneme(c, 'C')),
+    ...vowels.map((v) => createPhoneme(v, 'V')),
+  ];
+  return {
+    SchemaVersion: 2,
+    Name: 'Mandarin Chinese (普通话)',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 4 },
+      { pattern: 'CVC', weight: 2 },
+      { pattern: 'V', weight: 1 },
+    ],
+    Phonotactics: {
+      allowedOnsets: ['p', 't', 'k', 'pʰ', 'tʰ', 'kʰ', 'ts', 'tsʰ', 'tʂ', 'tʂʰ', 'tɕ', 'tɕʰ', 'f', 's', 'ʂ', 'ɕ', 'x', 'm', 'n', 'l', 'ɻ', 'w', 'j'],
+      allowedCodas: ['n', 'ŋ', 'ɻ'],
+      maxOnsetCluster: 1,
+      maxCodaCluster: 1,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: { hyphenateSyllables: false, allowDuplicates: true },
+    StressPattern: 'None',
+    PhonologyRules: [
+      { Name: 'Third-Tone Sandhi', Target: '[tone=LHL]', Replacement: '[tone=LH]', PrevPhone: null, NextPhone: '[tone=LHL]', Condition: '', Enabled: true },
+    ],
+    DiachronicRules: [],
+    Lexemes: [
+      { Lemma: 'zhè', Pos: 'DET', UR: 'tʂ ɤ˥˩', Spelling: 'zhè', SemanticTags: ['det:def'] },
+      { Lemma: 'nà', Pos: 'DET', UR: 'n a˥˩', Spelling: 'nà', SemanticTags: ['det:def'] },
+      { Lemma: 'yī', Pos: 'DET', UR: 'i˥', Spelling: 'yī', SemanticTags: ['det:indef'] },
+      { Lemma: 'rén', Pos: 'N', UR: 'ɻ ɤ n˧˥', Spelling: 'rén', SemanticTags: ['animate', 'human'] },
+      { Lemma: 'gǒu', Pos: 'N', UR: 'k oʊ˨˩˦', Spelling: 'gǒu', SemanticTags: ['animate', 'animal'] },
+      { Lemma: 'māo', Pos: 'N', UR: 'm aʊ˥', Spelling: 'māo', SemanticTags: ['animate', 'animal'] },
+      { Lemma: 'shuǐ', Pos: 'N', UR: 'ʂ w eɪ˨˩˦', Spelling: 'shuǐ', SemanticTags: ['liquid', 'mass'] },
+      { Lemma: 'fángzi', Pos: 'N', UR: 'f ɑ ŋ ˧˥ ts z̩', Spelling: 'fángzi', SemanticTags: ['place', 'concrete'] },
+      { Lemma: 'shū', Pos: 'N', UR: 'ʂ u˥', Spelling: 'shū', SemanticTags: ['concrete'] },
+      { Lemma: 'kàn', Pos: 'V', UR: 'kʰ a n˥˩', Spelling: 'kàn' },
+      { Lemma: 'chī', Pos: 'V', UR: 'tʂʰ ɨ˥', Spelling: 'chī' },
+      { Lemma: 'hē', Pos: 'V', UR: 'x ɤ˥', Spelling: 'hē' },
+      { Lemma: 'zǒu', Pos: 'V', UR: 'ts oʊ˨˩˦', Spelling: 'zǒu' },
+      { Lemma: 'xiǎo', Pos: 'ADJ', UR: 'ɕ j aʊ˨˩˦', Spelling: 'xiǎo' },
+      { Lemma: 'dà', Pos: 'ADJ', UR: 't a˥˩', Spelling: 'dà' },
+      { Lemma: 'zài', Pos: 'PREP', UR: 'ts aɪ˥˩', Spelling: 'zài' },
+      { Lemma: 'hé', Pos: 'CONJ', UR: 'x ɤ˧˥', Spelling: 'hé' },
+      { Lemma: 'wǒ', Pos: 'PRON', UR: 'w o˨˩˦', Spelling: 'wǒ' },
+      { Lemma: 'nǐ', Pos: 'PRON', UR: 'n i˨˩˦', Spelling: 'nǐ' },
+      { Lemma: 'tā', Pos: 'PRON', UR: 'tʰ a˥', Spelling: 'tā' },
+    ],
+    Affixes: [
+      { Name: 'Plural -men', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-m ə n', IsPrefix: false, Enabled: true },
+      { Name: 'Aspect -le', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-l ə', IsPrefix: false, Enabled: true },
+    ],
+    WordOrder: 'SVO',
+    ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      alignment: 'NomAcc',
+      adjectiveOrder: 'BeforeNoun',
+      determinerOrder: 'BeforeNoun',
+      adpositionType: 'Preposition',
+      proDrop: false,
+      allowPassive: false,
+    },
+    OrthographyRules: [
+      { Phone: 'pʰ', Grapheme: 'p', Enabled: true },
+      { Phone: 'p', Grapheme: 'b', Enabled: true },
+      { Phone: 'tʰ', Grapheme: 't', Enabled: true },
+      { Phone: 't', Grapheme: 'd', Enabled: true },
+      { Phone: 'kʰ', Grapheme: 'k', Enabled: true },
+      { Phone: 'k', Grapheme: 'g', Enabled: true },
+      { Phone: 'tɕʰ', Grapheme: 'q', Enabled: true },
+      { Phone: 'tɕ', Grapheme: 'j', Enabled: true },
+      { Phone: 'ɕ', Grapheme: 'x', Enabled: true },
+      { Phone: 'tʂʰ', Grapheme: 'ch', Enabled: true },
+      { Phone: 'tʂ', Grapheme: 'zh', Enabled: true },
+      { Phone: 'ʂ', Grapheme: 'sh', Enabled: true },
+      { Phone: 'ɻ', Grapheme: 'r', Enabled: true },
+      { Phone: 'tsʰ', Grapheme: 'c', Enabled: true },
+      { Phone: 'ts', Grapheme: 'z', Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'wo', Output: 'wǒ' },
+      { Input: 'ni', Output: 'nǐ' },
+      { Input: 'ta', Output: 'tā' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
+  };
+}
+
+export function createArabicPresetProjectState(): LanguageProjectState {
+  const consonants = ['b', 't', 'd', 'k', 'q', 'ʔ', 'dʒ', 'f', 'θ', 'ð', 's', 'z', 'ʃ', 'x', 'ɣ', 'ħ', 'ʕ', 'h', 'm', 'n', 'r', 'l', 'w', 'j'];
+  const vowels = ['a', 'i', 'u', 'aː', 'iː', 'uː'];
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) => createPhoneme(c, 'C')),
+    ...vowels.map((v) => createPhoneme(v, 'V')),
+  ];
+  return {
+    SchemaVersion: 2,
+    Name: 'Arabic (MSA - العربية)',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 4 },
+      { pattern: 'CVC', weight: 3 },
+      { pattern: 'CVː', weight: 2 },
+    ],
+    Phonotactics: {
+      allowedOnsets: ['b', 't', 'd', 'k', 'q', 'ʔ', 'dʒ', 'f', 'θ', 'ð', 's', 'z', 'ʃ', 'x', 'ɣ', 'ħ', 'ʕ', 'h', 'm', 'n', 'r', 'l', 'w', 'j'],
+      allowedCodas: ['b', 't', 'd', 'k', 'q', 'ʔ', 'dʒ', 'f', 'θ', 'ð', 's', 'z', 'ʃ', 'x', 'ɣ', 'ħ', 'ʕ', 'h', 'm', 'n', 'r', 'l'],
+      maxOnsetCluster: 1,
+      maxCodaCluster: 2,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: { hyphenateSyllables: false, allowDuplicates: true },
+    StressPattern: 'Penultimate',
+    PhonologyRules: [
+      { Name: 'Coronal assimilation of article /l/', Target: 'l', Replacement: '[αplace]', PrevPhone: 'ʔ a', NextPhone: '[manner=fricative]', Condition: '', Enabled: true },
+    ],
+    DiachronicRules: [],
+    Lexemes: [
+      { Lemma: 'al', Pos: 'DET', UR: 'ʔ a l', Spelling: 'al-', SemanticTags: ['det:def'] },
+      { Lemma: 'rajul', Pos: 'N', UR: 'ˈr a dʒ u l', Spelling: 'rajul', SemanticTags: ['animate', 'human', 'masc'], LexClass: 'Masc', ProtoUR: 'r a g u l' },
+      { Lemma: 'imraah', Pos: 'N', UR: 'ˈi m r a ʔ a h', Spelling: 'imra\'ah', SemanticTags: ['animate', 'human', 'fem'], LexClass: 'Fem' },
+      { Lemma: 'kalb', Pos: 'N', UR: 'ˈk a l b', Spelling: 'kalb', SemanticTags: ['animate', 'animal'], LexClass: 'Masc', ProtoUR: 'k a l b' },
+      { Lemma: 'qitt', Pos: 'N', UR: 'ˈq i tˤ', Spelling: 'qitt', SemanticTags: ['animate', 'animal'], LexClass: 'Masc' },
+      { Lemma: 'maa', Pos: 'N', UR: 'ˈm aː ʔ', Spelling: 'maa\'', SemanticTags: ['liquid', 'mass'] },
+      { Lemma: 'bayt', Pos: 'N', UR: 'ˈb a j t', Spelling: 'bayt', SemanticTags: ['place', 'concrete'], LexClass: 'Masc', ProtoUR: 'b a y t' },
+      { Lemma: 'kitaab', Pos: 'N', UR: 'k i ˈt aː b', Spelling: 'kitaab', SemanticTags: ['concrete'], LexClass: 'Masc' },
+      { Lemma: 'kataba', Pos: 'V', UR: 'ˈk a t a b a', Spelling: 'kataba', ProtoUR: 'k a t a b a' },
+      { Lemma: 'qaraa', Pos: 'V', UR: 'ˈq a r a ʔ a', Spelling: 'qara\'a' },
+      { Lemma: 'raaa', Pos: 'V', UR: 'ˈr a ʔ aː', Spelling: 'ra\'aa' },
+      { Lemma: 'shariba', Pos: 'V', UR: 'ˈʃ a r i b a', Spelling: 'shariba' },
+      { Lemma: 'kabiir', Pos: 'ADJ', UR: 'k a ˈb iː r', Spelling: 'kabiir' },
+      { Lemma: 'saghiir', Pos: 'ADJ', UR: 'sˤ a ˈɣ iː r', Spelling: 'saghiir' },
+      { Lemma: 'fii', Pos: 'PREP', UR: 'f iː', Spelling: 'fii' },
+      { Lemma: 'maa', Pos: 'PREP', UR: 'ˈm a ʕ a', Spelling: 'ma\'a' },
+      { Lemma: 'wa', Pos: 'CONJ', UR: 'w a', Spelling: 'wa' },
+      { Lemma: 'huwa', Pos: 'PRON', UR: 'ˈh u w a', Spelling: 'huwa' },
+      { Lemma: 'hiya', Pos: 'PRON', UR: 'ˈh i j a', Spelling: 'hiya' },
+      { Lemma: 'hum', Pos: 'PRON', UR: 'h u m', Spelling: 'hum' },
+    ],
+    Affixes: [
+      { Name: 'Dual -aan', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Dual', Affix: '-aː n', IsPrefix: false, Enabled: true },
+      { Name: 'Plural -uun', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-uː n', IsPrefix: false, Enabled: true },
+      { Name: 'Fem Suffix -at', Pos: 'N', FeatureName: 'Class', FeatureValue: 'Fem', Affix: '-a t', IsPrefix: false, Enabled: true },
+      { Name: '3sg Fem Verb', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-a t', IsPrefix: false, Enabled: true },
+    ],
+    WordOrder: 'VSO',
+    ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      alignment: 'NomAcc',
+      adjectiveOrder: 'AfterNoun',
+      determinerOrder: 'BeforeNoun',
+      adpositionType: 'Preposition',
+      proDrop: true,
+      allowPassive: true,
+    },
+    OrthographyRules: [
+      { Phone: 'aː', Grapheme: 'aa', Enabled: true },
+      { Phone: 'iː', Grapheme: 'ii', Enabled: true },
+      { Phone: 'uː', Grapheme: 'uu', Enabled: true },
+      { Phone: 'ʃ', Grapheme: 'sh', Enabled: true },
+      { Phone: 'x', Grapheme: 'kh', Enabled: true },
+      { Phone: 'ɣ', Grapheme: 'gh', Enabled: true },
+      { Phone: 'ħ', Grapheme: 'h', Enabled: true },
+      { Phone: 'ʕ', Grapheme: '\'', Enabled: true },
+      { Phone: 'ʔ', Grapheme: '\'', Enabled: true },
+      { Phone: 'dʒ', Grapheme: 'j', Enabled: true },
+      { Phone: 'θ', Grapheme: 'th', Enabled: true },
+      { Phone: 'ð', Grapheme: 'dh', Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'ʔal', Output: 'al-' },
+      { Input: 'wa', Output: 'wa' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
+  };
+}
+
+export function createJapanesePresetProjectState(): LanguageProjectState {
+  const consonants = ['p', 't', 'k', 'b', 'd', 'g', 'ts', 'tɕ', 'dʑ', 's', 'ɕ', 'z', 'ʑ', 'h', 'ç', 'ɸ', 'm', 'n', 'ɲ', 'ŋ', 'ɾ', 'w', 'j'];
+  const vowels = ['a', 'i', 'u', 'e', 'o', 'aː', 'iː', 'uː', 'eː', 'oː'];
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) => createPhoneme(c, 'C')),
+    ...vowels.map((v) => createPhoneme(v, 'V')),
+  ];
+  return {
+    SchemaVersion: 2,
+    Name: 'Japanese (日本語)',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 4 },
+      { pattern: 'V', weight: 1 },
+      { pattern: 'CVC', weight: 1 },
+    ],
+    Phonotactics: {
+      allowedOnsets: ['p', 't', 'k', 'b', 'd', 'g', 's', 'z', 'h', 'm', 'n', 'ɾ', 'w', 'j', 'tɕ', 'dʑ', 'ɕ', 'ts'],
+      allowedCodas: ['n', 'ŋ'],
+      maxOnsetCluster: 1,
+      maxCodaCluster: 1,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: { hyphenateSyllables: false, allowDuplicates: true },
+    StressPattern: 'None',
+    PhonologyRules: [
+      { Name: 'Palatalization /t/ before /i/', Target: 't', Replacement: 'tɕ', PrevPhone: null, NextPhone: 'i', Condition: '', Enabled: true },
+      { Name: 'Palatalization /s/ before /i/', Target: 's', Replacement: 'ɕ', PrevPhone: null, NextPhone: 'i', Condition: '', Enabled: true },
+      { Name: 'Palatalization /h/ before /i/', Target: 'h', Replacement: 'ç', PrevPhone: null, NextPhone: 'i', Condition: '', Enabled: true },
+      { Name: 'Affrication /t/ before /u/', Target: 't', Replacement: 'ts', PrevPhone: null, NextPhone: 'u', Condition: '', Enabled: true },
+      { Name: 'Bilabial /h/ before /u/', Target: 'h', Replacement: 'ɸ', PrevPhone: null, NextPhone: 'u', Condition: '', Enabled: true },
+    ],
+    DiachronicRules: [],
+    Lexemes: [
+      { Lemma: 'kono', Pos: 'DET', UR: 'k o n o', Spelling: 'kono', SemanticTags: ['det:def'] },
+      { Lemma: 'sono', Pos: 'DET', UR: 's o n o', Spelling: 'sono', SemanticTags: ['det:def'] },
+      { Lemma: 'hito', Pos: 'N', UR: 'ç i t o', Spelling: 'hito', SemanticTags: ['animate', 'human'], ProtoUR: 'p i t o' },
+      { Lemma: 'inu', Pos: 'N', UR: 'i n u', Spelling: 'inu', SemanticTags: ['animate', 'animal'], ProtoUR: 'i n u' },
+      { Lemma: 'neko', Pos: 'N', UR: 'n e k o', Spelling: 'neko', SemanticTags: ['animate', 'animal'], ProtoUR: 'n e k o' },
+      { Lemma: 'mizu', Pos: 'N', UR: 'm i z u', Spelling: 'mizu', SemanticTags: ['liquid', 'mass'], ProtoUR: 'm i d u' },
+      { Lemma: 'ie', Pos: 'N', UR: 'i e', Spelling: 'ie', SemanticTags: ['place', 'concrete'], ProtoUR: 'i p e' },
+      { Lemma: 'hon', Pos: 'N', UR: 'h o ɴ', Spelling: 'hon', SemanticTags: ['concrete'] },
+      { Lemma: 'miru', Pos: 'V', UR: 'm i ɾ u', Spelling: 'miru', Irregulars: { 'Tense=Past': 'm i t a' } },
+      { Lemma: 'taberu', Pos: 'V', UR: 't a b e ɾ u', Spelling: 'taberu', Irregulars: { 'Tense=Past': 't a b e t a' } },
+      { Lemma: 'nomu', Pos: 'V', UR: 'n o m u', Spelling: 'nomu', Irregulars: { 'Tense=Past': 'n o n d a' } },
+      { Lemma: 'iku', Pos: 'V', UR: 'i k u', Spelling: 'iku', Irregulars: { 'Tense=Past': 'i t t a' } },
+      { Lemma: 'chiisai', Pos: 'ADJ', UR: 'tɕ iː s a i', Spelling: 'chiisai' },
+      { Lemma: 'ookii', Pos: 'ADJ', UR: 'oː k iː', Spelling: 'ookii' },
+      { Lemma: 'hayai', Pos: 'ADJ', UR: 'h a j a i', Spelling: 'hayai' },
+      { Lemma: 'de', Pos: 'PREP', UR: 'd e', Spelling: 'de' },
+      { Lemma: 'ni', Pos: 'PREP', UR: 'n i', Spelling: 'ni' },
+      { Lemma: 'to', Pos: 'CONJ', UR: 't o', Spelling: 'to' },
+      { Lemma: 'ka', Pos: 'Q', UR: 'k a', Spelling: 'ka' },
+      { Lemma: 'watashi', Pos: 'PRON', UR: 'w a t a ɕ i', Spelling: 'watashi' },
+      { Lemma: 'kare', Pos: 'PRON', UR: 'k a ɾ e', Spelling: 'kare' },
+      { Lemma: 'kanojo', Pos: 'PRON', UR: 'k a n o dʑ o', Spelling: 'kanojo' },
+    ],
+    Affixes: [
+      { Name: 'Past -ta', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-t a', IsPrefix: false, Enabled: true },
+      { Name: 'Neg -nai', Pos: 'V', FeatureName: 'Polarity', FeatureValue: 'Neg', Affix: '-n a i', IsPrefix: false, Enabled: true },
+      { Name: 'Polite -masu', Pos: 'V', FeatureName: 'Aspect', FeatureValue: 'Part', Affix: '-m a s u', IsPrefix: false, Enabled: true },
+    ],
+    WordOrder: 'SOV',
+    ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      alignment: 'NomAcc',
+      adjectiveOrder: 'BeforeNoun',
+      determinerOrder: 'BeforeNoun',
+      adpositionType: 'Postposition',
+      questionStrategy: 'Particle',
+      proDrop: true,
+      allowPassive: false,
+    },
+    OrthographyRules: [
+      { Phone: 'tɕ', Grapheme: 'ch', Enabled: true },
+      { Phone: 'ɕ', Grapheme: 'sh', Enabled: true },
+      { Phone: 'dʑ', Grapheme: 'j', Enabled: true },
+      { Phone: 'ts', Grapheme: 'ts', Enabled: true },
+      { Phone: 'ɸ', Grapheme: 'f', Enabled: true },
+      { Phone: 'ç', Grapheme: 'h', Enabled: true },
+      { Phone: 'ɾ', Grapheme: 'r', Enabled: true },
+      { Phone: 'aː', Grapheme: 'aa', Enabled: true },
+      { Phone: 'oː', Grapheme: 'oo', Enabled: true },
+      { Phone: 'uː', Grapheme: 'uu', Enabled: true },
+      { Phone: 'eː', Grapheme: 'ee', Enabled: true },
+      { Phone: 'iː', Grapheme: 'ii', Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'kononi', Output: 'kono ni' },
+      { Input: 'inude', Output: 'inu de' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
+  };
+}
+
+export function createTurkishPresetProjectState(): LanguageProjectState {
+  const consonants = ['p', 'b', 't', 'd', 'k', 'g', 'tʃ', 'dʒ', 'f', 'v', 's', 'z', 'ʃ', 'ʒ', 'h', 'm', 'n', 'l', 'ɫ', 'ɾ', 'j'];
+  const vowels = ['a', 'e', 'ɯ', 'i', 'o', 'ø', 'u', 'y'];
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) => createPhoneme(c, 'C')),
+    ...vowels.map((v) => createPhoneme(v, 'V')),
+  ];
+  return {
+    SchemaVersion: 2,
+    Name: 'Turkish (Türkçe)',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 3 },
+      { pattern: 'CVC', weight: 3 },
+      { pattern: 'VC', weight: 1 },
+      { pattern: 'V', weight: 1 },
+    ],
+    Phonotactics: {
+      allowedOnsets: ['p', 'b', 't', 'd', 'k', 'g', 'tʃ', 'dʒ', 'f', 'v', 's', 'z', 'ʃ', 'h', 'm', 'n', 'l', 'ɾ', 'j'],
+      allowedCodas: ['p', 't', 'k', 'tʃ', 'f', 's', 'ʃ', 'h', 'm', 'n', 'l', 'ɾ', 'j', 'st', 'lt', 'rt', 'nt'],
+      maxOnsetCluster: 1,
+      maxCodaCluster: 2,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: { hyphenateSyllables: false, allowDuplicates: true },
+    StressPattern: 'Final',
+    PhonologyRules: [
+      { Name: '2-way Backness Harmony', Target: 'e', Replacement: '[αback]', PrevPhone: 'C', NextPhone: null, Condition: '', Enabled: true },
+      { Name: '4-way Backness+Rounding Harmony', Target: 'i', Replacement: '[αback, αround]', PrevPhone: 'C', NextPhone: null, Condition: '', Enabled: true },
+    ],
+    DiachronicRules: [],
+    Lexemes: [
+      { Lemma: 'bir', Pos: 'DET', UR: 'b i ɾ', Spelling: 'bir', SemanticTags: ['det:indef'] },
+      { Lemma: 'bu', Pos: 'DET', UR: 'b u', Spelling: 'bu', SemanticTags: ['det:def'] },
+      { Lemma: 'ev', Pos: 'N', UR: 'e v', Spelling: 'ev', SemanticTags: ['place', 'concrete'] },
+      { Lemma: 'adam', Pos: 'N', UR: 'a d a m', Spelling: 'adam', SemanticTags: ['animate', 'human'] },
+      { Lemma: 'kadın', Pos: 'N', UR: 'k a d ɯ n', Spelling: 'kadın', SemanticTags: ['animate', 'human'] },
+      { Lemma: 'köpek', Pos: 'N', UR: 'c ø p e c', Spelling: 'köpek', SemanticTags: ['animate', 'animal'] },
+      { Lemma: 'kedi', Pos: 'N', UR: 'c e d i', Spelling: 'kedi', SemanticTags: ['animate', 'animal'] },
+      { Lemma: 'su', Pos: 'N', UR: 's u', Spelling: 'su', SemanticTags: ['liquid', 'mass'] },
+      { Lemma: 'kitap', Pos: 'N', UR: 'c i t a p', Spelling: 'kitap', SemanticTags: ['concrete'] },
+      { Lemma: 'görmek', Pos: 'V', UR: 'ɟ ø ɾ m e c', Spelling: 'görmek', Irregulars: { 'Tense=Past': 'ɟ ø ɾ d y' } },
+      { Lemma: 'gitmek', Pos: 'V', UR: 'ɟ i t m e c', Spelling: 'gitmek', Irregulars: { 'Tense=Past': 'ɟ i t t i' } },
+      { Lemma: 'yemek', Pos: 'V', UR: 'j e m e c', Spelling: 'yemek', Irregulars: { 'Tense=Past': 'j e d i' } },
+      { Lemma: 'içmek', Pos: 'V', UR: 'i tʃ m e c', Spelling: 'içmek', Irregulars: { 'Tense=Past': 'i tʃ t i' } },
+      { Lemma: 'küçük', Pos: 'ADJ', UR: 'c y tʃ y c', Spelling: 'küçük' },
+      { Lemma: 'büyük', Pos: 'ADJ', UR: 'b y j y c', Spelling: 'büyük' },
+      { Lemma: 'güzel', Pos: 'ADJ', UR: 'ɟ y z e l', Spelling: 'güzel' },
+      { Lemma: 'içinde', Pos: 'PREP', UR: 'i tʃ i n d e', Spelling: 'içinde' },
+      { Lemma: 've', Pos: 'CONJ', UR: 'v e', Spelling: 've' },
+      { Lemma: 'ben', Pos: 'PRON', UR: 'b e n', Spelling: 'ben' },
+      { Lemma: 'o', Pos: 'PRON', UR: 'o', Spelling: 'o' },
+      { Lemma: 'onlar', Pos: 'PRON', UR: 'o n l a ɾ', Spelling: 'onlar' },
+    ],
+    Affixes: [
+      { Name: 'Plural -ler/-lar', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-l e r', IsPrefix: false, Enabled: true },
+      { Name: 'Past -di/-dı', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-d i', IsPrefix: false, Enabled: true },
+      { Name: 'Accusative -i', Pos: 'N', FeatureName: 'Case', FeatureValue: 'Acc', Affix: '-i', IsPrefix: false, Enabled: true },
+      { Name: 'Dative -e', Pos: 'N', FeatureName: 'Case', FeatureValue: 'Dat', Affix: '-e', IsPrefix: false, Enabled: true },
+      { Name: 'Locative -de', Pos: 'N', FeatureName: 'Case', FeatureValue: 'Loc', Affix: '-d e', IsPrefix: false, Enabled: true },
+    ],
+    WordOrder: 'SOV',
+    ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      alignment: 'NomAcc',
+      adjectiveOrder: 'BeforeNoun',
+      determinerOrder: 'BeforeNoun',
+      adpositionType: 'Postposition',
+      proDrop: true,
+      allowPassive: true,
+    },
+    OrthographyRules: [
+      { Phone: 'tʃ', Grapheme: 'ç', Enabled: true },
+      { Phone: 'dʒ', Grapheme: 'c', Enabled: true },
+      { Phone: 'ʃ', Grapheme: 'ş', Enabled: true },
+      { Phone: 'ɯ', Grapheme: 'ı', Enabled: true },
+      { Phone: 'ø', Grapheme: 'ö', Enabled: true },
+      { Phone: 'y', Grapheme: 'ü', Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'bir', Output: 'bir' },
+      { Input: 'bu', Output: 'bu' },
+      { Input: 'su', Output: 'su' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
+  };
+}
+
+export function createSwahiliPresetProjectState(): LanguageProjectState {
+  const consonants = ['p', 'b', 't', 'd', 'k', 'g', 'tʃ', 'dʒ', 'f', 'v', 'θ', 'ð', 's', 'z', 'ʃ', 'h', 'm', 'n', 'ɲ', 'ŋ', 'l', 'r', 'w', 'j'];
+  const vowels = ['a', 'e', 'i', 'o', 'u'];
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) => createPhoneme(c, 'C')),
+    ...vowels.map((v) => createPhoneme(v, 'V')),
+  ];
+  return {
+    SchemaVersion: 2,
+    Name: 'Swahili (Kiswahili)',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 4 },
+      { pattern: 'V', weight: 1 },
+    ],
+    Phonotactics: {
+      allowedOnsets: ['p', 'b', 't', 'd', 'k', 'g', 'tʃ', 'dʒ', 'f', 'v', 's', 'z', 'ʃ', 'h', 'm', 'n', 'ɲ', 'l', 'r', 'w', 'j', 'mb', 'nd', 'ng', 'mv', 'nz'],
+      allowedCodas: [],
+      maxOnsetCluster: 2,
+      maxCodaCluster: 0,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: { hyphenateSyllables: false, allowDuplicates: true },
+    StressPattern: 'Penultimate',
+    PhonologyRules: [],
+    DiachronicRules: [],
+    Lexemes: [
+      { Lemma: 'mtu', Pos: 'N', UR: 'm t u', Spelling: 'mtu', SemanticTags: ['animate', 'human'], LexClass: 'M' },
+      { Lemma: 'watu', Pos: 'N', UR: 'w a t u', Spelling: 'watu', SemanticTags: ['animate', 'human'], LexClass: 'Wa' },
+      { Lemma: 'mtoto', Pos: 'N', UR: 'm t o t o', Spelling: 'mtoto', SemanticTags: ['animate', 'human'], LexClass: 'M' },
+      { Lemma: 'mbwa', Pos: 'N', UR: 'm b w a', Spelling: 'mbwa', SemanticTags: ['animate', 'animal'], LexClass: 'N' },
+      { Lemma: 'paka', Pos: 'N', UR: 'p a k a', Spelling: 'paka', SemanticTags: ['animate', 'animal'], LexClass: 'N' },
+      { Lemma: 'maji', Pos: 'N', UR: 'm a dʒ i', Spelling: 'maji', SemanticTags: ['liquid', 'mass'], LexClass: 'Ma' },
+      { Lemma: 'nyumba', Pos: 'N', UR: 'ɲ u m b a', Spelling: 'nyumba', SemanticTags: ['place', 'concrete'], LexClass: 'N' },
+      { Lemma: 'kitabu', Pos: 'N', UR: 'k i t a b u', Spelling: 'kitabu', SemanticTags: ['concrete'], LexClass: 'Ki' },
+      { Lemma: 'vitabu', Pos: 'N', UR: 'v i t a b u', Spelling: 'vitabu', SemanticTags: ['concrete'], LexClass: 'Vi' },
+      { Lemma: 'ona', Pos: 'V', UR: 'o n a', Spelling: 'ona' },
+      { Lemma: 'kula', Pos: 'V', UR: 'k u l a', Spelling: 'kula' },
+      { Lemma: 'enda', Pos: 'V', UR: 'e n d a', Spelling: 'enda' },
+      { Lemma: 'fanya', Pos: 'V', UR: 'f a ɲ a', Spelling: 'fanya' },
+      { Lemma: 'dogo', Pos: 'ADJ', UR: 'd o g o', Spelling: 'dogo' },
+      { Lemma: 'kubwa', Pos: 'ADJ', UR: 'k u b w a', Spelling: 'kubwa' },
+      { Lemma: 'zuri', Pos: 'ADJ', UR: 'z u r i', Spelling: 'zuri' },
+      { Lemma: 'katika', Pos: 'PREP', UR: 'k a t i k a', Spelling: 'katika' },
+      { Lemma: 'na', Pos: 'CONJ', UR: 'n a', Spelling: 'na' },
+      { Lemma: 'mimi', Pos: 'PRON', UR: 'm i m i', Spelling: 'mimi' },
+      { Lemma: 'yeye', Pos: 'PRON', UR: 'j e j e', Spelling: 'yeye' },
+      { Lemma: 'wao', Pos: 'PRON', UR: 'w a o', Spelling: 'wao' },
+    ],
+    Affixes: [
+      { Name: 'Pres na-', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Pres', Affix: 'n a -', IsPrefix: true, Enabled: true },
+      { Name: 'Past li-', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: 'l i -', IsPrefix: true, Enabled: true },
+      { Name: 'Fut ta-', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Fut', Affix: 't a -', IsPrefix: true, Enabled: true },
+      { Name: 'Class M Adj', Pos: 'ADJ', FeatureName: 'Class', FeatureValue: 'M', Affix: 'm -', IsPrefix: true, Enabled: true },
+      { Name: 'Class Wa Adj', Pos: 'ADJ', FeatureName: 'Class', FeatureValue: 'Wa', Affix: 'w a -', IsPrefix: true, Enabled: true },
+      { Name: 'Class Ki Adj', Pos: 'ADJ', FeatureName: 'Class', FeatureValue: 'Ki', Affix: 'k i -', IsPrefix: true, Enabled: true },
+      { Name: 'Class Vi Adj', Pos: 'ADJ', FeatureName: 'Class', FeatureValue: 'Vi', Affix: 'v i -', IsPrefix: true, Enabled: true },
+    ],
+    WordOrder: 'SVO',
+    ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      alignment: 'NomAcc',
+      adjectiveOrder: 'AfterNoun',
+      determinerOrder: 'AfterNoun',
+      adpositionType: 'Preposition',
+      proDrop: false,
+    },
+    OrthographyRules: [
+      { Phone: 'tʃ', Grapheme: 'ch', Enabled: true },
+      { Phone: 'dʒ', Grapheme: 'j', Enabled: true },
+      { Phone: 'ʃ', Grapheme: 'sh', Enabled: true },
+      { Phone: 'ɲ', Grapheme: 'ny', Enabled: true },
+      { Phone: 'ŋ', Grapheme: 'ng\'', Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'na', Output: 'na' },
+      { Input: 'katika', Output: 'katika' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
+  };
+}
+
+export function createRussianPresetProjectState(): LanguageProjectState {
+  const consonants = ['p', 'b', 't', 'd', 'k', 'g', 'f', 'v', 's', 'z', 'ʃ', 'ʒ', 'ts', 'tʃ', 'x', 'm', 'n', 'l', 'r', 'j'];
+  const vowels = ['a', 'e', 'i', 'o', 'u', 'ɨ'];
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) => createPhoneme(c, 'C')),
+    ...vowels.map((v) => createPhoneme(v, 'V')),
+  ];
+  return {
+    SchemaVersion: 2,
+    Name: 'Russian (Русский)',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 3 },
+      { pattern: 'CVC', weight: 3 },
+      { pattern: 'CCVC', weight: 2 },
+    ],
+    Phonotactics: {
+      allowedOnsets: ['p', 'b', 't', 'd', 'k', 'g', 'f', 'v', 's', 'z', 'ʃ', 'ʒ', 'ts', 'tʃ', 'x', 'm', 'n', 'l', 'r', 'pr', 'tr', 'kr', 'br', 'dr', 'gr', 'sp', 'st', 'sk', 'str'],
+      allowedCodas: ['p', 't', 'k', 'f', 's', 'ʃ', 'x', 'm', 'n', 'l', 'r', 'st', 'nt', 'kt'],
+      maxOnsetCluster: 3,
+      maxCodaCluster: 2,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: { hyphenateSyllables: false, allowDuplicates: true },
+    StressPattern: 'Lexical',
+    PhonologyRules: [
+      { Name: 'Final Devoicing /b/ -> [p]', Target: 'b', Replacement: 'p', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Final Devoicing /d/ -> [t]', Target: 'd', Replacement: 't', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Final Devoicing /g/ -> [k]', Target: 'g', Replacement: 'k', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Final Devoicing /v/ -> [f]', Target: 'v', Replacement: 'f', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Final Devoicing /z/ -> [s]', Target: 'z', Replacement: 's', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Final Devoicing /ʒ/ -> [ʃ]', Target: 'ʒ', Replacement: 'ʃ', PrevPhone: null, NextPhone: '#', Condition: '', Enabled: true },
+      { Name: 'Vowel Reduction (unstressed o -> a)', Target: 'o', Replacement: 'a', PrevPhone: null, NextPhone: null, Condition: '[-stressed]', Enabled: true },
+    ],
+    DiachronicRules: [],
+    Lexemes: [
+      { Lemma: 'etot', Pos: 'DET', UR: 'ˈe t o t', Spelling: 'etot', SemanticTags: ['det:def'], LexClass: 'Masc' },
+      { Lemma: 'eta', Pos: 'DET', UR: 'ˈe t a', Spelling: 'eta', SemanticTags: ['det:def'], LexClass: 'Fem' },
+      { Lemma: 'chelovek', Pos: 'N', UR: 'tʃ e l o ˈv e k', Spelling: 'chelovek', SemanticTags: ['animate', 'human'], LexClass: 'Masc' },
+      { Lemma: 'sobaka', Pos: 'N', UR: 's o ˈb a k a', Spelling: 'sobaka', SemanticTags: ['animate', 'animal'], LexClass: 'Fem' },
+      { Lemma: 'koshka', Pos: 'N', UR: 'ˈk o ʃ k a', Spelling: 'koshka', SemanticTags: ['animate', 'animal'], LexClass: 'Fem' },
+      { Lemma: 'voda', Pos: 'N', UR: 'v o ˈd a', Spelling: 'voda', SemanticTags: ['liquid', 'mass'], LexClass: 'Fem', ProtoUR: 'w o d a' },
+      { Lemma: 'dom', Pos: 'N', UR: 'd o m', Spelling: 'dom', SemanticTags: ['place', 'concrete'], LexClass: 'Masc' },
+      { Lemma: 'kniga', Pos: 'N', UR: 'ˈk n i g a', Spelling: 'kniga', SemanticTags: ['concrete'], LexClass: 'Fem' },
+      { Lemma: 'videt', Pos: 'V', UR: 'ˈv i dʲ e tʲ', Spelling: 'videt\'', Irregulars: { 'Tense=Past': 'ˈv i dʲ e l', 'Agreement=3sg': 'ˈv i dʲ i t' } },
+      { Lemma: 'chitat', Pos: 'V', UR: 'tʃ i ˈt a tʲ', Spelling: 'chitat\'', Irregulars: { 'Tense=Past': 'tʃ i ˈt a l', 'Agreement=3sg': 'tʃ i ˈt a j e t' } },
+      { Lemma: 'idti', Pos: 'V', UR: 'i ˈt t i', Spelling: 'idti', Irregulars: { 'Tense=Past': 'ʃ o l', 'Agreement=3sg': 'i ˈdʲ o t' } },
+      { Lemma: 'pit', Pos: 'V', UR: 'p i tʲ', Spelling: 'pit\'', Irregulars: { 'Tense=Past': 'p i l', 'Agreement=3sg': 'p j o t' } },
+      { Lemma: 'malenkiy', Pos: 'ADJ', UR: 'ˈm a lʲ e nʲ k i j', Spelling: 'malen\'kiy' },
+      { Lemma: 'bolshoy', Pos: 'ADJ', UR: 'b o lʲ ˈʃ o j', Spelling: 'bol\'shoy' },
+      { Lemma: 'novyy', Pos: 'ADJ', UR: 'ˈn o v ɨ j', Spelling: 'novyy' },
+      { Lemma: 'v', Pos: 'PREP', UR: 'v', Spelling: 'v' },
+      { Lemma: 's', Pos: 'PREP', UR: 's', Spelling: 's' },
+      { Lemma: 'i', Pos: 'CONJ', UR: 'i', Spelling: 'i' },
+      { Lemma: 'chto', Pos: 'COMP', UR: 'tʃ t o', Spelling: 'chto' },
+      { Lemma: 'ya', Pos: 'PRON', UR: 'j a', Spelling: 'ya' },
+      { Lemma: 'on', Pos: 'PRON', UR: 'o n', Spelling: 'on' },
+      { Lemma: 'ona', Pos: 'PRON', UR: 'o ˈn a', Spelling: 'ona' },
+      { Lemma: 'oni', Pos: 'PRON', UR: 'o ˈn i', Spelling: 'oni' },
+    ],
+    Affixes: [
+      { Name: 'Plural -y', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-ɨ', IsPrefix: false, Enabled: true },
+      { Name: 'Past -l', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-l', IsPrefix: false, Enabled: true },
+      { Name: '3sg Pres', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-e t', IsPrefix: false, Enabled: true },
+    ],
+    WordOrder: 'SVO',
+    ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      alignment: 'NomAcc',
+      adjectiveOrder: 'BeforeNoun',
+      determinerOrder: 'BeforeNoun',
+      adpositionType: 'Preposition',
+      proDrop: true,
+      allowPassive: true,
+      allowEmbeddedClauses: true,
+    },
+    OrthographyRules: [
+      { Phone: 'ʃ', Grapheme: 'sh', Enabled: true },
+      { Phone: 'ʒ', Grapheme: 'zh', Enabled: true },
+      { Phone: 'tʃ', Grapheme: 'ch', Enabled: true },
+      { Phone: 'ts', Grapheme: 'ts', Enabled: true },
+      { Phone: 'x', Grapheme: 'kh', Enabled: true },
+      { Phone: 'ɨ', Grapheme: 'y', Enabled: true },
+      { Phone: 'j', Grapheme: 'y', Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'v', Output: 'v' },
+      { Input: 's', Output: 's' },
+      { Input: 'i', Output: 'i' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
+  };
+}
+
+export function createIndonesianPresetProjectState(): LanguageProjectState {
+  const consonants = ['p', 'b', 't', 'd', 'k', 'g', 'tʃ', 'dʒ', 'f', 's', 'z', 'ʃ', 'x', 'h', 'm', 'n', 'ɲ', 'ŋ', 'l', 'r', 'w', 'j'];
+  const vowels = ['a', 'e', 'ə', 'i', 'o', 'u'];
+  const phonemes: Phoneme[] = [
+    ...consonants.map((c) => createPhoneme(c, 'C')),
+    ...vowels.map((v) => createPhoneme(v, 'V')),
+  ];
+  return {
+    SchemaVersion: 2,
+    Name: 'Indonesian (Bahasa Indonesia)',
+    Phonemes: phonemes,
+    Consonants: consonants,
+    Vowels: vowels,
+    SyllableTemplates: [
+      { pattern: 'CV', weight: 4 },
+      { pattern: 'CVC', weight: 3 },
+      { pattern: 'V', weight: 1 },
+    ],
+    Phonotactics: {
+      allowedOnsets: ['p', 'b', 't', 'd', 'k', 'g', 'tʃ', 'dʒ', 'f', 's', 'z', 'ʃ', 'x', 'h', 'm', 'n', 'ɲ', 'ŋ', 'l', 'r', 'w', 'j', 'tr', 'dr', 'kr', 'pr', 'br', 'bl', 'kl', 'pl'],
+      allowedCodas: ['p', 't', 'k', 's', 'h', 'm', 'n', 'ŋ', 'l', 'r'],
+      maxOnsetCluster: 2,
+      maxCodaCluster: 1,
+      forbiddenPatterns: [],
+    },
+    GeneratorOptions: { hyphenateSyllables: false, allowDuplicates: true },
+    StressPattern: 'Penultimate',
+    PhonologyRules: [
+      { Name: 'Nasal prefix mutation before /p/', Target: 'p', Replacement: 'm', PrevPhone: 'm ə', NextPhone: 'V', Condition: '', Enabled: true },
+      { Name: 'Nasal prefix mutation before /t/', Target: 't', Replacement: 'n', PrevPhone: 'm ə', NextPhone: 'V', Condition: '', Enabled: true },
+      { Name: 'Nasal prefix mutation before /k/', Target: 'k', Replacement: 'ŋ', PrevPhone: 'm ə', NextPhone: 'V', Condition: '', Enabled: true },
+    ],
+    DiachronicRules: [],
+    Lexemes: [
+      { Lemma: 'itu', Pos: 'DET', UR: 'i t u', Spelling: 'itu', SemanticTags: ['det:def'] },
+      { Lemma: 'ini', Pos: 'DET', UR: 'i n i', Spelling: 'ini', SemanticTags: ['det:def'] },
+      { Lemma: 'sebuah', Pos: 'DET', UR: 's ə b u a h', Spelling: 'sebuah', SemanticTags: ['det:indef'] },
+      { Lemma: 'orang', Pos: 'N', UR: 'o r a ŋ', Spelling: 'orang', SemanticTags: ['animate', 'human'] },
+      { Lemma: 'anak', Pos: 'N', UR: 'a n a k', Spelling: 'anak', SemanticTags: ['animate', 'human'] },
+      { Lemma: 'anjing', Pos: 'N', UR: 'a n dʒ i ŋ', Spelling: 'anjing', SemanticTags: ['animate', 'animal'] },
+      { Lemma: 'kucing', Pos: 'N', UR: 'k u tʃ i ŋ', Spelling: 'kucing', SemanticTags: ['animate', 'animal'] },
+      { Lemma: 'air', Pos: 'N', UR: 'a i r', Spelling: 'air', SemanticTags: ['liquid', 'mass'], ProtoUR: 'w a y ə r' },
+      { Lemma: 'rumah', Pos: 'N', UR: 'r u m a h', Spelling: 'rumah', SemanticTags: ['place', 'concrete'], ProtoUR: 'r u m a q' },
+      { Lemma: 'buku', Pos: 'N', UR: 'b u k u', Spelling: 'buku', SemanticTags: ['concrete'] },
+      { Lemma: 'melihat', Pos: 'V', UR: 'm ə l i h a t', Spelling: 'melihat' },
+      { Lemma: 'makan', Pos: 'V', UR: 'm a k a n', Spelling: 'makan' },
+      { Lemma: 'minum', Pos: 'V', UR: 'm i n u m', Spelling: 'minum' },
+      { Lemma: 'berjalan', Pos: 'V', UR: 'b ə r dʒ a l a n', Spelling: 'berjalan' },
+      { Lemma: 'kecil', Pos: 'ADJ', UR: 'k ə tʃ i l', Spelling: 'kecil' },
+      { Lemma: 'besar', Pos: 'ADJ', UR: 'b ə s a r', Spelling: 'besar' },
+      { Lemma: 'cepat', Pos: 'ADJ', UR: 'tʃ ə p a t', Spelling: 'cepat' },
+      { Lemma: 'di', Pos: 'PREP', UR: 'd i', Spelling: 'di' },
+      { Lemma: 'dengan', Pos: 'PREP', UR: 'd ə ŋ a n', Spelling: 'dengan' },
+      { Lemma: 'dan', Pos: 'CONJ', UR: 'd a n', Spelling: 'dan' },
+      { Lemma: 'bahwa', Pos: 'COMP', UR: 'b a h w a', Spelling: 'bahwa' },
+      { Lemma: 'saya', Pos: 'PRON', UR: 's a j a', Spelling: 'saya' },
+      { Lemma: 'dia', Pos: 'PRON', UR: 'd i a', Spelling: 'dia' },
+      { Lemma: 'mereka', Pos: 'PRON', UR: 'm ə r e k a', Spelling: 'mereka' },
+    ],
+    Affixes: [
+      { Name: 'Active meN-', Pos: 'V', FeatureName: 'Voice', FeatureValue: 'Active', Affix: 'm ə n -', IsPrefix: true, Enabled: true },
+      { Name: 'Passive di-', Pos: 'V', FeatureName: 'Voice', FeatureValue: 'Passive', Affix: 'd i -', IsPrefix: true, Enabled: true },
+      { Name: 'Causative -kan', Pos: 'V', FeatureName: 'Aspect', FeatureValue: 'Part', Affix: '-k a n', IsPrefix: false, Enabled: true },
+    ],
+    WordOrder: 'SVO',
+    ClauseTemplate: 'Transitive',
+    SyntaxConfig: {
+      ...DEFAULT_SYNTAX_CONFIG,
+      alignment: 'NomAcc',
+      adjectiveOrder: 'AfterNoun',
+      determinerOrder: 'AfterNoun',
+      adpositionType: 'Preposition',
+      proDrop: false,
+      allowPassive: true,
+      allowEmbeddedClauses: true,
+    },
+    OrthographyRules: [
+      { Phone: 'tʃ', Grapheme: 'c', Enabled: true },
+      { Phone: 'dʒ', Grapheme: 'j', Enabled: true },
+      { Phone: 'ɲ', Grapheme: 'ny', Enabled: true },
+      { Phone: 'ŋ', Grapheme: 'ng', Enabled: true },
+      { Phone: 'ʃ', Grapheme: 'sy', Enabled: true },
+      { Phone: 'x', Grapheme: 'kh', Enabled: true },
+    ],
+    OrthographyExceptions: [
+      { Input: 'di', Output: 'di' },
+      { Input: 'dan', Output: 'dan' },
+      { Input: 'ini', Output: 'ini' },
+      { Input: 'itu', Output: 'itu' },
+    ],
+    Capitalization: 'SentenceInitial',
+    WritingSystem: createDefaultWritingSystem(),
+    Pipeline: {
+      syntaxGeneratorId: 'phrase-structure-syntax',
+      morphologyRealizerId: 'standard-morphology',
+      orthographyRendererId: 'morphophonemic-orthography',
+      enabledPhonoPluginRules: [],
+    },
+  };
+}
+
+export interface LanguagePresetInfo {
+  id: string;
+  name: string;
+  description: string;
+  create: () => LanguageProjectState;
+}
+
+export const TOP_10_LANGUAGE_PRESETS: readonly LanguagePresetInfo[] = [
+  { id: 'english', name: 'General American English', description: 'Germanic / Fusional-Analytic, SVO', create: createEnglishPresetProjectState },
+  { id: 'spanish', name: 'Spanish (Español)', description: 'Romance / Fusional, SVO, rich verbal inflection', create: createSpanishPresetProjectState },
+  { id: 'german', name: 'Standard German (Deutsch)', description: 'Germanic / Agglutinative-Fusional, V2/SOV', create: createGermanPresetProjectState },
+  { id: 'mandarin', name: 'Mandarin Chinese (普通话)', description: 'Sinitic / Analytic-Tone, SVO, tone sandhi', create: createMandarinPresetProjectState },
+  { id: 'arabic', name: 'Arabic (MSA - العربية)', description: 'Afroasiatic / Root-and-Pattern, VSO/SVO', create: createArabicPresetProjectState },
+  { id: 'japanese', name: 'Japanese (日本語)', description: 'Japonic / Agglutinative, SOV, postpositions', create: createJapanesePresetProjectState },
+  { id: 'turkish', name: 'Turkish (Türkçe)', description: 'Turkic / Agglutinative, SOV, vowel harmony', create: createTurkishPresetProjectState },
+  { id: 'swahili', name: 'Swahili (Kiswahili)', description: 'Niger-Congo / Noun Class System, SVO', create: createSwahiliPresetProjectState },
+  { id: 'russian', name: 'Russian (Русский)', description: 'Slavic / Fusional, SVO, 6 cases & 3 genders', create: createRussianPresetProjectState },
+  { id: 'indonesian', name: 'Indonesian (Bahasa Indonesia)', description: 'Austronesian / Agglutinative-Isolating, SVO', create: createIndonesianPresetProjectState },
+];
 
 export function normalizeLoadedProjectState(raw: Partial<LanguageProjectState>): LanguageProjectState {
   const defaults = createDefaultProjectState();

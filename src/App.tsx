@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LanguageProjectState } from './core/types';
 import {
   createDefaultProjectState,
-  createEnglishPresetProjectState,
+  TOP_10_LANGUAGE_PRESETS,
   normalizeLoadedProjectState,
   validateProject,
 } from './core/languageEngine';
@@ -120,14 +120,18 @@ export const App: React.FC = () => {
     setStatusMessage('Reset project to defaults');
   };
 
-  const handleLoadEnglishPreset = () => {
-    setBackups(createBackupSnapshot(projectState, 'before-english-preset'));
-    const preset = createEnglishPresetProjectState();
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('english');
+
+  const handleLoadPreset = (id?: string) => {
+    const targetId = id ?? selectedPresetId;
+    const presetInfo = TOP_10_LANGUAGE_PRESETS.find((p) => p.id === targetId) ?? TOP_10_LANGUAGE_PRESETS[0];
+    setBackups(createBackupSnapshot(projectState, `before-${presetInfo.id}-preset`));
+    const preset = presetInfo.create();
     setProjectState(preset);
     setCurrentProjectFile('(unsaved)');
-    historyRef.current?.push(preset, 'Loaded General American English preset');
+    historyRef.current?.push(preset, `Loaded ${presetInfo.name} preset`);
     setHistoryVersion((v) => v + 1);
-    setStatusMessage('Loaded General American English showcase preset');
+    setStatusMessage(`Loaded ${presetInfo.name} showcase preset`);
   };
 
   const handleSave = (saveAs: boolean) => {
@@ -287,12 +291,21 @@ export const App: React.FC = () => {
           >
             New / Reset
           </button>
+          <select
+            value={selectedPresetId}
+            onChange={(e) => setSelectedPresetId(e.target.value)}
+            className="px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded text-slate-800"
+          >
+            {TOP_10_LANGUAGE_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
           <button
             type="button"
-            onClick={handleLoadEnglishPreset}
+            onClick={() => handleLoadPreset()}
             className="px-3 py-1 text-xs font-medium bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 rounded text-indigo-800"
           >
-            English Preset
+            Load Preset
           </button>
           <input
             ref={loadProjectInputRef}

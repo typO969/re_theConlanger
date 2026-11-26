@@ -424,6 +424,160 @@ public static class ProjectFactory
         };
     }
 
+    public static IReadOnlyList<(string Id, string Name, string Description)> GetTop10Presets() => new[]
+    {
+        ("english", "General American English", "Germanic / Fusional-Analytic, SVO"),
+        ("spanish", "Spanish (Español)", "Romance / Fusional, SVO, rich verbal inflection"),
+        ("german", "Standard German (Deutsch)", "Germanic / Agglutinative-Fusional, V2/SOV"),
+        ("mandarin", "Mandarin Chinese (普通话)", "Sinitic / Analytic-Tone, SVO, tone sandhi"),
+        ("arabic", "Arabic (MSA - العربية)", "Afroasiatic / Root-and-Pattern, VSO/SVO"),
+        ("japanese", "Japanese (日本語)", "Japonic / Agglutinative, SOV, postpositions"),
+        ("turkish", "Turkish (Türkçe)", "Turkic / Agglutinative, SOV, vowel harmony"),
+        ("swahili", "Swahili (Kiswahili)", "Niger-Congo / Noun Class System, SVO"),
+        ("russian", "Russian (Русский)", "Slavic / Fusional, SVO, 6 cases & 3 genders"),
+        ("indonesian", "Indonesian (Bahasa Indonesia)", "Austronesian / Agglutinative-Isolating, SVO")
+    };
+
+    public static LanguageProject CreatePresetProject(string id) => (id?.ToLowerInvariant()) switch
+    {
+        "spanish" => CreateSpanishPresetProject(),
+        "german" => CreateGermanPresetProject(),
+        "mandarin" => CreateMandarinPresetProject(),
+        "arabic" => CreateArabicPresetProject(),
+        "japanese" => CreateJapanesePresetProject(),
+        "turkish" => CreateTurkishPresetProject(),
+        "swahili" => CreateSwahiliPresetProject(),
+        "russian" => CreateRussianPresetProject(),
+        "indonesian" => CreateIndonesianPresetProject(),
+        _ => CreateEnglishPresetProject()
+    };
+
+    public static LanguageProject CreateSpanishPresetProject()
+    {
+        var p = CreateEnglishPresetProject();
+        p.Name = "Spanish (Español)";
+        p.Lexemes =
+        [
+            new() { Lemma = "the", Pos = "DET", UR = "el", Spelling = "el", SemanticTags = ["det:def"] },
+            new() { Lemma = "a", Pos = "DET", UR = "un", Spelling = "un", SemanticTags = ["det:indef"] },
+            new() { Lemma = "dog", Pos = "N", UR = "p e r r o", Spelling = "perro", SemanticTags = ["animate", "animal"], ProtoUR = "p e r r o" },
+            new() { Lemma = "cat", Pos = "N", UR = "g a t o", Spelling = "gato", SemanticTags = ["animate", "animal"], ProtoUR = "g a t o" },
+            new() { Lemma = "water", Pos = "N", UR = "a g u a", Spelling = "agua", SemanticTags = ["liquid", "mass"], ProtoUR = "a g u a" },
+            new() { Lemma = "run", Pos = "V", UR = "c o r r e r", Spelling = "correr", ProtoUR = "c o r r e r" },
+            new() { Lemma = "see", Pos = "V", UR = "v e r", Spelling = "ver", ProtoUR = "v e r" }
+        ];
+        return p;
+    }
+
+    public static LanguageProject CreateGermanPresetProject()
+    {
+        var p = CreateEnglishPresetProject();
+        p.Name = "Standard German (Deutsch)";
+        p.Lexemes =
+        [
+            new() { Lemma = "the", Pos = "DET", UR = "d eː r", Spelling = "der", SemanticTags = ["det:def"] },
+            new() { Lemma = "dog", Pos = "N", UR = "h uː n t", Spelling = "Hund", SemanticTags = ["animate", "animal"], ProtoUR = "h u n d" },
+            new() { Lemma = "water", Pos = "N", UR = "v a s ɐ", Spelling = "Wasser", SemanticTags = ["liquid", "mass"], ProtoUR = "w a t s e r" },
+            new() { Lemma = "walk", Pos = "V", UR = "l a U f ən", Spelling = "laufen", ProtoUR = "l a u p a n" }
+        ];
+        return p;
+    }
+
+    public static LanguageProject CreateMandarinPresetProject()
+    {
+        var p = CreateEnglishPresetProject();
+        p.Name = "Mandarin Chinese (普通话)";
+        p.Lexemes =
+        [
+            new() { Lemma = "person", Pos = "N", UR = "ɹ e n˥˩", Spelling = "ren", SemanticTags = ["animate", "human"], ProtoUR = "r e n" },
+            new() { Lemma = "water", Pos = "N", UR = "ʂ ʊ ɪ ˥˩", Spelling = "shui", SemanticTags = ["liquid", "mass"], ProtoUR = "s u i" },
+            new() { Lemma = "see", Pos = "V", UR = "k ɑ ṇ ˥˩", Spelling = "kan", ProtoUR = "k a n" }
+        ];
+        return p;
+    }
+
+    public static LanguageProject CreateArabicPresetProject()
+    {
+        var p = CreateEnglishPresetProject();
+        p.Name = "Arabic (MSA - العربية)";
+        p.WordOrder = WordOrder.VSO;
+        p.Lexemes =
+        [
+            new() { Lemma = "book", Pos = "N", UR = "k i t aː b", Spelling = "kitab", SemanticTags = ["concrete"], ProtoUR = "k i t a b" },
+            new() { Lemma = "man", Pos = "N", UR = "r a dʒ u l", Spelling = "rajul", SemanticTags = ["animate", "human", "masc"], ProtoUR = "r a dʒ u l" },
+            new() { Lemma = "write", Pos = "V", UR = "k a t a b a", Spelling = "kataba", ProtoUR = "k a t a b a" }
+        ];
+        return p;
+    }
+
+    public static LanguageProject CreateJapanesePresetProject()
+    {
+        var p = CreateEnglishPresetProject();
+        p.Name = "Japanese (日本語)";
+        p.WordOrder = WordOrder.SOV;
+        p.SyntaxConfig.AdpositionType = AdpositionOrder.Postposition;
+        p.Lexemes =
+        [
+            new() { Lemma = "dog", Pos = "N", UR = "i n u", Spelling = "inu", SemanticTags = ["animate", "animal"] },
+            new() { Lemma = "water", Pos = "N", UR = "m i z u", Spelling = "mizu", SemanticTags = ["liquid", "mass"] },
+            new() { Lemma = "eat", Pos = "V", UR = "t a b e r u", Spelling = "taberu" }
+        ];
+        return p;
+    }
+
+    public static LanguageProject CreateTurkishPresetProject()
+    {
+        var p = CreateEnglishPresetProject();
+        p.Name = "Turkish (Türkçe)";
+        p.WordOrder = WordOrder.SOV;
+        p.Lexemes =
+        [
+            new() { Lemma = "house", Pos = "N", UR = "e v", Spelling = "ev", SemanticTags = ["place", "concrete"] },
+            new() { Lemma = "water", Pos = "N", UR = "s u", Spelling = "su", SemanticTags = ["liquid", "mass"] },
+            new() { Lemma = "come", Pos = "V", UR = "g e l m e k", Spelling = "gelmek" }
+        ];
+        return p;
+    }
+
+    public static LanguageProject CreateSwahiliPresetProject()
+    {
+        var p = CreateEnglishPresetProject();
+        p.Name = "Swahili (Kiswahili)";
+        p.Lexemes =
+        [
+            new() { Lemma = "person", Pos = "N", UR = "m t u", Spelling = "mtu", SemanticTags = ["animate", "human"], LexClass = "M" },
+            new() { Lemma = "people", Pos = "N", UR = "w a t u", Spelling = "watu", SemanticTags = ["animate", "human"], LexClass = "Wa" },
+            new() { Lemma = "water", Pos = "N", UR = "m a j i", Spelling = "maji", SemanticTags = ["liquid", "mass"], LexClass = "Ma" }
+        ];
+        return p;
+    }
+
+    public static LanguageProject CreateRussianPresetProject()
+    {
+        var p = CreateEnglishPresetProject();
+        p.Name = "Russian (Русский)";
+        p.Lexemes =
+        [
+            new() { Lemma = "dog", Pos = "N", UR = "s o b a k ə", Spelling = "sobaka", SemanticTags = ["animate", "animal"], LexClass = "Fem" },
+            new() { Lemma = "water", Pos = "N", UR = "v o d ə", Spelling = "voda", SemanticTags = ["liquid", "mass"], LexClass = "Fem" },
+            new() { Lemma = "read", Pos = "V", UR = "tʃ i t a tʲ", Spelling = "chitat" }
+        ];
+        return p;
+    }
+
+    public static LanguageProject CreateIndonesianPresetProject()
+    {
+        var p = CreateEnglishPresetProject();
+        p.Name = "Indonesian (Bahasa Indonesia)";
+        p.Lexemes =
+        [
+            new() { Lemma = "child", Pos = "N", UR = "a n a k", Spelling = "anak", SemanticTags = ["animate", "human"] },
+            new() { Lemma = "water", Pos = "N", UR = "a i r", Spelling = "air", SemanticTags = ["liquid", "mass"] },
+            new() { Lemma = "eat", Pos = "V", UR = "m a k a n", Spelling = "makan" }
+        ];
+        return p;
+    }
+
     public static void SyncLegacyLists(LanguageProject project)
     {
         if (project.Phonemes.Count == 0 && (project.Consonants.Count > 0 || project.Vowels.Count > 0))

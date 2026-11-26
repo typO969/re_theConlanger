@@ -236,6 +236,7 @@ public sealed class MainViewModel : ViewModelBase
 
         NewProjectCommand = new AsyncRelayCommand(ResetProjectAsync);
         LoadEnglishPresetCommand = new RelayCommand(LoadEnglishPreset);
+        LoadTop10PresetCommand = new RelayCommand(LoadTop10Preset);
         UndoCommand = new RelayCommand(Undo, () => _history.CanUndo);
         RedoCommand = new RelayCommand(Redo, () => _history.CanRedo);
         RefreshAllCommand = new RelayCommand(RefreshDerivedViews);
@@ -430,6 +431,15 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand SimulateEvolutionCommand { get; }
     public ICommand ApplyEvolutionCommand { get; }
     public ICommand GenerateDiscourseCommand { get; }
+
+    public IReadOnlyList<(string Id, string Name, string Description)> Top10Presets => ProjectFactory.GetTop10Presets();
+    private string _selectedTop10PresetId = "english";
+    public string SelectedTop10PresetId
+    {
+        get => _selectedTop10PresetId;
+        set => SetField(ref _selectedTop10PresetId, value);
+    }
+    public ICommand LoadTop10PresetCommand { get; }
 
     public Array WordOrders => Enum.GetValues(typeof(WordOrder));
     public Array ClauseTemplates => Enum.GetValues(typeof(ClauseTemplate));
@@ -1824,6 +1834,20 @@ public sealed class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             DiscourseParagraphText = $"Discourse generation error: {ex.Message}";
+        }
+    }
+
+    private void LoadTop10Preset()
+    {
+        try
+        {
+            var prj = ProjectFactory.CreatePresetProject(SelectedTop10PresetId);
+            LoadProject(prj, "(unsaved)", "");
+            StatusMessage = $"Loaded preset: {prj.Name}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Preset load error: {ex.Message}";
         }
     }
 }
