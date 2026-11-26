@@ -15,7 +15,7 @@
         <Border Grid.Row="0" Background="#1E1E1E" CornerRadius="6" Padding="12" Margin="0,0,0,12">
             <WrapPanel Orientation="Horizontal">
                 <TextBlock Text="Diachronic Evolution Presets:" Foreground="White" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold"/>
-                <ComboBox Width="240" ItemsSource="{Binding DiachronicPresets}" SelectedValuePath="Id" DisplayValuePath="Name" SelectedValue="{Binding SelectedDiachronicPresetId}" Margin="0,0,12,0"/>
+                <ComboBox Width="240" ItemsSource="{Binding DiachronicPresets}" SelectedValuePath="Id" DisplayMemberPath="Name" SelectedValue="{Binding SelectedDiachronicPresetId}" Margin="0,0,12,0"/>
                 <Button Content="Load (Replace)" Command="{Binding LoadDiachronicPresetReplaceCommand}" Margin="0,0,8,0" Padding="8,4"/>
                 <Button Content="Load (Append)" Command="{Binding LoadDiachronicPresetAppendCommand}" Margin="0,0,24,0" Padding="8,4"/>
                 <Button Content="Simulate Evolution" Command="{Binding SimulateEvolutionCommand}" Background="#2D7D9A" Foreground="White" Padding="10,5" FontWeight="Bold"/>
