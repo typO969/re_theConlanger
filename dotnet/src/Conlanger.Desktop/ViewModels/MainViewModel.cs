@@ -708,6 +708,7 @@ public sealed class MainViewModel : ViewModelBase
     public string Layer1SourceDisplay { get => _layer1SourceDisplay; set => SetField(ref _layer1SourceDisplay, value); }
     public string Layer1TokensSummary { get => _layer1TokensSummary; set => SetField(ref _layer1TokensSummary, value); }
     public bool ShowAnchors { get => _showAnchors; set => SetField(ref _showAnchors, value); }
+    public string ActiveWritingSystemName => _project.WritingSystem.Name;
     public Conlanger.SDK.FlowDirection SelectedFlowDirection
     {
         get => _project.WritingSystem.FlowDirection;
@@ -1046,6 +1047,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(MaxClauseDepth));
         OnPropertyChanged(nameof(CustomSyntaxRulesText));
         OnPropertyChanged(nameof(SelectedCapitalization));
+        OnPropertyChanged(nameof(ActiveWritingSystemName));
         OnPropertyChanged(nameof(SelectedFlowDirection));
         OnPropertyChanged(nameof(CursiveBonding));
         OnPropertyChanged(nameof(ContextualVariants));
@@ -1315,6 +1317,8 @@ public sealed class MainViewModel : ViewModelBase
     private void ApplyWritingPreset(string key)
     {
         _project.WritingSystem = WritingSystemEngine.CreatePreset(key);
+        _shapingInput = WritingSystemEngine.GetSampleInput(null);
+        OnPropertyChanged(nameof(ShapingInput));
         SyncCollectionsFromProject();
         CommitAndRefresh($"Applied writing preset: {key}");
     }
@@ -1621,12 +1625,16 @@ public sealed class MainViewModel : ViewModelBase
     {
         var backups = await ProjectPersistence.SaveVersionedBackupAsync(_project, "before-reset");
         ReplaceCollection(BackupSnapshots, backups);
+        _shapingInput = WritingSystemEngine.GetSampleInput(null);
+        OnPropertyChanged(nameof(ShapingInput));
         LoadProject(ProjectFactory.CreateStarterProject(), "(unsaved)", "");
         StatusMessage = "Reset project to starter defaults";
     }
 
     private void LoadEnglishPreset()
     {
+        _shapingInput = WritingSystemEngine.GetSampleInput("english");
+        OnPropertyChanged(nameof(ShapingInput));
         LoadProject(ProjectFactory.CreateEnglishPresetProject(), "general-american-english.clproj.json", "");
         TestWordUr = "ˈw ɔː t ɚ";
         MorphPreviewLemma = "fox";
@@ -1872,6 +1880,8 @@ public sealed class MainViewModel : ViewModelBase
         try
         {
             var prj = ProjectFactory.CreatePresetProject(SelectedTop10PresetId);
+            _shapingInput = WritingSystemEngine.GetSampleInput(SelectedTop10PresetId);
+            OnPropertyChanged(nameof(ShapingInput));
             LoadProject(prj, "(unsaved)", "");
             StatusMessage = $"Loaded preset: {prj.Name}";
         }

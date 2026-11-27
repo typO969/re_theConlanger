@@ -37,7 +37,7 @@ import {
   WordOrder,
 } from './types';
 import { RNG } from './rng';
-import { createDefaultWritingSystem } from './writingSystem';
+import { createDefaultWritingSystem, createLanguageWritingSystem } from './writingSystem';
 
 export function emptyFeatures(): PhonologicalFeatures {
   return {
@@ -4109,7 +4109,7 @@ export function createEnglishPresetProjectState(): LanguageProjectState {
       { Input: 'wɔːɾɚz', Output: 'waters' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('english'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
@@ -4221,7 +4221,7 @@ export function createSpanishPresetProjectState(): LanguageProjectState {
       { Input: 'gato', Output: 'gato' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('spanish'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
@@ -4335,7 +4335,7 @@ export function createGermanPresetProjectState(): LanguageProjectState {
       { Input: 'das', Output: 'das' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('german'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
@@ -4436,7 +4436,7 @@ export function createMandarinPresetProjectState(): LanguageProjectState {
       { Input: 'ta', Output: 'tā' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('mandarin'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
@@ -4535,7 +4535,7 @@ export function createArabicPresetProjectState(): LanguageProjectState {
       { Input: 'wa', Output: 'wa' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('arabic'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
@@ -4640,7 +4640,7 @@ export function createJapanesePresetProjectState(): LanguageProjectState {
       { Input: 'inude', Output: 'inu de' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('japanese'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
@@ -4738,7 +4738,7 @@ export function createTurkishPresetProjectState(): LanguageProjectState {
       { Input: 'su', Output: 'su' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('turkish'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
@@ -4830,7 +4830,7 @@ export function createSwahiliPresetProjectState(): LanguageProjectState {
       { Input: 'katika', Output: 'katika' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('swahili'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
@@ -4934,7 +4934,7 @@ export function createRussianPresetProjectState(): LanguageProjectState {
       { Input: 'i', Output: 'i' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('russian'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
@@ -5035,7 +5035,7 @@ export function createIndonesianPresetProjectState(): LanguageProjectState {
       { Input: 'itu', Output: 'itu' },
     ],
     Capitalization: 'SentenceInitial',
-    WritingSystem: createDefaultWritingSystem(),
+    WritingSystem: createLanguageWritingSystem('indonesian'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',

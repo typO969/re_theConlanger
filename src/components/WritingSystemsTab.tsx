@@ -1,15 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlowDirection,
   GlyphDefinition,
   LanguageProjectState,
   WritingSystemConfig,
 } from '../core/types';
-import { buildEngineFromState } from '../core/languageEngine';
+import { buildEngineFromState, TOP_10_LANGUAGE_PRESETS } from '../core/languageEngine';
 import { RNG } from '../core/rng';
 import {
   createPresetWritingSystem,
   exportShapedSvg,
+  getWritingSystemSampleInput,
   runShapingGraph,
   tokenizeRawInput,
 } from '../core/writingSystem';
@@ -28,13 +29,44 @@ const FLOW_OPTIONS: Array<{ value: FlowDirection; label: string }> = [
   { value: 'Boustrophedon', label: 'Alternating (Boustrophedon)' },
 ];
 
+function inferPresetIdFromState(state: LanguageProjectState): string {
+  const matched = TOP_10_LANGUAGE_PRESETS.find((p) => p.name === state.Name);
+  if (matched) return matched.id;
+  const wsName = state.WritingSystem.name.toLowerCase();
+  if (wsName.includes('english')) return 'english';
+  if (wsName.includes('español') || wsName.includes('spanish')) return 'spanish';
+  if (wsName.includes('deutsch') || wsName.includes('german')) return 'german';
+  if (wsName.includes('普通话') || wsName.includes('sinographic') || wsName.includes('mandarin')) return 'mandarin';
+  if (wsName.includes('العربية') || wsName.includes('arabic')) return 'arabic';
+  if (wsName.includes('日本語') || wsName.includes('kana') || wsName.includes('japanese')) return 'japanese';
+  if (wsName.includes('türkçe') || wsName.includes('turkish')) return 'turkish';
+  if (wsName.includes('kiswahili') || wsName.includes('swahili')) return 'swahili';
+  if (wsName.includes('русский') || wsName.includes('cyrillic') || wsName.includes('russian')) return 'russian';
+  if (wsName.includes('indonesia') || wsName.includes('nusantara')) return 'indonesian';
+  return 'default';
+}
+
 export const WritingSystemsTab: React.FC<WritingSystemsTabProps> = ({ state, onUpdate }) => {
   const ws = state.WritingSystem;
 
   const [inputMode, setInputMode] = useState<'custom' | 'engine'>('custom');
-  const [rawInput, setRawInput] = useState('shika taka person');
+  const initialSample = getWritingSystemSampleInput(inferPresetIdFromState(state));
+  const [rawInput, setRawInput] = useState(initialSample);
+  const lastAutoSampleRef = useRef<string>(initialSample);
   const [engineSeed, setEngineSeed] = useState(1);
   const [showDebugAnchors, setShowDebugAnchors] = useState(true);
+
+  useEffect(() => {
+    const nextSample = getWritingSystemSampleInput(inferPresetIdFromState(state));
+    setRawInput((prev) => {
+      if (prev === lastAutoSampleRef.current || prev === 'shika taka person' || !prev.trim()) {
+        lastAutoSampleRef.current = nextSample;
+        return nextSample;
+      }
+      lastAutoSampleRef.current = nextSample;
+      return prev;
+    });
+  }, [state.Name, ws.name]);
 
   const glyphKeys = useMemo(() => Object.keys(ws.glyphs).sort(), [ws.glyphs]);
   const [selectedGlyphId, setSelectedGlyphId] = useState<string>(glyphKeys[0] ?? 'a');
@@ -79,6 +111,11 @@ export const WritingSystemsTab: React.FC<WritingSystemsTabProps> = ({ state, onU
   };
 
   const applyPreset = (preset: 'rtl-western' | 'vertical-mongolian' | 'boustrophedon') => {
+    const milestoneSample = 'shika taka person';
+    if (rawInput === lastAutoSampleRef.current || !rawInput.trim()) {
+      lastAutoSampleRef.current = milestoneSample;
+      setRawInput(milestoneSample);
+    }
     onUpdate(
       (prev) => ({ ...prev, WritingSystem: createPresetWritingSystem(preset) }),
       `Writing System preset (${preset})`
@@ -174,8 +211,11 @@ export const WritingSystemsTab: React.FC<WritingSystemsTabProps> = ({ state, onU
       {/* Header + Presets */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-bold text-slate-900">
-            Agnostic Text Shaping Engine <span className="text-xs font-normal text-slate-500">(3-Layer Lego Shaping Prototype)</span>
+          <h3 className="text-base font-bold text-slate-900 flex flex-wrap items-center gap-2">
+            <span>Agnostic Text Shaping Engine</span>
+            <span className="px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-800 border border-indigo-200 rounded">
+              {ws.name}
+            </span>
           </h3>
           <p className="text-xs text-slate-600">
             Bypasses OS font/direction sandboxes: Input Matrix → Node-Based Shaping Graph → Vector Canvas.

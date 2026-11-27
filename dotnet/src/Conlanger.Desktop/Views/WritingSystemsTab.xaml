@@ -48,7 +48,12 @@
                     <TextBox Text="{Binding WrapLimit, UpdateSourceTrigger=LostFocus}" Width="55" />
                 </WrapPanel>
 
-                <TextBlock Text="{Binding Layer1TokensSummary}" FontFamily="Consolas" FontSize="11" Foreground="#475569" TextTrimming="CharacterEllipsis" />
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#EEF2FF" BorderBrush="#C7D2FE" BorderThickness="1" CornerRadius="3" Padding="6,1" Margin="0,0,10,0">
+                        <TextBlock Text="{Binding ActiveWritingSystemName}" FontWeight="SemiBold" FontSize="11" Foreground="#3730A3" />
+                    </Border>
+                    <TextBlock Text="{Binding Layer1TokensSummary}" FontFamily="Consolas" FontSize="11" Foreground="#475569" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                </WrapPanel>
             </StackPanel>
         </GroupBox>
 

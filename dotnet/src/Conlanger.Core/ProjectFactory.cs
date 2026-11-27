@@ -439,7 +439,7 @@ public static class ProjectFactory
                 new() { Input = "wɔːɾɚz", Output = "waters" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("english"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
@@ -586,7 +586,7 @@ public static class ProjectFactory
                 new() { Input = "gato", Output = "gato" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("spanish"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
@@ -707,7 +707,7 @@ public static class ProjectFactory
                 new() { Input = "das", Output = "das" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("german"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
@@ -815,7 +815,7 @@ public static class ProjectFactory
                 new() { Input = "ta", Output = "tā" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("mandarin"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
@@ -921,7 +921,7 @@ public static class ProjectFactory
                 new() { Input = "wa", Output = "wa" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("arabic"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
@@ -1033,7 +1033,7 @@ public static class ProjectFactory
                 new() { Input = "inude", Output = "inu de" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("japanese"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
@@ -1138,7 +1138,7 @@ public static class ProjectFactory
                 new() { Input = "su", Output = "su" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("turkish"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
@@ -1236,7 +1236,7 @@ public static class ProjectFactory
                 new() { Input = "katika", Output = "katika" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("swahili"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
@@ -1347,7 +1347,7 @@ public static class ProjectFactory
                 new() { Input = "i", Output = "i" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("russian"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
@@ -1455,7 +1455,7 @@ public static class ProjectFactory
                 new() { Input = "itu", Output = "itu" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
-            WritingSystem = WritingSystemEngine.CreateDefaultConfig(),
+            WritingSystem = WritingSystemEngine.CreateForLanguage("indonesian"),
             Pipeline = new PipelineSelection
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
