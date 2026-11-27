@@ -971,7 +971,7 @@ public static class DiachronicEngine
         LanguageProject project)
     {
         var traces = new List<DiachronicStepTrace>();
-        var cur = MorphologyEngine.SplitPhones(protoUr);
+        IReadOnlyList<string> cur = MorphologyEngine.SplitPhones(protoUr);
         traces.Add(new DiachronicStepTrace("Proto-Form", "UR", string.Join(" ", cur)));
 
         int stepNum = 1;
