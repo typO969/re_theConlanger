@@ -286,9 +286,9 @@ public sealed class MainViewModel : ViewModelBase
         LoadDiachronicPresetReplaceCommand = new RelayCommand(() => LoadDiachronicPreset(replace: true));
         LoadDiachronicPresetAppendCommand = new RelayCommand(() => LoadDiachronicPreset(replace: false));
         AddDiachronicRuleCommand = new RelayCommand(AddDiachronicRule, () => !string.IsNullOrWhiteSpace(NewDiachronicName));
-        RemoveDiachronicRuleCommand = new RelayCommand(p => RemoveDiachronicRule(p as PhonologyRuleSpec));
-        MoveDiachronicRuleUpCommand = new RelayCommand(p => MoveDiachronicRule(p as PhonologyRuleSpec, -1));
-        MoveDiachronicRuleDownCommand = new RelayCommand(p => MoveDiachronicRule(p as PhonologyRuleSpec, 1));
+        RemoveDiachronicRuleCommand = new RelayCommand(p => RemoveDiachronicRule(p as DiachronicRuleSpec));
+        MoveDiachronicRuleUpCommand = new RelayCommand(p => MoveDiachronicRule(p as DiachronicRuleSpec, -1));
+        MoveDiachronicRuleDownCommand = new RelayCommand(p => MoveDiachronicRule(p as DiachronicRuleSpec, 1));
         TraceProtoFormCommand = new RelayCommand(TraceProtoForm);
         LoadProtoSampleKnightCommand = new RelayCommand(() => { ProtoTestUr = "ˈk n iː x t"; TraceProtoForm(); });
         LoadProtoSampleMouseCommand = new RelayCommand(() => { ProtoTestUr = "ˈm uː s"; TraceProtoForm(); });
@@ -388,7 +388,7 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<ExecutedPluginOutput> PluginOutputs { get; } = new();
     public ObservableCollection<string> CustomPluginFolders { get; } = new();
     public ObservableCollection<string> ActivePluginSearchPaths { get; } = new();
-    public ObservableCollection<PhonologyRuleSpec> DiachronicRulesCollection { get; } = new();
+    public ObservableCollection<DiachronicRuleSpec> DiachronicRulesCollection { get; } = new();
     public ObservableCollection<DiachronicCognateDiff> DiachronicCognateDiffs { get; } = new();
     public ObservableCollection<DiachronicAffixDiff> DiachronicAffixDiffs { get; } = new();
 
@@ -1703,7 +1703,7 @@ public sealed class MainViewModel : ViewModelBase
         if (replace) DiachronicRulesCollection.Clear();
         foreach (var r in preset.Rules)
         {
-            DiachronicRulesCollection.Add(new PhonologyRuleSpec
+            DiachronicRulesCollection.Add(new DiachronicRuleSpec
             {
                 Name = r.Name,
                 Era = r.Era,
@@ -1722,7 +1722,7 @@ public sealed class MainViewModel : ViewModelBase
     private void AddDiachronicRule()
     {
         if (string.IsNullOrWhiteSpace(NewDiachronicName)) return;
-        DiachronicRulesCollection.Add(new PhonologyRuleSpec
+        DiachronicRulesCollection.Add(new DiachronicRuleSpec
         {
             Name = NewDiachronicName.Trim(),
             Era = string.IsNullOrWhiteSpace(NewDiachronicEra) ? "Era 1" : NewDiachronicEra.Trim(),
@@ -1740,7 +1740,7 @@ public sealed class MainViewModel : ViewModelBase
         SimulateEvolution();
     }
 
-    private void RemoveDiachronicRule(PhonologyRuleSpec? r)
+    private void RemoveDiachronicRule(DiachronicRuleSpec? r)
     {
         if (r is null) return;
         DiachronicRulesCollection.Remove(r);
@@ -1748,7 +1748,7 @@ public sealed class MainViewModel : ViewModelBase
         SimulateEvolution();
     }
 
-    private void MoveDiachronicRule(PhonologyRuleSpec? r, int direction)
+    private void MoveDiachronicRule(DiachronicRuleSpec? r, int direction)
     {
         if (r is null) return;
         int idx = DiachronicRulesCollection.IndexOf(r);

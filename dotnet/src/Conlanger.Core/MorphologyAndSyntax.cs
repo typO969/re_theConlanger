@@ -1077,7 +1077,7 @@ public class MorphologyEngine : IMorphologyRealizer
                 {
                     bestScore = clauses.Count;
                     bestUr = form;
-                    bestKeys = new HashSet<string>(clauses.Select(c => c.Key), StringComparison.OrdinalIgnoreCase);
+                    bestKeys = new HashSet<string>(clauses.Select(c => c.Key), StringComparer.OrdinalIgnoreCase);
                 }
             }
 
