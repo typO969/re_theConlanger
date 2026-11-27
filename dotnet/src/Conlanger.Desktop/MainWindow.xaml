@@ -38,7 +38,7 @@
                         <Button Content="Save" Click="OnSaveProjectClick" />
                         <Button Content="Save As..." Click="OnSaveAsProjectClick" />
                         <Button Content="New / Reset" Command="{Binding NewProjectCommand}" />
-                        <ComboBox Width="160" ItemsSource="{Binding Top10Presets}" SelectedValuePath="Item1" DisplayMemberPath="Item2" SelectedValue="{Binding SelectedTop10PresetId, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <ComboBox Width="185" ItemsSource="{Binding Top10Presets}" SelectedValuePath="Id" DisplayMemberPath="Name" SelectedValue="{Binding SelectedTop10PresetId, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,4,0" VerticalAlignment="Center" />
                         <Button Content="Load Preset" Command="{Binding LoadTop10PresetCommand}" Background="#EFF6FF" Foreground="#1D4ED8" BorderBrush="#93C5FD" />
                         <Button Content="Undo" Command="{Binding UndoCommand}" />
                         <Button Content="Redo" Command="{Binding RedoCommand}" />

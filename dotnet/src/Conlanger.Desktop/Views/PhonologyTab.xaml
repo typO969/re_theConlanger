@@ -102,7 +102,7 @@
         <!-- Right Column: Syllables, Phonotactics, Primary Stress, Ordered Rules -->
         <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,10">
             <Grid.RowDefinitions>
-                <RowDefinition Height="145" />
+                <RowDefinition Height="215" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>

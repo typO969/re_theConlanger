@@ -433,7 +433,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ApplyEvolutionCommand { get; }
     public ICommand GenerateDiscourseCommand { get; }
 
-    public IReadOnlyList<(string Id, string Name, string Description)> Top10Presets => ProjectFactory.GetTop10Presets();
+    public IReadOnlyList<LanguagePresetInfo> Top10Presets => ProjectFactory.GetTop10Presets();
     private string _selectedTop10PresetId = "english";
     public string SelectedTop10PresetId
     {
