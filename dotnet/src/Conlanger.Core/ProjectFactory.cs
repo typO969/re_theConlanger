@@ -545,7 +545,7 @@ public static class ProjectFactory
                 new() { Name = "Plural /s/", Pos = "N", FeatureName = "Number", FeatureValue = "Pl", Affix = "-s", IsPrefix = false, Condition = "[manner=vowel]", Enabled = true },
                 new() { Name = "Plural /es/", Pos = "N", FeatureName = "Number", FeatureValue = "Pl", Affix = "-e s", IsPrefix = false, Condition = "[-sonorant]", Enabled = true },
                 new() { Name = "Fem Adj", Pos = "ADJ", FeatureName = "Class", FeatureValue = "Fem", Affix = "-a", IsPrefix = false, Enabled = true },
-                new() { Name = "Masc Adj", Pos = "ADJ", FeatureName = "Class", FeatureValue = "Masc", Affix = "-o", IsPrefix = false, Enabled: true },
+                new() { Name = "Masc Adj", Pos = "ADJ", FeatureName = "Class", FeatureValue = "Masc", Affix = "-o", IsPrefix = false, Enabled = true },
                 new() { Name = "3sg Pres", Pos = "V", FeatureName = "Agreement", FeatureValue = "3sg", Affix = "-e", IsPrefix = false, Enabled = true },
                 new() { Name = "Past Preterite", Pos = "V", FeatureName = "Tense", FeatureValue = "Past", Affix = "-o", IsPrefix = false, Enabled = true }
             },
