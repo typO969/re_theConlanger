@@ -84,6 +84,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly PipelineRegistry _pipelineRegistry;
     private readonly LangEngine _engine;
     private readonly bool _isDesignMode;
+    private bool _isSyncingCollections;
     private LanguageProject _project;
     private CancellationTokenSource? _autosaveCts;
 
@@ -354,6 +355,7 @@ public sealed class MainViewModel : ViewModelBase
         CurrentFileName = fileName;
         CurrentFilePath = filePath;
         if (recordHistory) _history.PushSnapshot(_project);
+        GeneratedSentences.Clear();
         SyncCollectionsFromProject();
         RefreshDerivedViews();
         ScheduleAutosave();
@@ -433,12 +435,12 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ApplyEvolutionCommand { get; }
     public ICommand GenerateDiscourseCommand { get; }
 
-    public IReadOnlyList<LanguagePresetInfo> Top10Presets => ProjectFactory.GetTop10Presets();
+    public IReadOnlyList<LanguagePresetInfo> Top10Presets { get; } = ProjectFactory.GetTop10Presets();
     private string _selectedTop10PresetId = "english";
     public string SelectedTop10PresetId
     {
         get => _selectedTop10PresetId;
-        set => SetField(ref _selectedTop10PresetId, value);
+        set => SetField(ref _selectedTop10PresetId, string.IsNullOrWhiteSpace(value) ? "english" : value);
     }
     public ICommand LoadTop10PresetCommand { get; }
 
@@ -742,7 +744,8 @@ public sealed class MainViewModel : ViewModelBase
         get => _selectedGlyphId;
         set
         {
-            if (SetField(ref _selectedGlyphId, value))
+            var next = value ?? "";
+            if (SetField(ref _selectedGlyphId, next))
             {
                 OnPropertyChanged(nameof(SelectedGlyphSvgPath));
                 OnPropertyChanged(nameof(SelectedGlyphPreviewGeometry));
@@ -755,7 +758,7 @@ public sealed class MainViewModel : ViewModelBase
     }
 
     private GlyphDefinition? ActiveGlyph =>
-        _project.WritingSystem.Glyphs.TryGetValue(_selectedGlyphId, out var g) ? g : null;
+        !string.IsNullOrEmpty(_selectedGlyphId) && _project.WritingSystem.Glyphs.TryGetValue(_selectedGlyphId, out var g) ? g : null;
 
     public string SelectedGlyphSvgPath
     {
@@ -833,7 +836,16 @@ public sealed class MainViewModel : ViewModelBase
     public string GeneratedWordsText { get => _generatedWordsText; set => SetField(ref _generatedWordsText, value); }
 
     // Inspectors properties
-    public string SelectedInspectorLexeme { get => _selectedInspectorLexeme; set { if (SetField(ref _selectedInspectorLexeme, value)) RefreshInspectors(); } }
+    public string SelectedInspectorLexeme
+    {
+        get => _selectedInspectorLexeme;
+        set
+        {
+            var next = value ?? "";
+            if (SetField(ref _selectedInspectorLexeme, next) && !_isSyncingCollections && !string.IsNullOrEmpty(next))
+                RefreshInspectors();
+        }
+    }
     public string InspectorLexemeText { get => _inspectorLexemeText; set => SetField(ref _inspectorLexemeText, value); }
     public string InspectorSyntaxTreeText { get => _inspectorSyntaxTreeText; set => SetField(ref _inspectorSyntaxTreeText, value); }
     public string InspectorPhonologyTraceText { get => _inspectorPhonologyTraceText; set => SetField(ref _inspectorPhonologyTraceText, value); }
@@ -842,17 +854,17 @@ public sealed class MainViewModel : ViewModelBase
     public string SelectedSyntaxGeneratorId
     {
         get => _project.Pipeline.SyntaxGeneratorId;
-        set { _project.Pipeline.SyntaxGeneratorId = value; OnPropertyChanged(); CommitAndRefresh("Swapped syntax generator"); }
+        set { if (!string.IsNullOrWhiteSpace(value)) { _project.Pipeline.SyntaxGeneratorId = value; OnPropertyChanged(); if (!_isSyncingCollections) CommitAndRefresh("Swapped syntax generator"); } }
     }
     public string SelectedMorphologyRealizerId
     {
         get => _project.Pipeline.MorphologyRealizerId;
-        set { _project.Pipeline.MorphologyRealizerId = value; OnPropertyChanged(); CommitAndRefresh("Swapped morphology realizer"); }
+        set { if (!string.IsNullOrWhiteSpace(value)) { _project.Pipeline.MorphologyRealizerId = value; OnPropertyChanged(); if (!_isSyncingCollections) CommitAndRefresh("Swapped morphology realizer"); } }
     }
     public string SelectedOrthographyRendererId
     {
         get => _project.Pipeline.OrthographyRendererId;
-        set { _project.Pipeline.OrthographyRendererId = value; OnPropertyChanged(); CommitAndRefresh("Swapped orthography renderer"); }
+        set { if (!string.IsNullOrWhiteSpace(value)) { _project.Pipeline.OrthographyRendererId = value; OnPropertyChanged(); if (!_isSyncingCollections) CommitAndRefresh("Swapped orthography renderer"); } }
     }
     public DiscoveredPlugin? SelectedPlugin { get => _selectedPlugin; set => SetField(ref _selectedPlugin, value); }
     public DiscoveredAction? SelectedAction
@@ -978,25 +990,39 @@ public sealed class MainViewModel : ViewModelBase
 
     private void SyncCollectionsFromProject()
     {
-        ReplaceCollection(Phonemes, _project.Phonemes);
-        ReplaceCollection(Consonants, _project.Phonemes.Where(p => p.Type == "C"));
-        ReplaceCollection(Vowels, _project.Phonemes.Where(p => p.Type == "V"));
-        ReplaceCollection(SyllableTemplates, _project.SyllableTemplates);
-        ReplaceCollection(PhonologyRules, _project.PhonologyRules);
-        ReplaceCollection(DiachronicRulesCollection, _project.DiachronicRules ?? new());
-        ReplaceCollection(Lexemes, _project.Lexemes);
-        ReplaceCollection(LexemeIds, _project.Lexemes.OrderBy(l => l.Lemma).Select(l => l.Lemma));
-        if (!LexemeIds.Contains(_selectedInspectorLexeme) && LexemeIds.Count > 0)
-            _selectedInspectorLexeme = LexemeIds[0];
+        _isSyncingCollections = true;
+        try
+        {
+            var preferredLexeme = _selectedInspectorLexeme;
+            var preferredGlyph = _selectedGlyphId;
 
-        ReplaceCollection(Affixes, _project.Affixes);
-        ReplaceCollection(OrthographyRules, _project.OrthographyRules);
-        ReplaceCollection(OrthographyExceptions, _project.OrthographyExceptions);
-        ReplaceCollection(GlyphIds, _project.WritingSystem.Glyphs.Keys.OrderBy(k => k));
-        if (!_project.WritingSystem.Glyphs.ContainsKey(_selectedGlyphId) && GlyphIds.Count > 0)
-            SelectedGlyphId = GlyphIds[0];
-        ReplaceCollection(FeaturicRules, _project.WritingSystem.FeaturicRules);
-        RebuildPipelinePhonoItems();
+            ReplaceCollection(Phonemes, _project.Phonemes);
+            ReplaceCollection(Consonants, _project.Phonemes.Where(p => p.Type == "C"));
+            ReplaceCollection(Vowels, _project.Phonemes.Where(p => p.Type == "V"));
+            ReplaceCollection(SyllableTemplates, _project.SyllableTemplates);
+            ReplaceCollection(PhonologyRules, _project.PhonologyRules);
+            ReplaceCollection(DiachronicRulesCollection, _project.DiachronicRules ?? new());
+            ReplaceCollection(Lexemes, _project.Lexemes);
+            ReplaceCollection(LexemeIds, _project.Lexemes.OrderBy(l => l.Lemma).Select(l => l.Lemma));
+            _selectedInspectorLexeme = !string.IsNullOrEmpty(preferredLexeme) && LexemeIds.Contains(preferredLexeme)
+                ? preferredLexeme
+                : (LexemeIds.Count > 0 ? LexemeIds[0] : "");
+
+            ReplaceCollection(Affixes, _project.Affixes);
+            ReplaceCollection(OrthographyRules, _project.OrthographyRules);
+            ReplaceCollection(OrthographyExceptions, _project.OrthographyExceptions);
+            ReplaceCollection(GlyphIds, _project.WritingSystem.Glyphs.Keys.OrderBy(k => k));
+            var nextGlyph = !string.IsNullOrEmpty(preferredGlyph) && _project.WritingSystem.Glyphs.ContainsKey(preferredGlyph)
+                ? preferredGlyph
+                : (GlyphIds.Count > 0 ? GlyphIds[0] : "");
+            SelectedGlyphId = nextGlyph;
+            ReplaceCollection(FeaturicRules, _project.WritingSystem.FeaturicRules);
+            RebuildPipelinePhonoItems();
+        }
+        finally
+        {
+            _isSyncingCollections = false;
+        }
 
         OnPropertyChanged(nameof(ProjectName));
         OnPropertyChanged(nameof(AllowedOnsetsText));
@@ -1430,8 +1456,11 @@ public sealed class MainViewModel : ViewModelBase
 
     private void RefreshInspectors()
     {
-        var lex = _project.Lexemes.FirstOrDefault(l => string.Equals(l.Lemma, SelectedInspectorLexeme, StringComparison.OrdinalIgnoreCase))
-            ?? new LexemeEntry { Lemma = SelectedInspectorLexeme, Pos = "N", UR = SelectedInspectorLexeme };
+        var targetLemma = string.IsNullOrWhiteSpace(SelectedInspectorLexeme)
+            ? (_project.Lexemes.FirstOrDefault()?.Lemma ?? "person")
+            : SelectedInspectorLexeme;
+        var lex = _project.Lexemes.FirstOrDefault(l => string.Equals(l.Lemma, targetLemma, StringComparison.OrdinalIgnoreCase))
+            ?? new LexemeEntry { Lemma = targetLemma, Pos = "N", UR = targetLemma };
 
         var morph = _engine.ResolveMorphology(_project);
         var orth = _engine.ResolveOrthography(_project);
