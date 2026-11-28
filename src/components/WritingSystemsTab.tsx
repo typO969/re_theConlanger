@@ -55,6 +55,7 @@ export const WritingSystemsTab: React.FC<WritingSystemsTabProps> = ({ state, onU
   const lastAutoSampleRef = useRef<string>(initialSample);
   const [engineSeed, setEngineSeed] = useState(1);
   const [showDebugAnchors, setShowDebugAnchors] = useState(true);
+  const [previewVariant, setPreviewVariant] = useState<'default' | 'initial' | 'medial' | 'final'>('default');
 
   useEffect(() => {
     const nextSample = getWritingSystemSampleInput(inferPresetIdFromState(state));
@@ -468,31 +469,57 @@ export const WritingSystemsTab: React.FC<WritingSystemsTabProps> = ({ state, onU
             {activeGlyph && (
               <div className="space-y-2">
                 <div className="flex items-start gap-3">
-                  <svg
-                    viewBox="0 0 100 100"
-                    className="w-20 h-20 border border-slate-300 bg-slate-50 rounded shrink-0"
-                  >
-                    <path
-                      d={activeGlyph.svgPath}
-                      fill="none"
-                      stroke="#0f172a"
-                      strokeWidth="5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <circle
-                      cx={activeGlyph.enteringAnchor.x}
-                      cy={activeGlyph.enteringAnchor.y}
-                      r="5"
-                      fill="#16a34a"
-                    />
-                    <circle
-                      cx={activeGlyph.exitingAnchor.x}
-                      cy={activeGlyph.exitingAnchor.y}
-                      r="5"
-                      fill="#2563eb"
-                    />
-                  </svg>
+                  <div className="shrink-0 space-y-1">
+                    <svg
+                      viewBox="0 0 100 100"
+                      className="w-20 h-20 border border-slate-300 bg-slate-50 rounded"
+                    >
+                      <path
+                        d={
+                          previewVariant === 'initial'
+                            ? activeGlyph.initialPath || activeGlyph.svgPath
+                            : previewVariant === 'medial'
+                              ? activeGlyph.medialPath || activeGlyph.svgPath
+                              : previewVariant === 'final'
+                                ? activeGlyph.finalPath || activeGlyph.svgPath
+                                : activeGlyph.svgPath
+                        }
+                        fill="none"
+                        stroke="#0f172a"
+                        strokeWidth="5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <circle
+                        cx={activeGlyph.enteringAnchor.x}
+                        cy={activeGlyph.enteringAnchor.y}
+                        r="5"
+                        fill="#16a34a"
+                      />
+                      <circle
+                        cx={activeGlyph.exitingAnchor.x}
+                        cy={activeGlyph.exitingAnchor.y}
+                        r="5"
+                        fill="#2563eb"
+                      />
+                    </svg>
+                    <div className="grid grid-cols-2 gap-0.5 text-[10px]">
+                      {(['default', 'initial', 'medial', 'final'] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setPreviewVariant(v)}
+                          className={`px-1 py-0.5 border rounded capitalize ${
+                            previewVariant === v
+                              ? 'bg-slate-800 text-white border-slate-800'
+                              : 'bg-slate-100 text-slate-700 border-slate-300'
+                          }`}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                   <div className="flex-1 space-y-1.5 text-xs">
                     <label className="block space-y-0.5">
@@ -504,7 +531,45 @@ export const WritingSystemsTab: React.FC<WritingSystemsTabProps> = ({ state, onU
                         className="w-full px-1.5 py-1 border border-slate-300 rounded font-mono text-[11px]"
                       />
                     </label>
-                    <div className="grid grid-cols-4 gap-1">
+                    <div className="grid grid-cols-3 gap-1">
+                      <label>
+                        <span className="text-slate-600">Initial Path</span>
+                        <input
+                          type="text"
+                          value={activeGlyph.initialPath ?? ''}
+                          placeholder="(default)"
+                          onChange={(e) =>
+                            updateGlyph({ initialPath: e.target.value.trim() || undefined })
+                          }
+                          className="w-full px-1 py-0.5 border border-slate-300 rounded font-mono text-[11px]"
+                        />
+                      </label>
+                      <label>
+                        <span className="text-slate-600">Medial Path</span>
+                        <input
+                          type="text"
+                          value={activeGlyph.medialPath ?? ''}
+                          placeholder="(default)"
+                          onChange={(e) =>
+                            updateGlyph({ medialPath: e.target.value.trim() || undefined })
+                          }
+                          className="w-full px-1 py-0.5 border border-slate-300 rounded font-mono text-[11px]"
+                        />
+                      </label>
+                      <label>
+                        <span className="text-slate-600">Final Path</span>
+                        <input
+                          type="text"
+                          value={activeGlyph.finalPath ?? ''}
+                          placeholder="(default)"
+                          onChange={(e) =>
+                            updateGlyph({ finalPath: e.target.value.trim() || undefined })
+                          }
+                          className="w-full px-1 py-0.5 border border-slate-300 rounded font-mono text-[11px]"
+                        />
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
                       <label>
                         <span className="text-emerald-700">#in X</span>
                         <input
@@ -538,6 +603,19 @@ export const WritingSystemsTab: React.FC<WritingSystemsTabProps> = ({ state, onU
                         />
                       </label>
                       <label>
+                        <span className="text-slate-700">Adv Width</span>
+                        <input
+                          type="number"
+                          value={activeGlyph.advanceWidth}
+                          onChange={(e) =>
+                            updateGlyph({
+                              advanceWidth: Math.max(10, Number(e.target.value) || 72),
+                            })
+                          }
+                          className="w-full px-1 py-0.5 border border-slate-300 rounded"
+                        />
+                      </label>
+                      <label>
                         <span className="text-blue-700">#out X</span>
                         <input
                           type="number"
@@ -564,6 +642,19 @@ export const WritingSystemsTab: React.FC<WritingSystemsTabProps> = ({ state, onU
                                 ...activeGlyph.exitingAnchor,
                                 y: Number(e.target.value) || 0,
                               },
+                            })
+                          }
+                          className="w-full px-1 py-0.5 border border-slate-300 rounded"
+                        />
+                      </label>
+                      <label>
+                        <span className="text-slate-700">Adv Height</span>
+                        <input
+                          type="number"
+                          value={activeGlyph.advanceHeight}
+                          onChange={(e) =>
+                            updateGlyph({
+                              advanceHeight: Math.max(10, Number(e.target.value) || 75),
                             })
                           }
                           className="w-full px-1 py-0.5 border border-slate-300 rounded"

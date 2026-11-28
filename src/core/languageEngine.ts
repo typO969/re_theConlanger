@@ -2362,7 +2362,8 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
       rolePrefix: 'Subj' | 'Obj',
       nounLex: Lexeme | undefined,
       nounLemma: string,
-      number: string
+      number: string,
+      headClass?: string
     ): Lexeme | undefined => {
       if (dets.length === 0) return undefined;
       const isMass = nounLemma.toLowerCase() === 'water' || lexemeHasTag(nounLex, 'mass');
@@ -2388,6 +2389,18 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
               (d) => lexemeHasTag(d, 'det:indef') || d.lemma.toLowerCase() === 'a' || d.lemma.toLowerCase() === 'an'
             );
         if (targetDetPool.length > 0) compatibleDets = targetDetPool;
+      }
+
+      if (headClass) {
+        const classMatched = compatibleDets.filter(
+          (d) => d.lexClass?.trim().toLowerCase() === headClass.toLowerCase()
+        );
+        if (classMatched.length > 0) {
+          compatibleDets = classMatched;
+        } else {
+          const classless = compatibleDets.filter((d) => !d.lexClass?.trim());
+          if (classless.length > 0) compatibleDets = classless;
+        }
       }
 
       return pick(compatibleDets.length > 0 ? compatibleDets : dets);
@@ -2429,8 +2442,22 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
       ) {
         const pron = forcedPron ?? pick(semEligibleProns)!;
         const lower = pron.lemma.toLowerCase();
-        const person = lower === 'i' || lower === 'we' ? '1' : lower === 'you' ? '2' : '3';
-        const number = constrainedNumber ?? (lower === 'they' || lower === 'we' || lower === 'you' ? 'Pl' : 'Sing');
+        const person =
+          lexemeHasTag(pron, 'pron:1sg') || lexemeHasTag(pron, 'pron:1pl') || lower === 'i' || lower === 'we'
+            ? '1'
+            : lexemeHasTag(pron, 'pron:2sg') || lexemeHasTag(pron, 'pron:2pl') || lower === 'you'
+              ? '2'
+              : '3';
+        const number =
+          constrainedNumber ??
+          (lexemeHasTag(pron, 'pron:1pl') ||
+          lexemeHasTag(pron, 'pron:2pl') ||
+          lexemeHasTag(pron, 'pron:3pl') ||
+          lower === 'they' ||
+          lower === 'we' ||
+          lower === 'you'
+            ? 'Pl'
+            : 'Sing');
         const pronClass = pron.lexClass?.trim();
         const pronFeats: Feat[] = [
           { name: 'Role', value: rolePrefix },
@@ -2455,7 +2482,7 @@ class PhraseStructureSyntaxGenerator extends ConfigurableSyntaxGenerator {
       const number = constrainedNumber ?? (rng.nextDouble() < 0.35 ? 'Pl' : 'Sing');
 
       let detNode: SyntaxNode | null = null;
-      const det = pickDetForNoun(rolePrefix, noun, nounLemma, number);
+      const det = pickDetForNoun(rolePrefix, noun, nounLemma, number, headClass);
       if (det) {
         const detFeats: Feat[] = [
           { name: 'Role', value: 'Det' },
@@ -4169,15 +4196,15 @@ export function createSpanishPresetProjectState(): LanguageProjectState {
       { Lemma: 'ver', Pos: 'V', UR: 'ˈb e ɾ', Spelling: 'ver', Irregulars: { 'Tense=Past': 'ˈb j o', 'Agreement=3sg': 'ˈb e' }, ProtoUR: 'ˈw i d eː r e' },
       { Lemma: 'correr', Pos: 'V', UR: 'k o ˈr e ɾ', Spelling: 'correr', Irregulars: { 'Tense=Past': 'k o ˈr j o', 'Agreement=3sg': 'ˈk o r e' }, ProtoUR: 'k u ˈr e r e' },
       { Lemma: 'caminar', Pos: 'V', UR: 'k a m i ˈn a ɾ', Spelling: 'caminar', Irregulars: { 'Tense=Past': 'k a m i ˈn o', 'Agreement=3sg': 'k a ˈm i n a' } },
-      { Lemma: 'pequeño', Pos: 'ADJ', UR: 'p e ˈk e ɲ o', Spelling: 'pequeño' },
+      { Lemma: 'pequeño', Pos: 'ADJ', UR: 'p e ˈk e ɲ', Spelling: 'pequeño' },
       { Lemma: 'grande', Pos: 'ADJ', UR: 'ˈg ɾ a n d e', Spelling: 'grande' },
       { Lemma: 'en', Pos: 'PREP', UR: 'e n', Spelling: 'en' },
       { Lemma: 'con', Pos: 'PREP', UR: 'k o n', Spelling: 'con' },
       { Lemma: 'y', Pos: 'CONJ', UR: 'i', Spelling: 'y' },
       { Lemma: 'que', Pos: 'COMP', UR: 'k e', Spelling: 'que' },
-      { Lemma: 'yo', Pos: 'PRON', UR: 'ˈdʒ o', Spelling: 'yo' },
-      { Lemma: 'ella', Pos: 'PRON', UR: 'ˈe ʎ a', Spelling: 'ella' },
-      { Lemma: 'ellos', Pos: 'PRON', UR: 'ˈe ʎ o s', Spelling: 'ellos' },
+      { Lemma: 'yo', Pos: 'PRON', UR: 'ˈdʒ o', Spelling: 'yo', SemanticTags: ['pron:1sg', 'animate', 'human'] },
+      { Lemma: 'ella', Pos: 'PRON', UR: 'ˈe ʎ a', Spelling: 'ella', LexClass: 'Fem', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'ellos', Pos: 'PRON', UR: 'ˈe ʎ o s', Spelling: 'ellos', LexClass: 'Masc', SemanticTags: ['pron:3pl', 'animate', 'human'] },
     ],
     Affixes: [
       { Name: 'Plural /s/', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-s', IsPrefix: false, Condition: '[manner=vowel]', Enabled: true },
@@ -4201,6 +4228,7 @@ export function createSpanishPresetProjectState(): LanguageProjectState {
       allowRelativeClauses: true,
     },
     OrthographyRules: [
+      { Phone: 'dʒ', Grapheme: 'y', Enabled: true },
       { Phone: 'tʃ', Grapheme: 'ch', Enabled: true },
       { Phone: 'ɲ', Grapheme: 'ñ', Enabled: true },
       { Phone: 'ʎ', Grapheme: 'll', Enabled: true },
@@ -4210,6 +4238,8 @@ export function createSpanishPresetProjectState(): LanguageProjectState {
       { Phone: 'ð', Grapheme: 'd', Enabled: true },
       { Phone: 'ɣ', Grapheme: 'g', Enabled: true },
       { Phone: 'ɾ', Grapheme: 'r', Enabled: true },
+      { Phone: 'k', Grapheme: 'qu', NextContext: 'e', Enabled: true },
+      { Phone: 'k', Grapheme: 'c', Enabled: true },
     ],
     OrthographyExceptions: [
       { Input: 'el', Output: 'el' },
@@ -4218,14 +4248,24 @@ export function createSpanishPresetProjectState(): LanguageProjectState {
       { Input: 'una', Output: 'una' },
       { Input: 'aɣwa', Output: 'agua' },
       { Input: 'pero', Output: 'perro' },
+      { Input: 'peros', Output: 'perros' },
       { Input: 'gato', Output: 'gato' },
+      { Input: 'omβɾe', Output: 'hombre' },
+      { Input: 'omβɾes', Output: 'hombres' },
+      { Input: 'i', Output: 'y' },
+      { Input: 'kaminaɾ', Output: 'caminar' },
+      { Input: 'kamina', Output: 'camina' },
+      { Input: 'kamino', Output: 'caminó' },
+      { Input: 'koɾeɾ', Output: 'correr' },
+      { Input: 'koɾe', Output: 'corre' },
+      { Input: 'koɾjo', Output: 'corrió' },
     ],
     Capitalization: 'SentenceInitial',
     WritingSystem: createLanguageWritingSystem('spanish'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
-      orthographyRendererId: 'morphophonemic-orthography',
+      orthographyRendererId: 'standard-orthography',
       enabledPhonoPluginRules: [],
     },
   };
@@ -4271,7 +4311,8 @@ export function createGermanPresetProjectState(): LanguageProjectState {
       { Lemma: 'der', Pos: 'DET', UR: 'd eː ɐ', Spelling: 'der', SemanticTags: ['det:def'], LexClass: 'Masc' },
       { Lemma: 'die', Pos: 'DET', UR: 'd iː', Spelling: 'die', SemanticTags: ['det:def'], LexClass: 'Fem' },
       { Lemma: 'das', Pos: 'DET', UR: 'd a s', Spelling: 'das', SemanticTags: ['det:def'], LexClass: 'Neut' },
-      { Lemma: 'ein', Pos: 'DET', UR: 'aɪ n', Spelling: 'ein', SemanticTags: ['det:indef'] },
+      { Lemma: 'ein', Pos: 'DET', UR: 'aɪ n', Spelling: 'ein', SemanticTags: ['det:indef'], LexClass: 'Masc' },
+      { Lemma: 'eine', Pos: 'DET', UR: 'aɪ n ə', Spelling: 'eine', SemanticTags: ['det:indef'], LexClass: 'Fem' },
       { Lemma: 'Hund', Pos: 'N', UR: 'ˈh ʊ n t', Spelling: 'Hund', SemanticTags: ['animate', 'animal'], LexClass: 'Masc', ProtoUR: 'ˈh u n d' },
       { Lemma: 'Katze', Pos: 'N', UR: 'ˈk a ts ə', Spelling: 'Katze', SemanticTags: ['animate', 'animal'], LexClass: 'Fem', ProtoUR: 'ˈk a t s a' },
       { Lemma: 'Mensch', Pos: 'N', UR: 'ˈm ɛ n ʃ', Spelling: 'Mensch', SemanticTags: ['animate', 'human'], LexClass: 'Masc' },
@@ -4290,10 +4331,10 @@ export function createGermanPresetProjectState(): LanguageProjectState {
       { Lemma: 'mit', Pos: 'PREP', UR: 'm ɪ t', Spelling: 'mit' },
       { Lemma: 'und', Pos: 'CONJ', UR: 'ʊ n t', Spelling: 'und' },
       { Lemma: 'dass', Pos: 'COMP', UR: 'd a s', Spelling: 'dass' },
-      { Lemma: 'ich', Pos: 'PRON', UR: 'ˈɪ ç', Spelling: 'ich' },
-      { Lemma: 'er', Pos: 'PRON', UR: 'ˈeː ɐ', Spelling: 'er' },
-      { Lemma: 'sie', Pos: 'PRON', UR: 'ˈz iː', Spelling: 'sie' },
-      { Lemma: 'wir', Pos: 'PRON', UR: 'ˈv iː ɐ', Spelling: 'wir' },
+      { Lemma: 'ich', Pos: 'PRON', UR: 'ˈɪ ç', Spelling: 'ich', SemanticTags: ['pron:1sg', 'animate', 'human'] },
+      { Lemma: 'er', Pos: 'PRON', UR: 'ˈeː ɐ', Spelling: 'er', LexClass: 'Masc', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'sie', Pos: 'PRON', UR: 'ˈz iː', Spelling: 'sie', LexClass: 'Fem', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'wir', Pos: 'PRON', UR: 'ˈv iː ɐ', Spelling: 'wir', SemanticTags: ['pron:1pl', 'animate', 'human'] },
     ],
     Affixes: [
       { Name: 'Plural -e', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-ə', IsPrefix: false, Enabled: true },
@@ -4322,24 +4363,47 @@ export function createGermanPresetProjectState(): LanguageProjectState {
       { Phone: 'aʊ', Grapheme: 'au', Enabled: true },
       { Phone: 'ɔɪ', Grapheme: 'eu', Enabled: true },
       { Phone: 'v', Grapheme: 'w', Enabled: true },
-      { Phone: 'f', Grapheme: 'v', Enabled: true },
+      { Phone: 'f', Grapheme: 'f', Enabled: true },
+      { Phone: 'z', Grapheme: 's', Enabled: true },
+      { Phone: 'ʁ', Grapheme: 'r', Enabled: true },
+      { Phone: 'ŋ', Grapheme: 'ng', Enabled: true },
+      { Phone: 'eː', Grapheme: 'ee', Enabled: true },
       { Phone: 'iː', Grapheme: 'ie', Enabled: true },
+      { Phone: 'oː', Grapheme: 'o', Enabled: true },
+      { Phone: 'uː', Grapheme: 'u', Enabled: true },
       { Phone: 'yː', Grapheme: 'ü', Enabled: true },
       { Phone: 'øː', Grapheme: 'ö', Enabled: true },
+      { Phone: 'ɛ', Grapheme: 'e', Enabled: true },
+      { Phone: 'ɪ', Grapheme: 'i', Enabled: true },
+      { Phone: 'ɔ', Grapheme: 'o', Enabled: true },
+      { Phone: 'ʊ', Grapheme: 'u', Enabled: true },
+      { Phone: 'ə', Grapheme: 'e', Enabled: true },
+      { Phone: 'ɐ', Grapheme: 'er', Enabled: true },
     ],
     OrthographyExceptions: [
+      { Input: 'deːɐ', Output: 'der' },
       { Input: 'ʊnt', Output: 'und' },
       { Input: 'ɪn', Output: 'in' },
       { Input: 'mɪt', Output: 'mit' },
       { Input: 'hʊnt', Output: 'Hund' },
+      { Input: 'hʊndə', Output: 'Hunde' },
+      { Input: 'gʁoːs', Output: 'groß' },
+      { Input: 'zeːən', Output: 'sehen' },
+      { Input: 'zaː', Output: 'sah' },
+      { Input: 'ziːt', Output: 'sieht' },
+      { Input: 'geːən', Output: 'gehen' },
+      { Input: 'giŋ', Output: 'ging' },
+      { Input: 'geːt', Output: 'geht' },
       { Input: 'das', Output: 'das' },
+      { Input: 'eːɐ', Output: 'er' },
+      { Input: 'viːɐ', Output: 'wir' },
     ],
     Capitalization: 'SentenceInitial',
     WritingSystem: createLanguageWritingSystem('german'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
-      orthographyRendererId: 'morphophonemic-orthography',
+      orthographyRendererId: 'standard-orthography',
       enabledPhonoPluginRules: [],
     },
   };
@@ -4394,9 +4458,9 @@ export function createMandarinPresetProjectState(): LanguageProjectState {
       { Lemma: 'dà', Pos: 'ADJ', UR: 't a˥˩', Spelling: 'dà' },
       { Lemma: 'zài', Pos: 'PREP', UR: 'ts aɪ˥˩', Spelling: 'zài' },
       { Lemma: 'hé', Pos: 'CONJ', UR: 'x ɤ˧˥', Spelling: 'hé' },
-      { Lemma: 'wǒ', Pos: 'PRON', UR: 'w o˨˩˦', Spelling: 'wǒ' },
-      { Lemma: 'nǐ', Pos: 'PRON', UR: 'n i˨˩˦', Spelling: 'nǐ' },
-      { Lemma: 'tā', Pos: 'PRON', UR: 'tʰ a˥', Spelling: 'tā' },
+      { Lemma: 'wǒ', Pos: 'PRON', UR: 'w o˨˩˦', Spelling: 'wǒ', SemanticTags: ['pron:1sg', 'animate', 'human'] },
+      { Lemma: 'nǐ', Pos: 'PRON', UR: 'n i˨˩˦', Spelling: 'nǐ', SemanticTags: ['pron:2sg', 'animate', 'human'] },
+      { Lemma: 'tā', Pos: 'PRON', UR: 'tʰ a˥', Spelling: 'tā', SemanticTags: ['pron:3sg', 'animate', 'human'] },
     ],
     Affixes: [
       { Name: 'Plural -men', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-m ə n', IsPrefix: false, Enabled: true },
@@ -4429,25 +4493,55 @@ export function createMandarinPresetProjectState(): LanguageProjectState {
       { Phone: 'ɻ', Grapheme: 'r', Enabled: true },
       { Phone: 'tsʰ', Grapheme: 'c', Enabled: true },
       { Phone: 'ts', Grapheme: 'z', Enabled: true },
+      { Phone: 'ŋ', Grapheme: 'ng', Enabled: true },
+      { Phone: 'j', Grapheme: 'i', Enabled: true },
+      { Phone: 'ɤ', Grapheme: 'e', Enabled: true },
+      { Phone: 'ə', Grapheme: 'e', Enabled: true },
+      { Phone: 'ɨ', Grapheme: 'i', Enabled: true },
+      { Phone: 'ɑ', Grapheme: 'a', Enabled: true },
     ],
     OrthographyExceptions: [
-      { Input: 'wo', Output: 'wǒ' },
-      { Input: 'ni', Output: 'nǐ' },
-      { Input: 'ta', Output: 'tā' },
+      { Input: 'tʂɤ˥˩', Output: 'zhè' },
+      { Input: 'na˥˩', Output: 'nà' },
+      { Input: 'i˥', Output: 'yī' },
+      { Input: 'ɻɤn˧˥', Output: 'rén' },
+      { Input: 'ɻɤn˧˥mən', Output: 'rénmen' },
+      { Input: 'koʊ˨˩˦', Output: 'gǒu' },
+      { Input: 'koʊ˨˩˦mən', Output: 'gǒumen' },
+      { Input: 'maʊ˥', Output: 'māo' },
+      { Input: 'maʊ˥mən', Output: 'māomen' },
+      { Input: 'ʂweɪ˨˩˦', Output: 'shuǐ' },
+      { Input: 'fɑŋ˧˥tsz̩', Output: 'fángzi' },
+      { Input: 'ʂu˥', Output: 'shū' },
+      { Input: 'kʰan˥˩', Output: 'kàn' },
+      { Input: 'kʰan˥˩lə', Output: 'kànle' },
+      { Input: 'tʂʰɨ˥', Output: 'chī' },
+      { Input: 'tʂʰɨ˥lə', Output: 'chīle' },
+      { Input: 'xɤ˥', Output: 'hē' },
+      { Input: 'xɤ˥lə', Output: 'hēle' },
+      { Input: 'tsoʊ˨˩˦', Output: 'zǒu' },
+      { Input: 'tsoʊ˨˩˦lə', Output: 'zǒule' },
+      { Input: 'ɕjaʊ˨˩˦', Output: 'xiǎo' },
+      { Input: 'ta˥˩', Output: 'dà' },
+      { Input: 'tsaɪ˥˩', Output: 'zài' },
+      { Input: 'xɤ˧˥', Output: 'hé' },
+      { Input: 'wo˨˩˦', Output: 'wǒ' },
+      { Input: 'ni˨˩˦', Output: 'nǐ' },
+      { Input: 'tʰa˥', Output: 'tā' },
     ],
     Capitalization: 'SentenceInitial',
     WritingSystem: createLanguageWritingSystem('mandarin'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
-      orthographyRendererId: 'morphophonemic-orthography',
+      orthographyRendererId: 'standard-orthography',
       enabledPhonoPluginRules: [],
     },
   };
 }
 
 export function createArabicPresetProjectState(): LanguageProjectState {
-  const consonants = ['b', 't', 'd', 'k', 'q', 'ʔ', 'dʒ', 'f', 'θ', 'ð', 's', 'z', 'ʃ', 'x', 'ɣ', 'ħ', 'ʕ', 'h', 'm', 'n', 'r', 'l', 'w', 'j'];
+  const consonants = ['b', 't', 'd', 'k', 'q', 'ʔ', 'tˤ', 'dʒ', 'f', 'θ', 'ð', 's', 'sˤ', 'z', 'ʃ', 'x', 'ɣ', 'ħ', 'ʕ', 'h', 'm', 'n', 'r', 'l', 'w', 'j'];
   const vowels = ['a', 'i', 'u', 'aː', 'iː', 'uː'];
   const phonemes: Phoneme[] = [
     ...consonants.map((c) => createPhoneme(c, 'C')),
@@ -4465,8 +4559,8 @@ export function createArabicPresetProjectState(): LanguageProjectState {
       { pattern: 'CVː', weight: 2 },
     ],
     Phonotactics: {
-      allowedOnsets: ['b', 't', 'd', 'k', 'q', 'ʔ', 'dʒ', 'f', 'θ', 'ð', 's', 'z', 'ʃ', 'x', 'ɣ', 'ħ', 'ʕ', 'h', 'm', 'n', 'r', 'l', 'w', 'j'],
-      allowedCodas: ['b', 't', 'd', 'k', 'q', 'ʔ', 'dʒ', 'f', 'θ', 'ð', 's', 'z', 'ʃ', 'x', 'ɣ', 'ħ', 'ʕ', 'h', 'm', 'n', 'r', 'l'],
+      allowedOnsets: ['b', 't', 'd', 'k', 'q', 'ʔ', 'tˤ', 'dʒ', 'f', 'θ', 'ð', 's', 'sˤ', 'z', 'ʃ', 'x', 'ɣ', 'ħ', 'ʕ', 'h', 'm', 'n', 'r', 'l', 'w', 'j'],
+      allowedCodas: ['b', 't', 'd', 'k', 'q', 'ʔ', 'tˤ', 'dʒ', 'f', 'θ', 'ð', 's', 'sˤ', 'z', 'ʃ', 'x', 'ɣ', 'ħ', 'ʕ', 'h', 'm', 'n', 'r', 'l'],
       maxOnsetCluster: 1,
       maxCodaCluster: 2,
       forbiddenPatterns: [],
@@ -4493,16 +4587,17 @@ export function createArabicPresetProjectState(): LanguageProjectState {
       { Lemma: 'kabiir', Pos: 'ADJ', UR: 'k a ˈb iː r', Spelling: 'kabiir' },
       { Lemma: 'saghiir', Pos: 'ADJ', UR: 'sˤ a ˈɣ iː r', Spelling: 'saghiir' },
       { Lemma: 'fii', Pos: 'PREP', UR: 'f iː', Spelling: 'fii' },
-      { Lemma: 'maa', Pos: 'PREP', UR: 'ˈm a ʕ a', Spelling: 'ma\'a' },
+      { Lemma: 'maa_prep', Pos: 'PREP', UR: 'ˈm a ʕ a', Spelling: 'ma\'a' },
       { Lemma: 'wa', Pos: 'CONJ', UR: 'w a', Spelling: 'wa' },
-      { Lemma: 'huwa', Pos: 'PRON', UR: 'ˈh u w a', Spelling: 'huwa' },
-      { Lemma: 'hiya', Pos: 'PRON', UR: 'ˈh i j a', Spelling: 'hiya' },
-      { Lemma: 'hum', Pos: 'PRON', UR: 'h u m', Spelling: 'hum' },
+      { Lemma: 'huwa', Pos: 'PRON', UR: 'ˈh u w a', Spelling: 'huwa', LexClass: 'Masc', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'hiya', Pos: 'PRON', UR: 'ˈh i j a', Spelling: 'hiya', LexClass: 'Fem', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'hum', Pos: 'PRON', UR: 'h u m', Spelling: 'hum', LexClass: 'Masc', SemanticTags: ['pron:3pl', 'animate', 'human'] },
     ],
     Affixes: [
       { Name: 'Dual -aan', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Dual', Affix: '-aː n', IsPrefix: false, Enabled: true },
       { Name: 'Plural -uun', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-uː n', IsPrefix: false, Enabled: true },
       { Name: 'Fem Suffix -at', Pos: 'N', FeatureName: 'Class', FeatureValue: 'Fem', Affix: '-a t', IsPrefix: false, Enabled: true },
+      { Name: 'Passive CuCiCa', Pos: 'V', FeatureName: 'Voice', FeatureValue: 'Passive', Affix: 'C1 u C2 i C3 a', IsPrefix: false, AffixType: 'Template', Enabled: true },
       { Name: '3sg Fem Verb', Pos: 'V', FeatureName: 'Agreement', FeatureValue: '3sg', Affix: '-a t', IsPrefix: false, Enabled: true },
     ],
     WordOrder: 'VSO',
@@ -4526,27 +4621,33 @@ export function createArabicPresetProjectState(): LanguageProjectState {
       { Phone: 'ħ', Grapheme: 'h', Enabled: true },
       { Phone: 'ʕ', Grapheme: '\'', Enabled: true },
       { Phone: 'ʔ', Grapheme: '\'', Enabled: true },
+      { Phone: 'tˤ', Grapheme: 't', Enabled: true },
+      { Phone: 'sˤ', Grapheme: 's', Enabled: true },
       { Phone: 'dʒ', Grapheme: 'j', Enabled: true },
       { Phone: 'θ', Grapheme: 'th', Enabled: true },
       { Phone: 'ð', Grapheme: 'dh', Enabled: true },
+      { Phone: 'j', Grapheme: 'y', Enabled: true },
     ],
     OrthographyExceptions: [
       { Input: 'ʔal', Output: 'al-' },
       { Input: 'wa', Output: 'wa' },
+      { Input: 'imraʔah', Output: 'imra\'ah' },
+      { Input: 'imraʔahat', Output: 'imra\'at' },
+      { Input: 'qitˤ', Output: 'qitt' },
     ],
     Capitalization: 'SentenceInitial',
     WritingSystem: createLanguageWritingSystem('arabic'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
-      orthographyRendererId: 'morphophonemic-orthography',
+      orthographyRendererId: 'standard-orthography',
       enabledPhonoPluginRules: [],
     },
   };
 }
 
 export function createJapanesePresetProjectState(): LanguageProjectState {
-  const consonants = ['p', 't', 'k', 'b', 'd', 'g', 'ts', 'tɕ', 'dʑ', 's', 'ɕ', 'z', 'ʑ', 'h', 'ç', 'ɸ', 'm', 'n', 'ɲ', 'ŋ', 'ɾ', 'w', 'j'];
+  const consonants = ['p', 't', 'k', 'b', 'd', 'g', 'ts', 'tɕ', 'dʑ', 's', 'ɕ', 'z', 'ʑ', 'h', 'ç', 'ɸ', 'm', 'n', 'ɲ', 'ŋ', 'ɴ', 'ɾ', 'w', 'j'];
   const vowels = ['a', 'i', 'u', 'e', 'o', 'aː', 'iː', 'uː', 'eː', 'oː'];
   const phonemes: Phoneme[] = [
     ...consonants.map((c) => createPhoneme(c, 'C')),
@@ -4565,7 +4666,7 @@ export function createJapanesePresetProjectState(): LanguageProjectState {
     ],
     Phonotactics: {
       allowedOnsets: ['p', 't', 'k', 'b', 'd', 'g', 's', 'z', 'h', 'm', 'n', 'ɾ', 'w', 'j', 'tɕ', 'dʑ', 'ɕ', 'ts'],
-      allowedCodas: ['n', 'ŋ'],
+      allowedCodas: ['n', 'ŋ', 'ɴ'],
       maxOnsetCluster: 1,
       maxCodaCluster: 1,
       forbiddenPatterns: [],
@@ -4600,9 +4701,9 @@ export function createJapanesePresetProjectState(): LanguageProjectState {
       { Lemma: 'ni', Pos: 'PREP', UR: 'n i', Spelling: 'ni' },
       { Lemma: 'to', Pos: 'CONJ', UR: 't o', Spelling: 'to' },
       { Lemma: 'ka', Pos: 'Q', UR: 'k a', Spelling: 'ka' },
-      { Lemma: 'watashi', Pos: 'PRON', UR: 'w a t a ɕ i', Spelling: 'watashi' },
-      { Lemma: 'kare', Pos: 'PRON', UR: 'k a ɾ e', Spelling: 'kare' },
-      { Lemma: 'kanojo', Pos: 'PRON', UR: 'k a n o dʑ o', Spelling: 'kanojo' },
+      { Lemma: 'watashi', Pos: 'PRON', UR: 'w a t a ɕ i', Spelling: 'watashi', SemanticTags: ['pron:1sg', 'animate', 'human'] },
+      { Lemma: 'kare', Pos: 'PRON', UR: 'k a ɾ e', Spelling: 'kare', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'kanojo', Pos: 'PRON', UR: 'k a n o dʑ o', Spelling: 'kanojo', SemanticTags: ['pron:3sg', 'animate', 'human'] },
     ],
     Affixes: [
       { Name: 'Past -ta', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Past', Affix: '-t a', IsPrefix: false, Enabled: true },
@@ -4629,6 +4730,8 @@ export function createJapanesePresetProjectState(): LanguageProjectState {
       { Phone: 'ɸ', Grapheme: 'f', Enabled: true },
       { Phone: 'ç', Grapheme: 'h', Enabled: true },
       { Phone: 'ɾ', Grapheme: 'r', Enabled: true },
+      { Phone: 'ɴ', Grapheme: 'n', Enabled: true },
+      { Phone: 'j', Grapheme: 'y', Enabled: true },
       { Phone: 'aː', Grapheme: 'aa', Enabled: true },
       { Phone: 'oː', Grapheme: 'oo', Enabled: true },
       { Phone: 'uː', Grapheme: 'uu', Enabled: true },
@@ -4644,14 +4747,14 @@ export function createJapanesePresetProjectState(): LanguageProjectState {
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
-      orthographyRendererId: 'morphophonemic-orthography',
+      orthographyRendererId: 'standard-orthography',
       enabledPhonoPluginRules: [],
     },
   };
 }
 
 export function createTurkishPresetProjectState(): LanguageProjectState {
-  const consonants = ['p', 'b', 't', 'd', 'k', 'g', 'tʃ', 'dʒ', 'f', 'v', 's', 'z', 'ʃ', 'ʒ', 'h', 'm', 'n', 'l', 'ɫ', 'ɾ', 'j'];
+  const consonants = ['p', 'b', 't', 'd', 'k', 'g', 'c', 'ɟ', 'ɰ', 'tʃ', 'dʒ', 'f', 'v', 's', 'z', 'ʃ', 'ʒ', 'h', 'm', 'n', 'l', 'ɫ', 'ɾ', 'j'];
   const vowels = ['a', 'e', 'ɯ', 'i', 'o', 'ø', 'u', 'y'];
   const phonemes: Phoneme[] = [
     ...consonants.map((c) => createPhoneme(c, 'C')),
@@ -4670,8 +4773,8 @@ export function createTurkishPresetProjectState(): LanguageProjectState {
       { pattern: 'V', weight: 1 },
     ],
     Phonotactics: {
-      allowedOnsets: ['p', 'b', 't', 'd', 'k', 'g', 'tʃ', 'dʒ', 'f', 'v', 's', 'z', 'ʃ', 'h', 'm', 'n', 'l', 'ɾ', 'j'],
-      allowedCodas: ['p', 't', 'k', 'tʃ', 'f', 's', 'ʃ', 'h', 'm', 'n', 'l', 'ɾ', 'j', 'st', 'lt', 'rt', 'nt'],
+      allowedOnsets: ['p', 'b', 't', 'd', 'k', 'g', 'c', 'ɟ', 'tʃ', 'dʒ', 'f', 'v', 's', 'z', 'ʃ', 'h', 'm', 'n', 'l', 'ɾ', 'j'],
+      allowedCodas: ['p', 't', 'k', 'c', 'ɰ', 'tʃ', 'f', 's', 'ʃ', 'h', 'm', 'n', 'l', 'ɾ', 'j', 'st', 'lt', 'rt', 'nt'],
       maxOnsetCluster: 1,
       maxCodaCluster: 2,
       forbiddenPatterns: [],
@@ -4681,6 +4784,7 @@ export function createTurkishPresetProjectState(): LanguageProjectState {
     PhonologyRules: [
       { Name: '2-way Backness Harmony', Target: 'e', Replacement: '[αback]', PrevPhone: 'C', NextPhone: null, Condition: '', Enabled: true },
       { Name: '4-way Backness+Rounding Harmony', Target: 'i', Replacement: '[αback, αround]', PrevPhone: 'C', NextPhone: null, Condition: '', Enabled: true },
+      { Name: 'Intervocalic /k/ softening', Target: 'k', Replacement: 'ɰ', PrevPhone: 'V', NextPhone: 'V', Condition: '', Enabled: true },
     ],
     DiachronicRules: [],
     Lexemes: [
@@ -4702,9 +4806,9 @@ export function createTurkishPresetProjectState(): LanguageProjectState {
       { Lemma: 'güzel', Pos: 'ADJ', UR: 'ɟ y z e l', Spelling: 'güzel' },
       { Lemma: 'içinde', Pos: 'PREP', UR: 'i tʃ i n d e', Spelling: 'içinde' },
       { Lemma: 've', Pos: 'CONJ', UR: 'v e', Spelling: 've' },
-      { Lemma: 'ben', Pos: 'PRON', UR: 'b e n', Spelling: 'ben' },
-      { Lemma: 'o', Pos: 'PRON', UR: 'o', Spelling: 'o' },
-      { Lemma: 'onlar', Pos: 'PRON', UR: 'o n l a ɾ', Spelling: 'onlar' },
+      { Lemma: 'ben', Pos: 'PRON', UR: 'b e n', Spelling: 'ben', SemanticTags: ['pron:1sg', 'animate', 'human'] },
+      { Lemma: 'o', Pos: 'PRON', UR: 'o', Spelling: 'o', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'onlar', Pos: 'PRON', UR: 'o n l a ɾ', Spelling: 'onlar', SemanticTags: ['pron:3pl', 'animate', 'human'] },
     ],
     Affixes: [
       { Name: 'Plural -ler/-lar', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-l e r', IsPrefix: false, Enabled: true },
@@ -4731,9 +4835,15 @@ export function createTurkishPresetProjectState(): LanguageProjectState {
       { Phone: 'ɯ', Grapheme: 'ı', Enabled: true },
       { Phone: 'ø', Grapheme: 'ö', Enabled: true },
       { Phone: 'y', Grapheme: 'ü', Enabled: true },
+      { Phone: 'ɰ', Grapheme: 'ğ', Enabled: true },
+      { Phone: 'c', Grapheme: 'k', Enabled: true },
+      { Phone: 'ɟ', Grapheme: 'g', Enabled: true },
+      { Phone: 'ɾ', Grapheme: 'r', Enabled: true },
+      { Phone: 'ɫ', Grapheme: 'l', Enabled: true },
+      { Phone: 'j', Grapheme: 'y', Enabled: true },
     ],
     OrthographyExceptions: [
-      { Input: 'bir', Output: 'bir' },
+      { Input: 'biɾ', Output: 'bir' },
       { Input: 'bu', Output: 'bu' },
       { Input: 'su', Output: 'su' },
     ],
@@ -4742,7 +4852,7 @@ export function createTurkishPresetProjectState(): LanguageProjectState {
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
-      orthographyRendererId: 'morphophonemic-orthography',
+      orthographyRendererId: 'standard-orthography',
       enabledPhonoPluginRules: [],
     },
   };
@@ -4795,9 +4905,9 @@ export function createSwahiliPresetProjectState(): LanguageProjectState {
       { Lemma: 'zuri', Pos: 'ADJ', UR: 'z u r i', Spelling: 'zuri' },
       { Lemma: 'katika', Pos: 'PREP', UR: 'k a t i k a', Spelling: 'katika' },
       { Lemma: 'na', Pos: 'CONJ', UR: 'n a', Spelling: 'na' },
-      { Lemma: 'mimi', Pos: 'PRON', UR: 'm i m i', Spelling: 'mimi' },
-      { Lemma: 'yeye', Pos: 'PRON', UR: 'j e j e', Spelling: 'yeye' },
-      { Lemma: 'wao', Pos: 'PRON', UR: 'w a o', Spelling: 'wao' },
+      { Lemma: 'mimi', Pos: 'PRON', UR: 'm i m i', Spelling: 'mimi', SemanticTags: ['pron:1sg', 'animate', 'human'] },
+      { Lemma: 'yeye', Pos: 'PRON', UR: 'j e j e', Spelling: 'yeye', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'wao', Pos: 'PRON', UR: 'w a o', Spelling: 'wao', SemanticTags: ['pron:3pl', 'animate', 'human'] },
     ],
     Affixes: [
       { Name: 'Pres na-', Pos: 'V', FeatureName: 'Tense', FeatureValue: 'Pres', Affix: 'n a -', IsPrefix: true, Enabled: true },
@@ -4824,6 +4934,7 @@ export function createSwahiliPresetProjectState(): LanguageProjectState {
       { Phone: 'ʃ', Grapheme: 'sh', Enabled: true },
       { Phone: 'ɲ', Grapheme: 'ny', Enabled: true },
       { Phone: 'ŋ', Grapheme: 'ng\'', Enabled: true },
+      { Phone: 'j', Grapheme: 'y', Enabled: true },
     ],
     OrthographyExceptions: [
       { Input: 'na', Output: 'na' },
@@ -4834,14 +4945,14 @@ export function createSwahiliPresetProjectState(): LanguageProjectState {
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
-      orthographyRendererId: 'morphophonemic-orthography',
+      orthographyRendererId: 'standard-orthography',
       enabledPhonoPluginRules: [],
     },
   };
 }
 
 export function createRussianPresetProjectState(): LanguageProjectState {
-  const consonants = ['p', 'b', 't', 'd', 'k', 'g', 'f', 'v', 's', 'z', 'ʃ', 'ʒ', 'ts', 'tʃ', 'x', 'm', 'n', 'l', 'r', 'j'];
+  const consonants = ['p', 'b', 't', 'd', 'k', 'g', 'f', 'v', 's', 'z', 'ʃ', 'ʒ', 'ts', 'tʃ', 'x', 'm', 'n', 'l', 'r', 'j', 'dʲ', 'tʲ', 'lʲ', 'nʲ'];
   const vowels = ['a', 'e', 'i', 'o', 'u', 'ɨ'];
   const phonemes: Phoneme[] = [
     ...consonants.map((c) => createPhoneme(c, 'C')),
@@ -4860,7 +4971,7 @@ export function createRussianPresetProjectState(): LanguageProjectState {
     ],
     Phonotactics: {
       allowedOnsets: ['p', 'b', 't', 'd', 'k', 'g', 'f', 'v', 's', 'z', 'ʃ', 'ʒ', 'ts', 'tʃ', 'x', 'm', 'n', 'l', 'r', 'pr', 'tr', 'kr', 'br', 'dr', 'gr', 'sp', 'st', 'sk', 'str'],
-      allowedCodas: ['p', 't', 'k', 'f', 's', 'ʃ', 'x', 'm', 'n', 'l', 'r', 'st', 'nt', 'kt'],
+      allowedCodas: ['p', 't', 'k', 'f', 's', 'ʃ', 'x', 'm', 'n', 'l', 'r', 'dʲ', 'tʲ', 'st', 'nt', 'kt'],
       maxOnsetCluster: 3,
       maxCodaCluster: 2,
       forbiddenPatterns: [],
@@ -4897,10 +5008,10 @@ export function createRussianPresetProjectState(): LanguageProjectState {
       { Lemma: 's', Pos: 'PREP', UR: 's', Spelling: 's' },
       { Lemma: 'i', Pos: 'CONJ', UR: 'i', Spelling: 'i' },
       { Lemma: 'chto', Pos: 'COMP', UR: 'tʃ t o', Spelling: 'chto' },
-      { Lemma: 'ya', Pos: 'PRON', UR: 'j a', Spelling: 'ya' },
-      { Lemma: 'on', Pos: 'PRON', UR: 'o n', Spelling: 'on' },
-      { Lemma: 'ona', Pos: 'PRON', UR: 'o ˈn a', Spelling: 'ona' },
-      { Lemma: 'oni', Pos: 'PRON', UR: 'o ˈn i', Spelling: 'oni' },
+      { Lemma: 'ya', Pos: 'PRON', UR: 'j a', Spelling: 'ya', SemanticTags: ['pron:1sg', 'animate', 'human'] },
+      { Lemma: 'on', Pos: 'PRON', UR: 'o n', Spelling: 'on', LexClass: 'Masc', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'ona', Pos: 'PRON', UR: 'o ˈn a', Spelling: 'ona', LexClass: 'Fem', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'oni', Pos: 'PRON', UR: 'o ˈn i', Spelling: 'oni', SemanticTags: ['pron:3pl', 'animate', 'human'] },
     ],
     Affixes: [
       { Name: 'Plural -y', Pos: 'N', FeatureName: 'Number', FeatureValue: 'Pl', Affix: '-ɨ', IsPrefix: false, Enabled: true },
@@ -4927,18 +5038,33 @@ export function createRussianPresetProjectState(): LanguageProjectState {
       { Phone: 'x', Grapheme: 'kh', Enabled: true },
       { Phone: 'ɨ', Grapheme: 'y', Enabled: true },
       { Phone: 'j', Grapheme: 'y', Enabled: true },
+      { Phone: 'dʲ', Grapheme: 'd', Enabled: true },
+      { Phone: 'tʲ', Grapheme: 't\'', Enabled: true },
+      { Phone: 'lʲ', Grapheme: 'l\'', Enabled: true },
+      { Phone: 'nʲ', Grapheme: 'n\'', Enabled: true },
     ],
     OrthographyExceptions: [
+      { Input: 'etot', Output: 'etot' },
+      { Input: 'etat', Output: 'etot' },
       { Input: 'v', Output: 'v' },
+      { Input: 'f', Output: 'v' },
       { Input: 's', Output: 's' },
       { Input: 'i', Output: 'i' },
+      { Input: 'tʃelavek', Output: 'chelovek' },
+      { Input: 'sabaka', Output: 'sobaka' },
+      { Input: 'vada', Output: 'voda' },
+      { Input: 'balʲʃoj', Output: 'bol\'shoy' },
+      { Input: 'idʲot', Output: 'idyot' },
+      { Input: 'pjot', Output: 'pyot' },
+      { Input: 'ana', Output: 'ona' },
+      { Input: 'ani', Output: 'oni' },
     ],
     Capitalization: 'SentenceInitial',
     WritingSystem: createLanguageWritingSystem('russian'),
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
-      orthographyRendererId: 'morphophonemic-orthography',
+      orthographyRendererId: 'standard-orthography',
       enabledPhonoPluginRules: [],
     },
   };
@@ -4999,9 +5125,9 @@ export function createIndonesianPresetProjectState(): LanguageProjectState {
       { Lemma: 'dengan', Pos: 'PREP', UR: 'd ə ŋ a n', Spelling: 'dengan' },
       { Lemma: 'dan', Pos: 'CONJ', UR: 'd a n', Spelling: 'dan' },
       { Lemma: 'bahwa', Pos: 'COMP', UR: 'b a h w a', Spelling: 'bahwa' },
-      { Lemma: 'saya', Pos: 'PRON', UR: 's a j a', Spelling: 'saya' },
-      { Lemma: 'dia', Pos: 'PRON', UR: 'd i a', Spelling: 'dia' },
-      { Lemma: 'mereka', Pos: 'PRON', UR: 'm ə r e k a', Spelling: 'mereka' },
+      { Lemma: 'saya', Pos: 'PRON', UR: 's a j a', Spelling: 'saya', SemanticTags: ['pron:1sg', 'animate', 'human'] },
+      { Lemma: 'dia', Pos: 'PRON', UR: 'd i a', Spelling: 'dia', SemanticTags: ['pron:3sg', 'animate', 'human'] },
+      { Lemma: 'mereka', Pos: 'PRON', UR: 'm ə r e k a', Spelling: 'mereka', SemanticTags: ['pron:3pl', 'animate', 'human'] },
     ],
     Affixes: [
       { Name: 'Active meN-', Pos: 'V', FeatureName: 'Voice', FeatureValue: 'Active', Affix: 'm ə n -', IsPrefix: true, Enabled: true },
@@ -5027,6 +5153,8 @@ export function createIndonesianPresetProjectState(): LanguageProjectState {
       { Phone: 'ŋ', Grapheme: 'ng', Enabled: true },
       { Phone: 'ʃ', Grapheme: 'sy', Enabled: true },
       { Phone: 'x', Grapheme: 'kh', Enabled: true },
+      { Phone: 'ə', Grapheme: 'e', Enabled: true },
+      { Phone: 'j', Grapheme: 'y', Enabled: true },
     ],
     OrthographyExceptions: [
       { Input: 'di', Output: 'di' },
@@ -5039,7 +5167,7 @@ export function createIndonesianPresetProjectState(): LanguageProjectState {
     Pipeline: {
       syntaxGeneratorId: 'phrase-structure-syntax',
       morphologyRealizerId: 'standard-morphology',
-      orthographyRendererId: 'morphophonemic-orthography',
+      orthographyRendererId: 'standard-orthography',
       enabledPhonoPluginRules: [],
     },
   };

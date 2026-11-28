@@ -530,15 +530,15 @@ public static class ProjectFactory
                 new() { Lemma = "ver", Pos = "V", UR = "ˈb e ɾ", Spelling = "ver", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Tense=Past"] = "ˈb j o", ["Agreement=3sg"] = "ˈb e" }, ProtoUR = "ˈw i d eː r e" },
                 new() { Lemma = "correr", Pos = "V", UR = "k o ˈr e ɾ", Spelling = "correr", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Tense=Past"] = "k o ˈr j o", ["Agreement=3sg"] = "ˈk o r e" }, ProtoUR = "k u ˈr e r e" },
                 new() { Lemma = "caminar", Pos = "V", UR = "k a m i ˈn a ɾ", Spelling = "caminar", Irregulars = new(StringComparer.OrdinalIgnoreCase) { ["Tense=Past"] = "k a m i ˈn o", ["Agreement=3sg"] = "k a ˈm i n a" } },
-                new() { Lemma = "pequeño", Pos = "ADJ", UR = "p e ˈk e ɲ o", Spelling = "pequeño" },
+                new() { Lemma = "pequeño", Pos = "ADJ", UR = "p e ˈk e ɲ", Spelling = "pequeño" },
                 new() { Lemma = "grande", Pos = "ADJ", UR = "ˈg ɾ a n d e", Spelling = "grande" },
                 new() { Lemma = "en", Pos = "PREP", UR = "e n", Spelling = "en" },
                 new() { Lemma = "con", Pos = "PREP", UR = "k o n", Spelling = "con" },
                 new() { Lemma = "y", Pos = "CONJ", UR = "i", Spelling = "y" },
                 new() { Lemma = "que", Pos = "COMP", UR = "k e", Spelling = "que" },
-                new() { Lemma = "yo", Pos = "PRON", UR = "ˈdʒ o", Spelling = "yo" },
-                new() { Lemma = "ella", Pos = "PRON", UR = "ˈe ʎ a", Spelling = "ella" },
-                new() { Lemma = "ellos", Pos = "PRON", UR = "ˈe ʎ o s", Spelling = "ellos" }
+                new() { Lemma = "yo", Pos = "PRON", UR = "ˈdʒ o", Spelling = "yo", SemanticTags = ["pron:1sg", "animate", "human"] },
+                new() { Lemma = "ella", Pos = "PRON", UR = "ˈe ʎ a", Spelling = "ella", LexClass = "Fem", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "ellos", Pos = "PRON", UR = "ˈe ʎ o s", Spelling = "ellos", LexClass = "Masc", SemanticTags = ["pron:3pl", "animate", "human"] }
             },
             Affixes = new()
             {
@@ -565,6 +565,7 @@ public static class ProjectFactory
             },
             OrthographyRules = new()
             {
+                new() { Phone = "dʒ", Grapheme = "y", Enabled = true },
                 new() { Phone = "tʃ", Grapheme = "ch", Enabled = true },
                 new() { Phone = "ɲ", Grapheme = "ñ", Enabled = true },
                 new() { Phone = "ʎ", Grapheme = "ll", Enabled = true },
@@ -573,7 +574,9 @@ public static class ProjectFactory
                 new() { Phone = "β", Grapheme = "b", Enabled = true },
                 new() { Phone = "ð", Grapheme = "d", Enabled = true },
                 new() { Phone = "ɣ", Grapheme = "g", Enabled = true },
-                new() { Phone = "ɾ", Grapheme = "r", Enabled = true }
+                new() { Phone = "ɾ", Grapheme = "r", Enabled = true },
+                new() { Phone = "k", Grapheme = "qu", NextContext = "e", Enabled = true },
+                new() { Phone = "k", Grapheme = "c", Enabled = true }
             },
             OrthographyExceptions = new()
             {
@@ -583,7 +586,17 @@ public static class ProjectFactory
                 new() { Input = "una", Output = "una" },
                 new() { Input = "aɣwa", Output = "agua" },
                 new() { Input = "pero", Output = "perro" },
-                new() { Input = "gato", Output = "gato" }
+                new() { Input = "peros", Output = "perros" },
+                new() { Input = "gato", Output = "gato" },
+                new() { Input = "omβɾe", Output = "hombre" },
+                new() { Input = "omβɾes", Output = "hombres" },
+                new() { Input = "i", Output = "y" },
+                new() { Input = "kaminaɾ", Output = "caminar" },
+                new() { Input = "kamina", Output = "camina" },
+                new() { Input = "kamino", Output = "caminó" },
+                new() { Input = "koɾeɾ", Output = "correr" },
+                new() { Input = "koɾe", Output = "corre" },
+                new() { Input = "koɾjo", Output = "corrió" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
             WritingSystem = WritingSystemEngine.CreateForLanguage("spanish"),
@@ -591,7 +604,7 @@ public static class ProjectFactory
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
                 MorphologyRealizerId = "standard-morphology",
-                OrthographyRendererId = "morphophonemic-orthography",
+                OrthographyRendererId = "standard-orthography",
                 EnabledPhonoPluginRules = new()
             }
         };
@@ -639,7 +652,8 @@ public static class ProjectFactory
                 new() { Lemma = "der", Pos = "DET", UR = "d eː ɐ", Spelling = "der", SemanticTags = ["det:def"], LexClass = "Masc" },
                 new() { Lemma = "die", Pos = "DET", UR = "d iː", Spelling = "die", SemanticTags = ["det:def"], LexClass = "Fem" },
                 new() { Lemma = "das", Pos = "DET", UR = "d a s", Spelling = "das", SemanticTags = ["det:def"], LexClass = "Neut" },
-                new() { Lemma = "ein", Pos = "DET", UR = "aɪ n", Spelling = "ein", SemanticTags = ["det:indef"] },
+                new() { Lemma = "ein", Pos = "DET", UR = "aɪ n", Spelling = "ein", SemanticTags = ["det:indef"], LexClass = "Masc" },
+                new() { Lemma = "eine", Pos = "DET", UR = "aɪ n ə", Spelling = "eine", SemanticTags = ["det:indef"], LexClass = "Fem" },
                 new() { Lemma = "Hund", Pos = "N", UR = "ˈh ʊ n t", Spelling = "Hund", SemanticTags = ["animate", "animal"], LexClass = "Masc", ProtoUR = "ˈh u n d" },
                 new() { Lemma = "Katze", Pos = "N", UR = "ˈk a ts ə", Spelling = "Katze", SemanticTags = ["animate", "animal"], LexClass = "Fem", ProtoUR = "ˈk a t s a" },
                 new() { Lemma = "Mensch", Pos = "N", UR = "ˈm ɛ n ʃ", Spelling = "Mensch", SemanticTags = ["animate", "human"], LexClass = "Masc" },
@@ -658,10 +672,10 @@ public static class ProjectFactory
                 new() { Lemma = "mit", Pos = "PREP", UR = "m ɪ t", Spelling = "mit" },
                 new() { Lemma = "und", Pos = "CONJ", UR = "ʊ n t", Spelling = "und" },
                 new() { Lemma = "dass", Pos = "COMP", UR = "d a s", Spelling = "dass" },
-                new() { Lemma = "ich", Pos = "PRON", UR = "ˈɪ ç", Spelling = "ich" },
-                new() { Lemma = "er", Pos = "PRON", UR = "ˈeː ɐ", Spelling = "er" },
-                new() { Lemma = "sie", Pos = "PRON", UR = "ˈz iː", Spelling = "sie" },
-                new() { Lemma = "wir", Pos = "PRON", UR = "ˈv iː ɐ", Spelling = "wir" }
+                new() { Lemma = "ich", Pos = "PRON", UR = "ˈɪ ç", Spelling = "ich", SemanticTags = ["pron:1sg", "animate", "human"] },
+                new() { Lemma = "er", Pos = "PRON", UR = "ˈeː ɐ", Spelling = "er", LexClass = "Masc", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "sie", Pos = "PRON", UR = "ˈz iː", Spelling = "sie", LexClass = "Fem", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "wir", Pos = "PRON", UR = "ˈv iː ɐ", Spelling = "wir", SemanticTags = ["pron:1pl", "animate", "human"] }
             },
             Affixes = new()
             {
@@ -693,18 +707,41 @@ public static class ProjectFactory
                 new() { Phone = "aʊ", Grapheme = "au", Enabled = true },
                 new() { Phone = "ɔɪ", Grapheme = "eu", Enabled = true },
                 new() { Phone = "v", Grapheme = "w", Enabled = true },
-                new() { Phone = "f", Grapheme = "v", Enabled = true },
+                new() { Phone = "f", Grapheme = "f", Enabled = true },
+                new() { Phone = "z", Grapheme = "s", Enabled = true },
+                new() { Phone = "ʁ", Grapheme = "r", Enabled = true },
+                new() { Phone = "ŋ", Grapheme = "ng", Enabled = true },
+                new() { Phone = "eː", Grapheme = "ee", Enabled = true },
                 new() { Phone = "iː", Grapheme = "ie", Enabled = true },
+                new() { Phone = "oː", Grapheme = "o", Enabled = true },
+                new() { Phone = "uː", Grapheme = "u", Enabled = true },
                 new() { Phone = "yː", Grapheme = "ü", Enabled = true },
-                new() { Phone = "øː", Grapheme = "ö", Enabled = true }
+                new() { Phone = "øː", Grapheme = "ö", Enabled = true },
+                new() { Phone = "ɛ", Grapheme = "e", Enabled = true },
+                new() { Phone = "ɪ", Grapheme = "i", Enabled = true },
+                new() { Phone = "ɔ", Grapheme = "o", Enabled = true },
+                new() { Phone = "ʊ", Grapheme = "u", Enabled = true },
+                new() { Phone = "ə", Grapheme = "e", Enabled = true },
+                new() { Phone = "ɐ", Grapheme = "er", Enabled = true }
             },
             OrthographyExceptions = new()
             {
+                new() { Input = "deːɐ", Output = "der" },
                 new() { Input = "ʊnt", Output = "und" },
                 new() { Input = "ɪn", Output = "in" },
                 new() { Input = "mɪt", Output = "mit" },
                 new() { Input = "hʊnt", Output = "Hund" },
-                new() { Input = "das", Output = "das" }
+                new() { Input = "hʊndə", Output = "Hunde" },
+                new() { Input = "gʁoːs", Output = "groß" },
+                new() { Input = "zeːən", Output = "sehen" },
+                new() { Input = "zaː", Output = "sah" },
+                new() { Input = "ziːt", Output = "sieht" },
+                new() { Input = "geːən", Output = "gehen" },
+                new() { Input = "giŋ", Output = "ging" },
+                new() { Input = "geːt", Output = "geht" },
+                new() { Input = "das", Output = "das" },
+                new() { Input = "eːɐ", Output = "er" },
+                new() { Input = "viːɐ", Output = "wir" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
             WritingSystem = WritingSystemEngine.CreateForLanguage("german"),
@@ -712,7 +749,7 @@ public static class ProjectFactory
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
                 MorphologyRealizerId = "standard-morphology",
-                OrthographyRendererId = "morphophonemic-orthography",
+                OrthographyRendererId = "standard-orthography",
                 EnabledPhonoPluginRules = new()
             }
         };
@@ -769,9 +806,9 @@ public static class ProjectFactory
                 new() { Lemma = "dà", Pos = "ADJ", UR = "t a˥˩", Spelling = "dà" },
                 new() { Lemma = "zài", Pos = "PREP", UR = "ts aɪ˥˩", Spelling = "zài" },
                 new() { Lemma = "hé", Pos = "CONJ", UR = "x ɤ˧˥", Spelling = "hé" },
-                new() { Lemma = "wǒ", Pos = "PRON", UR = "w o˨˩˦", Spelling = "wǒ" },
-                new() { Lemma = "nǐ", Pos = "PRON", UR = "n i˨˩˦", Spelling = "nǐ" },
-                new() { Lemma = "tā", Pos = "PRON", UR = "tʰ a˥", Spelling = "tā" }
+                new() { Lemma = "wǒ", Pos = "PRON", UR = "w o˨˩˦", Spelling = "wǒ", SemanticTags = ["pron:1sg", "animate", "human"] },
+                new() { Lemma = "nǐ", Pos = "PRON", UR = "n i˨˩˦", Spelling = "nǐ", SemanticTags = ["pron:2sg", "animate", "human"] },
+                new() { Lemma = "tā", Pos = "PRON", UR = "tʰ a˥", Spelling = "tā", SemanticTags = ["pron:3sg", "animate", "human"] }
             },
             Affixes = new()
             {
@@ -806,13 +843,43 @@ public static class ProjectFactory
                 new() { Phone = "ʂ", Grapheme = "sh", Enabled = true },
                 new() { Phone = "ɻ", Grapheme = "r", Enabled = true },
                 new() { Phone = "tsʰ", Grapheme = "c", Enabled = true },
-                new() { Phone = "ts", Grapheme = "z", Enabled = true }
+                new() { Phone = "ts", Grapheme = "z", Enabled = true },
+                new() { Phone = "ŋ", Grapheme = "ng", Enabled = true },
+                new() { Phone = "j", Grapheme = "i", Enabled = true },
+                new() { Phone = "ɤ", Grapheme = "e", Enabled = true },
+                new() { Phone = "ə", Grapheme = "e", Enabled = true },
+                new() { Phone = "ɨ", Grapheme = "i", Enabled = true },
+                new() { Phone = "ɑ", Grapheme = "a", Enabled = true }
             },
             OrthographyExceptions = new()
             {
-                new() { Input = "wo", Output = "wǒ" },
-                new() { Input = "ni", Output = "nǐ" },
-                new() { Input = "ta", Output = "tā" }
+                new() { Input = "tʂɤ˥˩", Output = "zhè" },
+                new() { Input = "na˥˩", Output = "nà" },
+                new() { Input = "i˥", Output = "yī" },
+                new() { Input = "ɻɤn˧˥", Output = "rén" },
+                new() { Input = "ɻɤn˧˥mən", Output = "rénmen" },
+                new() { Input = "koʊ˨˩˦", Output = "gǒu" },
+                new() { Input = "koʊ˨˩˦mən", Output = "gǒumen" },
+                new() { Input = "maʊ˥", Output = "māo" },
+                new() { Input = "maʊ˥mən", Output = "māomen" },
+                new() { Input = "ʂweɪ˨˩˦", Output = "shuǐ" },
+                new() { Input = "fɑŋ˧˥tsz̩", Output = "fángzi" },
+                new() { Input = "ʂu˥", Output = "shū" },
+                new() { Input = "kʰan˥˩", Output = "kàn" },
+                new() { Input = "kʰan˥˩lə", Output = "kànle" },
+                new() { Input = "tʂʰɨ˥", Output = "chī" },
+                new() { Input = "tʂʰɨ˥lə", Output = "chīle" },
+                new() { Input = "xɤ˥", Output = "hē" },
+                new() { Input = "xɤ˥lə", Output = "hēle" },
+                new() { Input = "tsoʊ˨˩˦", Output = "zǒu" },
+                new() { Input = "tsoʊ˨˩˦lə", Output = "zǒule" },
+                new() { Input = "ɕjaʊ˨˩˦", Output = "xiǎo" },
+                new() { Input = "ta˥˩", Output = "dà" },
+                new() { Input = "tsaɪ˥˩", Output = "zài" },
+                new() { Input = "xɤ˧˥", Output = "hé" },
+                new() { Input = "wo˨˩˦", Output = "wǒ" },
+                new() { Input = "ni˨˩˦", Output = "nǐ" },
+                new() { Input = "tʰa˥", Output = "tā" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
             WritingSystem = WritingSystemEngine.CreateForLanguage("mandarin"),
@@ -820,7 +887,7 @@ public static class ProjectFactory
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
                 MorphologyRealizerId = "standard-morphology",
-                OrthographyRendererId = "morphophonemic-orthography",
+                OrthographyRendererId = "standard-orthography",
                 EnabledPhonoPluginRules = new()
             }
         };
@@ -828,7 +895,7 @@ public static class ProjectFactory
 
     public static LanguageProject CreateArabicPresetProject()
     {
-        var consonants = new[] { "b", "t", "d", "k", "q", "ʔ", "dʒ", "f", "θ", "ð", "s", "z", "ʃ", "x", "ɣ", "ħ", "ʕ", "h", "m", "n", "r", "l", "w", "j" };
+        var consonants = new[] { "b", "t", "d", "k", "q", "ʔ", "tˤ", "dʒ", "f", "θ", "ð", "s", "sˤ", "z", "ʃ", "x", "ɣ", "ħ", "ʕ", "h", "m", "n", "r", "l", "w", "j" };
         var vowels = new[] { "a", "i", "u", "aː", "iː", "uː" };
         var phonemes = consonants.Select(c => CreatePhoneme(c, "C")).Concat(vowels.Select(v => CreatePhoneme(v, "V"))).ToList();
         return new LanguageProject
@@ -846,8 +913,8 @@ public static class ProjectFactory
             },
             Phonotactics = new PhonotacticsConfig
             {
-                AllowedOnsets = new() { "b", "t", "d", "k", "q", "ʔ", "dʒ", "f", "θ", "ð", "s", "z", "ʃ", "x", "ɣ", "ħ", "ʕ", "h", "m", "n", "r", "l", "w", "j" },
-                AllowedCodas = new() { "b", "t", "d", "k", "q", "ʔ", "dʒ", "f", "θ", "ð", "s", "z", "ʃ", "x", "ɣ", "ħ", "ʕ", "h", "m", "n", "r", "l" },
+                AllowedOnsets = new() { "b", "t", "d", "k", "q", "ʔ", "tˤ", "dʒ", "f", "θ", "ð", "s", "sˤ", "z", "ʃ", "x", "ɣ", "ħ", "ʕ", "h", "m", "n", "r", "l", "w", "j" },
+                AllowedCodas = new() { "b", "t", "d", "k", "q", "ʔ", "tˤ", "dʒ", "f", "θ", "ð", "s", "sˤ", "z", "ʃ", "x", "ɣ", "ħ", "ʕ", "h", "m", "n", "r", "l" },
                 MaxOnsetCluster = 1,
                 MaxCodaCluster = 2,
                 ForbiddenPatterns = new()
@@ -877,15 +944,16 @@ public static class ProjectFactory
                 new() { Lemma = "fii", Pos = "PREP", UR = "f iː", Spelling = "fii" },
                 new() { Lemma = "maa_prep", Pos = "PREP", UR = "ˈm a ʕ a", Spelling = "ma'a" },
                 new() { Lemma = "wa", Pos = "CONJ", UR = "w a", Spelling = "wa" },
-                new() { Lemma = "huwa", Pos = "PRON", UR = "ˈh u w a", Spelling = "huwa" },
-                new() { Lemma = "hiya", Pos = "PRON", UR = "ˈh i j a", Spelling = "hiya" },
-                new() { Lemma = "hum", Pos = "PRON", UR = "h u m", Spelling = "hum" }
+                new() { Lemma = "huwa", Pos = "PRON", UR = "ˈh u w a", Spelling = "huwa", LexClass = "Masc", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "hiya", Pos = "PRON", UR = "ˈh i j a", Spelling = "hiya", LexClass = "Fem", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "hum", Pos = "PRON", UR = "h u m", Spelling = "hum", LexClass = "Masc", SemanticTags = ["pron:3pl", "animate", "human"] }
             },
             Affixes = new()
             {
                 new() { Name = "Dual -aan", Pos = "N", FeatureName = "Number", FeatureValue = "Dual", Affix = "-aː n", IsPrefix = false, Enabled = true },
                 new() { Name = "Plural -uun", Pos = "N", FeatureName = "Number", FeatureValue = "Pl", Affix = "-uː n", IsPrefix = false, Enabled = true },
                 new() { Name = "Fem Suffix -at", Pos = "N", FeatureName = "Class", FeatureValue = "Fem", Affix = "-a t", IsPrefix = false, Enabled = true },
+                new() { Name = "Passive CuCiCa", Pos = "V", FeatureName = "Voice", FeatureValue = "Passive", Affix = "C1 u C2 i C3 a", IsPrefix = false, AffixType = AffixType.Template, Enabled = true },
                 new() { Name = "3sg Fem Verb", Pos = "V", FeatureName = "Agreement", FeatureValue = "3sg", Affix = "-a t", IsPrefix = false, Enabled = true }
             },
             WordOrder = WordOrder.VSO,
@@ -911,14 +979,20 @@ public static class ProjectFactory
                 new() { Phone = "ħ", Grapheme = "h", Enabled = true },
                 new() { Phone = "ʕ", Grapheme = "'", Enabled = true },
                 new() { Phone = "ʔ", Grapheme = "'", Enabled = true },
+                new() { Phone = "tˤ", Grapheme = "t", Enabled = true },
+                new() { Phone = "sˤ", Grapheme = "s", Enabled = true },
                 new() { Phone = "dʒ", Grapheme = "j", Enabled = true },
                 new() { Phone = "θ", Grapheme = "th", Enabled = true },
-                new() { Phone = "ð", Grapheme = "dh", Enabled = true }
+                new() { Phone = "ð", Grapheme = "dh", Enabled = true },
+                new() { Phone = "j", Grapheme = "y", Enabled = true }
             },
             OrthographyExceptions = new()
             {
                 new() { Input = "ʔal", Output = "al-" },
-                new() { Input = "wa", Output = "wa" }
+                new() { Input = "wa", Output = "wa" },
+                new() { Input = "imraʔah", Output = "imra'ah" },
+                new() { Input = "imraʔahat", Output = "imra'at" },
+                new() { Input = "qitˤ", Output = "qitt" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
             WritingSystem = WritingSystemEngine.CreateForLanguage("arabic"),
@@ -926,7 +1000,7 @@ public static class ProjectFactory
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
                 MorphologyRealizerId = "standard-morphology",
-                OrthographyRendererId = "morphophonemic-orthography",
+                OrthographyRendererId = "standard-orthography",
                 EnabledPhonoPluginRules = new()
             }
         };
@@ -934,7 +1008,7 @@ public static class ProjectFactory
 
     public static LanguageProject CreateJapanesePresetProject()
     {
-        var consonants = new[] { "p", "t", "k", "b", "d", "g", "ts", "tɕ", "dʑ", "s", "ɕ", "z", "ʑ", "h", "ç", "ɸ", "m", "n", "ɲ", "ŋ", "ɾ", "w", "j" };
+        var consonants = new[] { "p", "t", "k", "b", "d", "g", "ts", "tɕ", "dʑ", "s", "ɕ", "z", "ʑ", "h", "ç", "ɸ", "m", "n", "ɲ", "ŋ", "ɴ", "ɾ", "w", "j" };
         var vowels = new[] { "a", "i", "u", "e", "o", "aː", "iː", "uː", "eː", "oː" };
         var phonemes = consonants.Select(c => CreatePhoneme(c, "C")).Concat(vowels.Select(v => CreatePhoneme(v, "V"))).ToList();
         return new LanguageProject
@@ -953,7 +1027,7 @@ public static class ProjectFactory
             Phonotactics = new PhonotacticsConfig
             {
                 AllowedOnsets = new() { "p", "t", "k", "b", "d", "g", "s", "z", "h", "m", "n", "ɾ", "w", "j", "tɕ", "dʑ", "ɕ", "ts" },
-                AllowedCodas = new() { "n", "ŋ" },
+                AllowedCodas = new() { "n", "ŋ", "ɴ" },
                 MaxOnsetCluster = 1,
                 MaxCodaCluster = 1,
                 ForbiddenPatterns = new()
@@ -989,9 +1063,9 @@ public static class ProjectFactory
                 new() { Lemma = "ni", Pos = "PREP", UR = "n i", Spelling = "ni" },
                 new() { Lemma = "to", Pos = "CONJ", UR = "t o", Spelling = "to" },
                 new() { Lemma = "ka", Pos = "Q", UR = "k a", Spelling = "ka" },
-                new() { Lemma = "watashi", Pos = "PRON", UR = "w a t a ɕ i", Spelling = "watashi" },
-                new() { Lemma = "kare", Pos = "PRON", UR = "k a ɾ e", Spelling = "kare" },
-                new() { Lemma = "kanojo", Pos = "PRON", UR = "k a n o dʑ o", Spelling = "kanojo" }
+                new() { Lemma = "watashi", Pos = "PRON", UR = "w a t a ɕ i", Spelling = "watashi", SemanticTags = ["pron:1sg", "animate", "human"] },
+                new() { Lemma = "kare", Pos = "PRON", UR = "k a ɾ e", Spelling = "kare", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "kanojo", Pos = "PRON", UR = "k a n o dʑ o", Spelling = "kanojo", SemanticTags = ["pron:3sg", "animate", "human"] }
             },
             Affixes = new()
             {
@@ -1021,6 +1095,8 @@ public static class ProjectFactory
                 new() { Phone = "ɸ", Grapheme = "f", Enabled = true },
                 new() { Phone = "ç", Grapheme = "h", Enabled = true },
                 new() { Phone = "ɾ", Grapheme = "r", Enabled = true },
+                new() { Phone = "ɴ", Grapheme = "n", Enabled = true },
+                new() { Phone = "j", Grapheme = "y", Enabled = true },
                 new() { Phone = "aː", Grapheme = "aa", Enabled = true },
                 new() { Phone = "oː", Grapheme = "oo", Enabled = true },
                 new() { Phone = "uː", Grapheme = "uu", Enabled = true },
@@ -1038,7 +1114,7 @@ public static class ProjectFactory
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
                 MorphologyRealizerId = "standard-morphology",
-                OrthographyRendererId = "morphophonemic-orthography",
+                OrthographyRendererId = "standard-orthography",
                 EnabledPhonoPluginRules = new()
             }
         };
@@ -1046,7 +1122,7 @@ public static class ProjectFactory
 
     public static LanguageProject CreateTurkishPresetProject()
     {
-        var consonants = new[] { "p", "b", "t", "d", "k", "g", "tʃ", "dʒ", "f", "v", "s", "z", "ʃ", "ʒ", "h", "m", "n", "l", "ɫ", "ɾ", "j" };
+        var consonants = new[] { "p", "b", "t", "d", "k", "g", "c", "ɟ", "ɰ", "tʃ", "dʒ", "f", "v", "s", "z", "ʃ", "ʒ", "h", "m", "n", "l", "ɫ", "ɾ", "j" };
         var vowels = new[] { "a", "e", "ɯ", "i", "o", "ø", "u", "y" };
         var phonemes = consonants.Select(c => CreatePhoneme(c, "C")).Concat(vowels.Select(v => CreatePhoneme(v, "V"))).ToList();
         return new LanguageProject
@@ -1065,8 +1141,8 @@ public static class ProjectFactory
             },
             Phonotactics = new PhonotacticsConfig
             {
-                AllowedOnsets = new() { "p", "b", "t", "d", "k", "g", "tʃ", "dʒ", "f", "v", "s", "z", "ʃ", "h", "m", "n", "l", "ɾ", "j" },
-                AllowedCodas = new() { "p", "t", "k", "tʃ", "f", "s", "ʃ", "h", "m", "n", "l", "ɾ", "j", "st", "lt", "rt", "nt" },
+                AllowedOnsets = new() { "p", "b", "t", "d", "k", "g", "c", "ɟ", "tʃ", "dʒ", "f", "v", "s", "z", "ʃ", "h", "m", "n", "l", "ɾ", "j" },
+                AllowedCodas = new() { "p", "t", "k", "c", "ɰ", "tʃ", "f", "s", "ʃ", "h", "m", "n", "l", "ɾ", "j", "st", "lt", "rt", "nt" },
                 MaxOnsetCluster = 1,
                 MaxCodaCluster = 2,
                 ForbiddenPatterns = new()
@@ -1076,7 +1152,8 @@ public static class ProjectFactory
             PhonologyRules = new()
             {
                 new() { Name = "2-way Backness Harmony", Target = "e", Replacement = "[αback]", PrevPhone = "C", NextPhone = null, Condition = "", Enabled = true },
-                new() { Name = "4-way Backness+Rounding Harmony", Target = "i", Replacement = "[αback, αround]", PrevPhone = "C", NextPhone = null, Condition = "", Enabled = true }
+                new() { Name = "4-way Backness+Rounding Harmony", Target = "i", Replacement = "[αback, αround]", PrevPhone = "C", NextPhone = null, Condition = "", Enabled = true },
+                new() { Name = "Intervocalic /k/ softening", Target = "k", Replacement = "ɰ", PrevPhone = "V", NextPhone = "V", Condition = "", Enabled = true }
             },
             Lexemes = new()
             {
@@ -1098,9 +1175,9 @@ public static class ProjectFactory
                 new() { Lemma = "güzel", Pos = "ADJ", UR = "ɟ y z e l", Spelling = "güzel" },
                 new() { Lemma = "içinde", Pos = "PREP", UR = "i tʃ i n d e", Spelling = "içinde" },
                 new() { Lemma = "ve", Pos = "CONJ", UR = "v e", Spelling = "ve" },
-                new() { Lemma = "ben", Pos = "PRON", UR = "b e n", Spelling = "ben" },
-                new() { Lemma = "o", Pos = "PRON", UR = "o", Spelling = "o" },
-                new() { Lemma = "onlar", Pos = "PRON", UR = "o n l a ɾ", Spelling = "onlar" }
+                new() { Lemma = "ben", Pos = "PRON", UR = "b e n", Spelling = "ben", SemanticTags = ["pron:1sg", "animate", "human"] },
+                new() { Lemma = "o", Pos = "PRON", UR = "o", Spelling = "o", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "onlar", Pos = "PRON", UR = "o n l a ɾ", Spelling = "onlar", SemanticTags = ["pron:3pl", "animate", "human"] }
             },
             Affixes = new()
             {
@@ -1129,11 +1206,17 @@ public static class ProjectFactory
                 new() { Phone = "ʃ", Grapheme = "ş", Enabled = true },
                 new() { Phone = "ɯ", Grapheme = "ı", Enabled = true },
                 new() { Phone = "ø", Grapheme = "ö", Enabled = true },
-                new() { Phone = "y", Grapheme = "ü", Enabled = true }
+                new() { Phone = "y", Grapheme = "ü", Enabled = true },
+                new() { Phone = "ɰ", Grapheme = "ğ", Enabled = true },
+                new() { Phone = "c", Grapheme = "k", Enabled = true },
+                new() { Phone = "ɟ", Grapheme = "g", Enabled = true },
+                new() { Phone = "ɾ", Grapheme = "r", Enabled = true },
+                new() { Phone = "ɫ", Grapheme = "l", Enabled = true },
+                new() { Phone = "j", Grapheme = "y", Enabled = true }
             },
             OrthographyExceptions = new()
             {
-                new() { Input = "bir", Output = "bir" },
+                new() { Input = "biɾ", Output = "bir" },
                 new() { Input = "bu", Output = "bu" },
                 new() { Input = "su", Output = "su" }
             },
@@ -1143,7 +1226,7 @@ public static class ProjectFactory
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
                 MorphologyRealizerId = "standard-morphology",
-                OrthographyRendererId = "morphophonemic-orthography",
+                OrthographyRendererId = "standard-orthography",
                 EnabledPhonoPluginRules = new()
             }
         };
@@ -1197,9 +1280,9 @@ public static class ProjectFactory
                 new() { Lemma = "zuri", Pos = "ADJ", UR = "z u r i", Spelling = "zuri" },
                 new() { Lemma = "katika", Pos = "PREP", UR = "k a t i k a", Spelling = "katika" },
                 new() { Lemma = "na", Pos = "CONJ", UR = "n a", Spelling = "na" },
-                new() { Lemma = "mimi", Pos = "PRON", UR = "m i m i", Spelling = "mimi" },
-                new() { Lemma = "yeye", Pos = "PRON", UR = "j e j e", Spelling = "yeye" },
-                new() { Lemma = "wao", Pos = "PRON", UR = "w a o", Spelling = "wao" }
+                new() { Lemma = "mimi", Pos = "PRON", UR = "m i m i", Spelling = "mimi", SemanticTags = ["pron:1sg", "animate", "human"] },
+                new() { Lemma = "yeye", Pos = "PRON", UR = "j e j e", Spelling = "yeye", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "wao", Pos = "PRON", UR = "w a o", Spelling = "wao", SemanticTags = ["pron:3pl", "animate", "human"] }
             },
             Affixes = new()
             {
@@ -1228,7 +1311,8 @@ public static class ProjectFactory
                 new() { Phone = "dʒ", Grapheme = "j", Enabled = true },
                 new() { Phone = "ʃ", Grapheme = "sh", Enabled = true },
                 new() { Phone = "ɲ", Grapheme = "ny", Enabled = true },
-                new() { Phone = "ŋ", Grapheme = "ng'", Enabled = true }
+                new() { Phone = "ŋ", Grapheme = "ng'", Enabled = true },
+                new() { Phone = "j", Grapheme = "y", Enabled = true }
             },
             OrthographyExceptions = new()
             {
@@ -1241,7 +1325,7 @@ public static class ProjectFactory
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
                 MorphologyRealizerId = "standard-morphology",
-                OrthographyRendererId = "morphophonemic-orthography",
+                OrthographyRendererId = "standard-orthography",
                 EnabledPhonoPluginRules = new()
             }
         };
@@ -1249,7 +1333,7 @@ public static class ProjectFactory
 
     public static LanguageProject CreateRussianPresetProject()
     {
-        var consonants = new[] { "p", "b", "t", "d", "k", "g", "f", "v", "s", "z", "ʃ", "ʒ", "ts", "tʃ", "x", "m", "n", "l", "r", "j" };
+        var consonants = new[] { "p", "b", "t", "d", "k", "g", "f", "v", "s", "z", "ʃ", "ʒ", "ts", "tʃ", "x", "m", "n", "l", "r", "j", "dʲ", "tʲ", "lʲ", "nʲ" };
         var vowels = new[] { "a", "e", "i", "o", "u", "ɨ" };
         var phonemes = consonants.Select(c => CreatePhoneme(c, "C")).Concat(vowels.Select(v => CreatePhoneme(v, "V"))).ToList();
         return new LanguageProject
@@ -1268,7 +1352,7 @@ public static class ProjectFactory
             Phonotactics = new PhonotacticsConfig
             {
                 AllowedOnsets = new() { "p", "b", "t", "d", "k", "g", "f", "v", "s", "z", "ʃ", "ʒ", "ts", "tʃ", "x", "m", "n", "l", "r", "pr", "tr", "kr", "br", "dr", "gr", "sp", "st", "sk", "str" },
-                AllowedCodas = new() { "p", "t", "k", "f", "s", "ʃ", "x", "m", "n", "l", "r", "st", "nt", "kt" },
+                AllowedCodas = new() { "p", "t", "k", "f", "s", "ʃ", "x", "m", "n", "l", "r", "dʲ", "tʲ", "st", "nt", "kt" },
                 MaxOnsetCluster = 3,
                 MaxCodaCluster = 2,
                 ForbiddenPatterns = new()
@@ -1306,10 +1390,10 @@ public static class ProjectFactory
                 new() { Lemma = "s", Pos = "PREP", UR = "s", Spelling = "s" },
                 new() { Lemma = "i", Pos = "CONJ", UR = "i", Spelling = "i" },
                 new() { Lemma = "chto", Pos = "COMP", UR = "tʃ t o", Spelling = "chto" },
-                new() { Lemma = "ya", Pos = "PRON", UR = "j a", Spelling = "ya" },
-                new() { Lemma = "on", Pos = "PRON", UR = "o n", Spelling = "on" },
-                new() { Lemma = "ona", Pos = "PRON", UR = "o ˈn a", Spelling = "ona" },
-                new() { Lemma = "oni", Pos = "PRON", UR = "o ˈn i", Spelling = "oni" }
+                new() { Lemma = "ya", Pos = "PRON", UR = "j a", Spelling = "ya", SemanticTags = ["pron:1sg", "animate", "human"] },
+                new() { Lemma = "on", Pos = "PRON", UR = "o n", Spelling = "on", LexClass = "Masc", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "ona", Pos = "PRON", UR = "o ˈn a", Spelling = "ona", LexClass = "Fem", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "oni", Pos = "PRON", UR = "o ˈn i", Spelling = "oni", SemanticTags = ["pron:3pl", "animate", "human"] }
             },
             Affixes = new()
             {
@@ -1338,13 +1422,28 @@ public static class ProjectFactory
                 new() { Phone = "ts", Grapheme = "ts", Enabled = true },
                 new() { Phone = "x", Grapheme = "kh", Enabled = true },
                 new() { Phone = "ɨ", Grapheme = "y", Enabled = true },
-                new() { Phone = "j", Grapheme = "y", Enabled = true }
+                new() { Phone = "j", Grapheme = "y", Enabled = true },
+                new() { Phone = "dʲ", Grapheme = "d", Enabled = true },
+                new() { Phone = "tʲ", Grapheme = "t'", Enabled = true },
+                new() { Phone = "lʲ", Grapheme = "l'", Enabled = true },
+                new() { Phone = "nʲ", Grapheme = "n'", Enabled = true }
             },
             OrthographyExceptions = new()
             {
+                new() { Input = "etot", Output = "etot" },
+                new() { Input = "etat", Output = "etot" },
                 new() { Input = "v", Output = "v" },
+                new() { Input = "f", Output = "v" },
                 new() { Input = "s", Output = "s" },
-                new() { Input = "i", Output = "i" }
+                new() { Input = "i", Output = "i" },
+                new() { Input = "tʃelavek", Output = "chelovek" },
+                new() { Input = "sabaka", Output = "sobaka" },
+                new() { Input = "vada", Output = "voda" },
+                new() { Input = "balʲʃoj", Output = "bol'shoy" },
+                new() { Input = "idʲot", Output = "idyot" },
+                new() { Input = "pjot", Output = "pyot" },
+                new() { Input = "ana", Output = "ona" },
+                new() { Input = "ani", Output = "oni" }
             },
             Capitalization = CapitalizationMode.SentenceInitial,
             WritingSystem = WritingSystemEngine.CreateForLanguage("russian"),
@@ -1352,7 +1451,7 @@ public static class ProjectFactory
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
                 MorphologyRealizerId = "standard-morphology",
-                OrthographyRendererId = "morphophonemic-orthography",
+                OrthographyRendererId = "standard-orthography",
                 EnabledPhonoPluginRules = new()
             }
         };
@@ -1415,9 +1514,9 @@ public static class ProjectFactory
                 new() { Lemma = "dengan", Pos = "PREP", UR = "d ə ŋ a n", Spelling = "dengan" },
                 new() { Lemma = "dan", Pos = "CONJ", UR = "d a n", Spelling = "dan" },
                 new() { Lemma = "bahwa", Pos = "COMP", UR = "b a h w a", Spelling = "bahwa" },
-                new() { Lemma = "saya", Pos = "PRON", UR = "s a j a", Spelling = "saya" },
-                new() { Lemma = "dia", Pos = "PRON", UR = "d i a", Spelling = "dia" },
-                new() { Lemma = "mereka", Pos = "PRON", UR = "m ə r e k a", Spelling = "mereka" }
+                new() { Lemma = "saya", Pos = "PRON", UR = "s a j a", Spelling = "saya", SemanticTags = ["pron:1sg", "animate", "human"] },
+                new() { Lemma = "dia", Pos = "PRON", UR = "d i a", Spelling = "dia", SemanticTags = ["pron:3sg", "animate", "human"] },
+                new() { Lemma = "mereka", Pos = "PRON", UR = "m ə r e k a", Spelling = "mereka", SemanticTags = ["pron:3pl", "animate", "human"] }
             },
             Affixes = new()
             {
@@ -1445,7 +1544,9 @@ public static class ProjectFactory
                 new() { Phone = "ɲ", Grapheme = "ny", Enabled = true },
                 new() { Phone = "ŋ", Grapheme = "ng", Enabled = true },
                 new() { Phone = "ʃ", Grapheme = "sy", Enabled = true },
-                new() { Phone = "x", Grapheme = "kh", Enabled = true }
+                new() { Phone = "x", Grapheme = "kh", Enabled = true },
+                new() { Phone = "ə", Grapheme = "e", Enabled = true },
+                new() { Phone = "j", Grapheme = "y", Enabled = true }
             },
             OrthographyExceptions = new()
             {
@@ -1460,7 +1561,7 @@ public static class ProjectFactory
             {
                 SyntaxGeneratorId = "phrase-structure-syntax",
                 MorphologyRealizerId = "standard-morphology",
-                OrthographyRendererId = "morphophonemic-orthography",
+                OrthographyRendererId = "standard-orthography",
                 EnabledPhonoPluginRules = new()
             }
         };

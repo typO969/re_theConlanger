@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { DiscourseResult, LanguageProjectState } from '../core/types';
 import { buildEngineFromState } from '../core/languageEngine';
 import { RNG } from '../core/rng';
 import { downloadTextFile } from '../core/download';
+import { exportShapedSvg, runShapingGraph, tokenizeRawInput } from '../core/writingSystem';
 
 interface OutputTabProps {
   state: LanguageProjectState;
@@ -27,6 +28,21 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
   const [usePronouns, setUsePronouns] = useState(true);
   const [useConnectives, setUseConnectives] = useState(true);
   const [discourseResult, setDiscourseResult] = useState<DiscourseResult | null>(null);
+  const [renderInScript, setRenderInScript] = useState(true);
+  const [selectedSampleIdx, setSelectedSampleIdx] = useState(0);
+
+  const scriptPreviewText = useMemo(() => {
+    if (samples.length > 0) {
+      return samples[Math.min(selectedSampleIdx, samples.length - 1)] ?? samples[0];
+    }
+    return discourseResult?.sentences[0]?.written ?? '';
+  }, [samples, selectedSampleIdx, discourseResult]);
+
+  const shapedScript = useMemo(() => {
+    if (!renderInScript || !scriptPreviewText.trim()) return null;
+    const tokens = tokenizeRawInput(scriptPreviewText, Object.keys(state.WritingSystem.glyphs));
+    return runShapingGraph(tokens, state.WritingSystem);
+  }, [renderInScript, scriptPreviewText, state.WritingSystem]);
 
   const generate = () => {
     const engine = buildEngineFromState(state);
@@ -210,10 +226,97 @@ export const OutputTab: React.FC<OutputTabProps> = ({ state }) => {
             <div className="p-3 text-sm text-slate-400">No generated samples yet.</div>
           ) : (
             samples.map((s, idx) => (
-              <div key={idx} className="px-3 py-1.5 text-sm font-mono">
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setSelectedSampleIdx(idx)}
+                className={`w-full text-left px-3 py-1.5 text-sm font-mono transition-colors ${
+                  idx === selectedSampleIdx ? 'bg-indigo-50 text-indigo-950' : 'hover:bg-slate-50'
+                }`}
+              >
                 {s}
-              </div>
+              </button>
             ))
+          )}
+        </div>
+
+        <div className="border border-slate-300 bg-white rounded p-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold uppercase tracking-wide text-slate-700">
+                Active Writing System Render
+              </span>
+              <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-800 font-medium">
+                {state.WritingSystem.name} ({state.WritingSystem.flowDirection})
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={renderInScript}
+                  onChange={(e) => setRenderInScript(e.target.checked)}
+                />
+                <span>Render in Active Script</span>
+              </label>
+              <button
+                type="button"
+                disabled={!shapedScript}
+                onClick={() =>
+                  shapedScript &&
+                  downloadTextFile(
+                    `${state.Name || 'output'}-script.svg`,
+                    exportShapedSvg(shapedScript, state.WritingSystem),
+                    'image/svg+xml;charset=utf-8'
+                  )
+                }
+                className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 border border-slate-300 rounded disabled:opacity-40"
+              >
+                Export Script SVG
+              </button>
+            </div>
+          </div>
+
+          {renderInScript && shapedScript ? (
+            <div className="border border-slate-200 bg-slate-50 rounded overflow-x-auto max-h-56">
+              <svg
+                viewBox={`0 0 ${shapedScript.bounds.width} ${shapedScript.bounds.height}`}
+                className="w-full min-h-[140px] max-h-52 bg-white"
+              >
+                {shapedScript.glyphs.map((g) => (
+                  <g
+                    key={g.index}
+                    transform={`translate(${g.x}, ${g.y}) scale(${state.WritingSystem.glyphScale || 0.72})`}
+                  >
+                    <path
+                      d={g.svgPath}
+                      fill="none"
+                      stroke="#0f172a"
+                      strokeWidth="4.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {g.extraPaths.map((ep, idx) => (
+                      <path
+                        key={idx}
+                        d={ep}
+                        fill="none"
+                        stroke="#334155"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    ))}
+                  </g>
+                ))}
+              </svg>
+            </div>
+          ) : (
+            <div className="text-xs text-slate-400 py-2">
+              {renderInScript
+                ? 'Generate sentences or a discourse paragraph above to preview them rendered in the active writing system.'
+                : 'Script preview paused.'}
+            </div>
           )}
         </div>
       </div>

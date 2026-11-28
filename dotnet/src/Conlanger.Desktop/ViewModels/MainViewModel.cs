@@ -200,6 +200,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _newFeaturicPath = "M 48 8 A 3 3 0 1 0 54 8 A 3 3 0 1 0 48 8";
     private double _canvasWidth = 760;
     private double _canvasHeight = 340;
+    private string _selectedGlyphVariant = "Default";
 
     // Output tab state
     private int _sampleCount = 5;
@@ -210,6 +211,9 @@ public sealed class MainViewModel : ViewModelBase
     private string _outputMoodFilter = "Decl";
     private string _outputVoiceFilter = "Auto";
     private string _batchOutputText = "";
+    private double _outputScriptCanvasWidth = 640;
+    private double _outputScriptCanvasHeight = 140;
+    private string _outputScriptSource = "";
     private int _wordCount = 15;
     private int _syllablesPerWord = 2;
     private string _generatedWordsText = "";
@@ -373,6 +377,7 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<OrthExceptionEntry> OrthographyExceptions { get; } = new();
     public ObservableCollection<DiagnosticIssue> Diagnostics { get; } = new();
     public ObservableCollection<RenderedGlyphItem> ShapedGlyphs { get; } = new();
+    public ObservableCollection<RenderedGlyphItem> OutputScriptGlyphs { get; } = new();
     public ObservableCollection<ShapingTraceEntry> ShapingTrace { get; } = new();
     public ObservableCollection<string> GlyphIds { get; } = new();
     public ObservableCollection<FeaturicAssemblyRule> FeaturicRules { get; } = new();
@@ -458,6 +463,7 @@ public sealed class MainViewModel : ViewModelBase
     public IReadOnlyList<string> SyntaxVoiceOptions { get; } = ["Auto", "Active", "Passive"];
     public IReadOnlyList<string> SyntaxTenseOptions { get; } = ["Pres", "Past", "Fut"];
     public IReadOnlyList<string> FeaturicContexts { get; } = ["any", "initial", "medial", "final"];
+    public IReadOnlyList<string> GlyphVariantOptions { get; } = ["Default", "Initial", "Medial", "Final"];
 
     // Toolbar properties
     public string ProjectName
@@ -749,12 +755,28 @@ public sealed class MainViewModel : ViewModelBase
             if (SetField(ref _selectedGlyphId, next))
             {
                 OnPropertyChanged(nameof(SelectedGlyphSvgPath));
+                OnPropertyChanged(nameof(SelectedGlyphInitialPath));
+                OnPropertyChanged(nameof(SelectedGlyphMedialPath));
+                OnPropertyChanged(nameof(SelectedGlyphFinalPath));
                 OnPropertyChanged(nameof(SelectedGlyphPreviewGeometry));
                 OnPropertyChanged(nameof(SelectedGlyphEnterX));
                 OnPropertyChanged(nameof(SelectedGlyphEnterY));
                 OnPropertyChanged(nameof(SelectedGlyphExitX));
                 OnPropertyChanged(nameof(SelectedGlyphExitY));
+                OnPropertyChanged(nameof(SelectedGlyphAdvanceWidth));
+                OnPropertyChanged(nameof(SelectedGlyphAdvanceHeight));
             }
+        }
+    }
+
+    public string SelectedGlyphVariant
+    {
+        get => _selectedGlyphVariant;
+        set
+        {
+            var next = string.IsNullOrWhiteSpace(value) ? "Default" : value;
+            if (SetField(ref _selectedGlyphVariant, next))
+                OnPropertyChanged(nameof(SelectedGlyphPreviewGeometry));
         }
     }
 
@@ -771,6 +793,52 @@ public sealed class MainViewModel : ViewModelBase
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedGlyphPreviewGeometry));
             RefreshWritingCanvas();
+            RefreshOutputScriptPreview();
+            ScheduleAutosave();
+        }
+    }
+
+    public string SelectedGlyphInitialPath
+    {
+        get => ActiveGlyph?.InitialPath ?? "";
+        set
+        {
+            if (ActiveGlyph is null) return;
+            ActiveGlyph.InitialPath = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedGlyphPreviewGeometry));
+            RefreshWritingCanvas();
+            RefreshOutputScriptPreview();
+            ScheduleAutosave();
+        }
+    }
+
+    public string SelectedGlyphMedialPath
+    {
+        get => ActiveGlyph?.MedialPath ?? "";
+        set
+        {
+            if (ActiveGlyph is null) return;
+            ActiveGlyph.MedialPath = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedGlyphPreviewGeometry));
+            RefreshWritingCanvas();
+            RefreshOutputScriptPreview();
+            ScheduleAutosave();
+        }
+    }
+
+    public string SelectedGlyphFinalPath
+    {
+        get => ActiveGlyph?.FinalPath ?? "";
+        set
+        {
+            if (ActiveGlyph is null) return;
+            ActiveGlyph.FinalPath = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedGlyphPreviewGeometry));
+            RefreshWritingCanvas();
+            RefreshOutputScriptPreview();
             ScheduleAutosave();
         }
     }
@@ -779,7 +847,14 @@ public sealed class MainViewModel : ViewModelBase
     {
         get
         {
-            try { return string.IsNullOrWhiteSpace(SelectedGlyphSvgPath) ? Geometry.Empty : Geometry.Parse(SelectedGlyphSvgPath); }
+            var rawPath = SelectedGlyphVariant switch
+            {
+                "Initial" when !string.IsNullOrWhiteSpace(SelectedGlyphInitialPath) => SelectedGlyphInitialPath,
+                "Medial" when !string.IsNullOrWhiteSpace(SelectedGlyphMedialPath) => SelectedGlyphMedialPath,
+                "Final" when !string.IsNullOrWhiteSpace(SelectedGlyphFinalPath) => SelectedGlyphFinalPath,
+                _ => SelectedGlyphSvgPath
+            };
+            try { return string.IsNullOrWhiteSpace(rawPath) ? Geometry.Empty : Geometry.Parse(rawPath); }
             catch { return Geometry.Empty; }
         }
     }
@@ -787,22 +862,32 @@ public sealed class MainViewModel : ViewModelBase
     public double SelectedGlyphEnterX
     {
         get => ActiveGlyph?.EnteringAnchor.X ?? 15;
-        set { if (ActiveGlyph is null) return; ActiveGlyph.EnteringAnchor = ActiveGlyph.EnteringAnchor with { X = value }; OnPropertyChanged(); RefreshWritingCanvas(); ScheduleAutosave(); }
+        set { if (ActiveGlyph is null) return; ActiveGlyph.EnteringAnchor = ActiveGlyph.EnteringAnchor with { X = value }; OnPropertyChanged(); RefreshWritingCanvas(); RefreshOutputScriptPreview(); ScheduleAutosave(); }
     }
     public double SelectedGlyphEnterY
     {
         get => ActiveGlyph?.EnteringAnchor.Y ?? 55;
-        set { if (ActiveGlyph is null) return; ActiveGlyph.EnteringAnchor = ActiveGlyph.EnteringAnchor with { Y = value }; OnPropertyChanged(); RefreshWritingCanvas(); ScheduleAutosave(); }
+        set { if (ActiveGlyph is null) return; ActiveGlyph.EnteringAnchor = ActiveGlyph.EnteringAnchor with { Y = value }; OnPropertyChanged(); RefreshWritingCanvas(); RefreshOutputScriptPreview(); ScheduleAutosave(); }
     }
     public double SelectedGlyphExitX
     {
         get => ActiveGlyph?.ExitingAnchor.X ?? 85;
-        set { if (ActiveGlyph is null) return; ActiveGlyph.ExitingAnchor = ActiveGlyph.ExitingAnchor with { X = value }; OnPropertyChanged(); RefreshWritingCanvas(); ScheduleAutosave(); }
+        set { if (ActiveGlyph is null) return; ActiveGlyph.ExitingAnchor = ActiveGlyph.ExitingAnchor with { X = value }; OnPropertyChanged(); RefreshWritingCanvas(); RefreshOutputScriptPreview(); ScheduleAutosave(); }
     }
     public double SelectedGlyphExitY
     {
         get => ActiveGlyph?.ExitingAnchor.Y ?? 55;
-        set { if (ActiveGlyph is null) return; ActiveGlyph.ExitingAnchor = ActiveGlyph.ExitingAnchor with { Y = value }; OnPropertyChanged(); RefreshWritingCanvas(); ScheduleAutosave(); }
+        set { if (ActiveGlyph is null) return; ActiveGlyph.ExitingAnchor = ActiveGlyph.ExitingAnchor with { Y = value }; OnPropertyChanged(); RefreshWritingCanvas(); RefreshOutputScriptPreview(); ScheduleAutosave(); }
+    }
+    public double SelectedGlyphAdvanceWidth
+    {
+        get => ActiveGlyph?.AdvanceWidth ?? 72;
+        set { if (ActiveGlyph is null) return; ActiveGlyph.AdvanceWidth = Math.Max(10, value); OnPropertyChanged(); RefreshWritingCanvas(); RefreshOutputScriptPreview(); ScheduleAutosave(); }
+    }
+    public double SelectedGlyphAdvanceHeight
+    {
+        get => ActiveGlyph?.AdvanceHeight ?? 76;
+        set { if (ActiveGlyph is null) return; ActiveGlyph.AdvanceHeight = Math.Max(10, value); OnPropertyChanged(); RefreshWritingCanvas(); RefreshOutputScriptPreview(); ScheduleAutosave(); }
     }
 
     public string NewGlyphId { get => _newGlyphId; set { if (SetField(ref _newGlyphId, value)) AddGlyphCommand.RaiseCanExecuteChanged(); } }
@@ -822,6 +907,9 @@ public sealed class MainViewModel : ViewModelBase
     public string OutputMoodFilter { get => _outputMoodFilter; set => SetField(ref _outputMoodFilter, value); }
     public string OutputVoiceFilter { get => _outputVoiceFilter; set => SetField(ref _outputVoiceFilter, value); }
     public string BatchOutputText { get => _batchOutputText; set => SetField(ref _batchOutputText, value); }
+    public double OutputScriptCanvasWidth { get => _outputScriptCanvasWidth; set => SetField(ref _outputScriptCanvasWidth, value); }
+    public double OutputScriptCanvasHeight { get => _outputScriptCanvasHeight; set => SetField(ref _outputScriptCanvasHeight, value); }
+    public string OutputScriptSource { get => _outputScriptSource; set => SetField(ref _outputScriptSource, value); }
     public int WordCount { get => _wordCount; set => SetField(ref _wordCount, Math.Max(1, value)); }
     public int SyllablesPerWord { get => _syllablesPerWord; set => SetField(ref _syllablesPerWord, Math.Max(1, value)); }
     public bool HyphenateSyllables
@@ -1072,6 +1160,7 @@ public sealed class MainViewModel : ViewModelBase
         RefreshInspectors();
         RefreshDiagnostics();
         if (GeneratedSentences.Count == 0) GenerateBatchSentences();
+        else RefreshOutputScriptPreview();
     }
 
     private void AddPhoneme(string kind)
@@ -1421,6 +1510,49 @@ public sealed class MainViewModel : ViewModelBase
         ReplaceCollection(ShapingTrace, result.Trace);
     }
 
+    private void RefreshOutputScriptPreview(string? sourceText = null)
+    {
+        var raw = string.IsNullOrWhiteSpace(sourceText)
+            ? (GeneratedSentences.FirstOrDefault() ?? (string.IsNullOrWhiteSpace(DiscourseParagraphText) ? ShapingInput : DiscourseParagraphText))
+            : sourceText;
+        OutputScriptSource = raw;
+
+        var tokens = WritingSystemEngine.TokenizeRawInput(raw, _project.WritingSystem.Glyphs.Keys);
+        var result = WritingSystemEngine.RunShapingGraph(tokens, _project.WritingSystem);
+        OutputScriptCanvasWidth = Math.Max(320, result.Width);
+        OutputScriptCanvasHeight = Math.Max(110, result.Height);
+        double scale = _project.WritingSystem.GlyphScale > 0 ? _project.WritingSystem.GlyphScale : 0.72;
+
+        OutputScriptGlyphs.Clear();
+        foreach (var g in result.Glyphs)
+        {
+            Geometry geom;
+            try { geom = Geometry.Parse(g.SvgPath); }
+            catch { geom = Geometry.Empty; }
+
+            var extras = new List<Geometry>();
+            foreach (var ep in g.ExtraPaths)
+            {
+                try { extras.Add(Geometry.Parse(ep)); } catch { }
+            }
+
+            OutputScriptGlyphs.Add(new RenderedGlyphItem
+            {
+                X = g.X,
+                Y = g.Y,
+                Scale = scale,
+                PathGeometry = geom,
+                ExtraGeometries = extras,
+                TokenLabel = g.Token.Id,
+                Variant = g.VariantUsed,
+                EnterX = g.EnteringWorld.X,
+                EnterY = g.EnteringWorld.Y,
+                ExitX = g.ExitingWorld.X,
+                ExitY = g.ExitingWorld.Y
+            });
+        }
+    }
+
     private void GenerateBatchSentences()
     {
         PushCollectionsBackToProject();
@@ -1442,6 +1574,7 @@ public sealed class MainViewModel : ViewModelBase
 
         ReplaceCollection(GeneratedSentences, list);
         BatchOutputText = string.Join(Environment.NewLine, list.Select((s, idx) => $"{idx + 1}. {s}"));
+        RefreshOutputScriptPreview(list.FirstOrDefault());
         StatusMessage = $"Generated {list.Count} sentence(s)";
     }
 
@@ -1867,6 +2000,7 @@ public sealed class MainViewModel : ViewModelBase
             );
             DiscourseParagraphText = res.ParagraphText;
             DiscourseEntitiesSummary = string.Join(", ", res.TrackedEntities);
+            RefreshOutputScriptPreview(res.Sentences.FirstOrDefault()?.Written);
             StatusMessage = $"Generated discourse paragraph ({res.Sentences.Count} sentences).";
         }
         catch (Exception ex)

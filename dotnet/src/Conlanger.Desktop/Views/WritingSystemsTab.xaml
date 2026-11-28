@@ -173,24 +173,43 @@
                             <Button Content="+ New Glyph" Command="{Binding AddGlyphCommand}" />
                         </StackPanel>
 
-                        <Border BorderBrush="#CBD5E1" BorderThickness="1" Background="#F8FAFC" Width="120" Height="120" HorizontalAlignment="Left" Margin="0,0,0,8">
-                            <Canvas Width="100" Height="100" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Path Data="{Binding SelectedGlyphPreviewGeometry}" Stroke="#0F172A" StrokeThickness="4.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
-                            </Canvas>
-                        </Border>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <Border BorderBrush="#CBD5E1" BorderThickness="1" Background="#F8FAFC" Width="110" Height="110" Margin="0,0,10,0">
+                                <Canvas Width="100" Height="100" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Path Data="{Binding SelectedGlyphPreviewGeometry}" Stroke="#0F172A" StrokeThickness="4.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                                </Canvas>
+                            </Border>
+                            <StackPanel VerticalAlignment="Top">
+                                <TextBlock Text="Preview Variant:" Foreground="#475569" Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding GlyphVariantOptions}" SelectedItem="{Binding SelectedGlyphVariant}" Width="110" />
+                            </StackPanel>
+                        </StackPanel>
 
-                        <TextBlock Text="SVG Path (0..100 Coordinate Box):" Foreground="#475569" Margin="0,0,0,3" />
-                        <TextBox Text="{Binding SelectedGlyphSvgPath, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Height="64" FontFamily="Consolas" Margin="0,0,0,8" />
+                        <TextBlock Text="Default SVG Path (0..100 Coordinate Box):" Foreground="#475569" Margin="0,0,0,3" />
+                        <TextBox Text="{Binding SelectedGlyphSvgPath, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Height="56" FontFamily="Consolas" Margin="0,0,0,6" />
+
+                        <TextBlock Text="Initial Path (optional override):" Foreground="#475569" Margin="0,0,0,2" />
+                        <TextBox Text="{Binding SelectedGlyphInitialPath, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,6" />
+
+                        <TextBlock Text="Medial Path (optional override):" Foreground="#475569" Margin="0,0,0,2" />
+                        <TextBox Text="{Binding SelectedGlyphMedialPath, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,6" />
+
+                        <TextBlock Text="Final Path (optional override):" Foreground="#475569" Margin="0,0,0,2" />
+                        <TextBox Text="{Binding SelectedGlyphFinalPath, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,8" />
 
                         <WrapPanel Orientation="Horizontal">
-                            <TextBlock Text="Enter X:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <TextBox Text="{Binding SelectedGlyphEnterX, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,10,0" />
-                            <TextBlock Text="Enter Y:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <TextBox Text="{Binding SelectedGlyphEnterY, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,12,0" />
-                            <TextBlock Text="Exit X:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <TextBox Text="{Binding SelectedGlyphExitX, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,10,0" />
-                            <TextBlock Text="Exit Y:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <TextBox Text="{Binding SelectedGlyphExitY, UpdateSourceTrigger=LostFocus}" Width="46" />
+                            <TextBlock Text="Enter X:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                            <TextBox Text="{Binding SelectedGlyphEnterX, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,10,4" />
+                            <TextBlock Text="Enter Y:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                            <TextBox Text="{Binding SelectedGlyphEnterY, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,12,4" />
+                            <TextBlock Text="Exit X:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                            <TextBox Text="{Binding SelectedGlyphExitX, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,10,4" />
+                            <TextBlock Text="Exit Y:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                            <TextBox Text="{Binding SelectedGlyphExitY, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,12,4" />
+                            <TextBlock Text="Adv W:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                            <TextBox Text="{Binding SelectedGlyphAdvanceWidth, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,10,4" />
+                            <TextBlock Text="Adv H:" VerticalAlignment="Center" Margin="0,0,4,4" />
+                            <TextBox Text="{Binding SelectedGlyphAdvanceHeight, UpdateSourceTrigger=LostFocus}" Width="46" Margin="0,0,0,4" />
                         </WrapPanel>
                     </StackPanel>
                 </ScrollViewer>

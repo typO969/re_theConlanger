@@ -533,8 +533,16 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
             {
                 var pron = Pick(eligibleProns)!;
                 var lower = pron.Lemma.ToLowerInvariant();
-                string person = lower is "i" or "we" ? "1" : lower == "you" ? "2" : "3";
-                string number = constrainedNumber ?? (lower is "they" or "we" or "you" ? "Pl" : "Sing");
+                bool HasPronTag(string tag) => pron.SemanticTags?.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)) == true;
+                string person = HasPronTag("pron:1sg") || HasPronTag("pron:1pl") || lower is "i" or "we"
+                    ? "1"
+                    : HasPronTag("pron:2sg") || HasPronTag("pron:2pl") || lower == "you"
+                        ? "2"
+                        : "3";
+                string number = constrainedNumber ?? (
+                    HasPronTag("pron:1pl") || HasPronTag("pron:2pl") || HasPronTag("pron:3pl") || lower is "they" or "we" or "you"
+                        ? "Pl"
+                        : "Sing");
                 string? pronClass = string.IsNullOrWhiteSpace(pron.LexClass) ? null : pron.LexClass!.Trim();
                 var pFeats = new List<Feat>
                 {
@@ -558,10 +566,26 @@ public sealed class PhraseStructureSyntaxGenerator : ConfigurableSyntaxGenerator
             SyntaxNode? detNode = null;
             if (dets.Count > 0)
             {
-                bool isMass = string.Equals(nounLemma, "water", StringComparison.OrdinalIgnoreCase);
+                bool isMass = string.Equals(nounLemma, "water", StringComparison.OrdinalIgnoreCase)
+                    || (noun?.SemanticTags?.Any(t => string.Equals(t, "mass", StringComparison.OrdinalIgnoreCase)) == true);
                 var compatDets = string.Equals(num, "Pl", StringComparison.OrdinalIgnoreCase) || isMass
                     ? dets.Where(d => !d.Lemma.Equals("a", StringComparison.OrdinalIgnoreCase) && !d.Lemma.Equals("an", StringComparison.OrdinalIgnoreCase)).ToList()
                     : dets;
+
+                if (!string.IsNullOrEmpty(headClass) && compatDets.Count > 0)
+                {
+                    var classMatched = compatDets.Where(d => string.Equals(d.LexClass?.Trim(), headClass, StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (classMatched.Count > 0)
+                    {
+                        compatDets = classMatched;
+                    }
+                    else
+                    {
+                        var classless = compatDets.Where(d => string.IsNullOrWhiteSpace(d.LexClass)).ToList();
+                        if (classless.Count > 0) compatDets = classless;
+                    }
+                }
+
                 var det = Pick(compatDets.Count > 0 ? compatDets : dets);
                 if (det is not null)
                 {
